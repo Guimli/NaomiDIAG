@@ -108,23 +108,12 @@ u32 maple_eeprom_read(u32 port, u8 *out128)
 
     pay = 0x00000001;                       /* start EEPROM -> MIE read */
     u32 hdr = maple_txn(port, 0x86, 1, &pay);
-    scif_puts("  [mie] start-read resp hdr ");
-    scif_puthex(hdr);
-    scif_puts(" w1 ");
-    scif_puthex(rx[1]);
-    scif_puts("\n");
+    (void)hdr;
 
     for (u32 tries = 0; tries < 50; tries++) {
         delay_ms(10);
         pay = 0x00000003;                   /* fetch read result */
         hdr = maple_txn(port, 0x86, 1, &pay);
-        if (tries < 1) {
-            scif_puts("  [mie] fetch resp hdr ");
-            scif_puthex(hdr);
-            scif_puts(" w1 ");
-            scif_puthex(rx[1]);
-            scif_puts("\n");
-        }
         if ((hdr & 0xFF) == 0x87 && ((hdr >> 24) & 0xFF) >= 32) {
             /* fetch response: 32 payload words = the 128 EEPROM bytes */
             const volatile u8 *src = (const volatile u8 *)&rx[1];

@@ -57,6 +57,7 @@ CLIPS = [
     ("elan",        "Mémoire du processeur géométrique."),
     ("eeprom",      "Mémoire des réglages."),
     ("x76",         "Puce de sécurité cartouche."),
+    ("cart",        "Cartouche de jeu."),
 ]
 
 RATE = 22050

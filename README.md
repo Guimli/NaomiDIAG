@@ -34,6 +34,25 @@ nouveau canal de sortie qui devient disponible.
 - Validation MAME : `-wavwrite` + analyse RMS → salves de parole aux bons
   instants, sans chevauchement.
 
+### Nouveau en v0.7 : test du contenu de la cartouche (SHA1 par IC)
+- Base embarquée des **192 jeux cartouche Naomi/Naomi 2 connus** (2298 IC),
+  générée depuis `mame -listxml` (`tools/gen_cartdb.py` → `src/cartdb.h`,
+  ~90 Ko de données : titre + {offset, taille, **SHA1**, sérigraphie IC}).
+- Lecture PIO du ROM board (G1, 0x5F7000/04/08) en **mode linéaire brut**
+  (bit 31 = auto-incrément, bit 29 = adressage linéaire des cartes M2 —
+  sinon remappage par fenêtres 4 Mo ; bit 30 = 0 → contenu chiffré brut,
+  identique aux dumps MAME). SHA-1 maison (`sha1.c`, 32 bits).
+- Déroulé : en-tête cartouche affiché (magie « NAOMI » + titre ASCII) →
+  identification du jeu par points de contrôle SHA1 sur la 1ʳᵉ IC →
+  vérification **IC par IC** du jeu identifié → « <Titre> : ic22 GOOD,
+  ic1 GOOD… » ou l'IC fautive nommée par sa sérigraphie.
+- Validé sous MAME : Cannon Spike (carte M2 chiffrée) et Power Stone 2
+  (non chiffrée) → identifiés, toutes IC GOOD ; détection BAD éprouvée
+  (IC corrompue → FAIL + IC nommée). Absence de cartouche = normal.
+- Garde-fou de build : refus si l'image dépasse 2 Mo (évite une
+  troncature silencieuse). La ROM est à 98 % — la prochaine grosse
+  addition imposera de compresser l'audio (ADPCM AICA, ÷4).
+
 ### Nouveau en v0.6b : auto-test du MIE (voie A — à retravailler)
 - Commande 0x84 du noyau d'usine → réponse 0x85, mot de statut 0 = OK :
   le Z80 du MIE exécute son propre test ROM+RAM interne.

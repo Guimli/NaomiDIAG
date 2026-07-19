@@ -10,3 +10,11 @@ replay_*.wav
 snap/
 tools/.venv/
 tools/voices/
+id_probe.lua
+n2_probe.lua
+n2_dev.lua
+testmode*.lua
+diag_snap*.lua
+elan_fault.lua
+sram_fault.lua
+fault_dbg.lua

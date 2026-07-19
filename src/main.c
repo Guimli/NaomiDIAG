@@ -21,7 +21,10 @@
 #include "dimm.h"
 #include "maple.h"
 #include "board.h"
+#include "cart.h"
+#include "sha1.h"
 #include "audio_clips.h"
+#include "cartdb.h"
 
 #ifndef QUICK_TEST
 #define QUICK_TEST 0
@@ -685,6 +688,137 @@ static void test_x76(void)
     say(CLIP_OK, REPORT_GAP_MS);
 }
 
+/* ------------------------------------------------------------------ */
+/* Cartridge content test: identify the game by streaming SHA-1
+ * checkpoints over the first IC, then verify every IC of the matched
+ * game against the embedded database (per-IC SHA1s from MAME). */
+
+static u32 sha1_ic(u32 offset, u32 size, u8 out[20])
+{
+    sha1_ctx c;
+    u8 buf[512];
+    sha1_init(&c);
+    cart_seek(offset);
+    for (u32 done = 0; done < size; done += sizeof buf) {
+        for (u32 i = 0; i < sizeof buf; i += 2) {
+            u16 w = CART_ROM_DATA;
+            buf[i] = (u8)w;
+            buf[i + 1] = (u8)(w >> 8);
+        }
+        sha1_update(&c, buf, sizeof buf);
+        if ((done & 0x3FFFFF) == 0)
+            scif_putc('.');
+    }
+    sha1_final(&c, out);
+    return 0;
+}
+
+static u32 sha1_eq(const u8 *a, const u8 *b)
+{
+    for (u32 i = 0; i < 20; i++)
+        if (a[i] != b[i])
+            return 0;
+    return 1;
+}
+
+static void test_cartridge(void)
+{
+    if (!cart_present()) {
+        log_result("Cartridge: not present", CLIP_NONE, T_OK, 0, 0);
+        say(CLIP_CART, 250);
+        say(CLIP_ABSENT, REPORT_GAP_MS);
+        return;
+    }
+
+    /* header peek: "NAOMI" magic + ASCII titles live in the first bytes */
+    u8 hdr[80];
+    cart_read(0, hdr, sizeof hdr);
+    scif_puts("\nCartridge header: \"");
+    for (u32 i = 0; i < 64; i++)
+        scif_putc((hdr[i] >= 32 && hdr[i] < 127) ? (char)hdr[i] : '.');
+    scif_puts("\"\n");
+
+    /* identify: stream first IC, snapshot SHA1 at each known size */
+    sha1_ctx c;
+    u8 buf[512], digest[20];
+    u32 game = 0xFFFFFFFF;
+    sha1_init(&c);
+    cart_seek(0);
+    u32 done = 0;
+    scif_puts("Identifying");
+    for (u32 s = 0; s < CARTDB_NFIRST && game == 0xFFFFFFFF; s++) {
+        u32 target = cartdb_first_sizes[s];
+        while (done < target) {
+            for (u32 i = 0; i < sizeof buf; i += 2) {
+                u16 w = CART_ROM_DATA;
+                buf[i] = (u8)w;
+                buf[i + 1] = (u8)(w >> 8);
+            }
+            sha1_update(&c, buf, sizeof buf);
+            done += sizeof buf;
+            if ((done & 0x3FFFFF) == 0)
+                scif_putc('.');
+        }
+        sha1_ctx snap;
+        {
+            const u8 *s = (const u8 *)&c;
+            u8 *d = (u8 *)&snap;
+            for (u32 i = 0; i < sizeof c; i++)
+                d[i] = s[i];
+        }
+        sha1_final(&snap, digest);
+        for (u32 g = 0; g < CARTDB_NGAMES; g++) {
+            u32 f = cartdb_game_first[g];
+            if (cartdb_ic_off[f] == 0 && cartdb_ic_size[f] == target &&
+                sha1_eq(digest, cartdb_sha1[f])) {
+                game = g;
+                break;
+            }
+        }
+    }
+    scif_puts("\n");
+
+    if (game == 0xFFFFFFFF) {
+        scif_puts("  cartridge not in database (unknown or corrupted"
+                  " first IC)\n");
+        log_result("Cartridge: unknown content", CLIP_CART, T_FAIL, 0, 0);
+        return;
+    }
+
+    scif_puts("  identified: ");
+    scif_puts(cartdb_title[game]);
+    scif_puts("\n");
+
+    /* verify every IC of the identified game */
+    u32 nics = cartdb_game_nics[game];
+    u32 base = cartdb_game_first[game];
+    u32 bad = 0;
+#if QUICK_TEST
+    if (nics > 2)
+        nics = 2;                       /* emulator bring-up: 2 ICs only */
+#endif
+    for (u32 i = 0; i < nics; i++) {
+        u32 idx = base + i;
+        scif_puts("  ");
+        scif_puts(cartdb_ic_name[idx]);   /* name already includes "ic" */
+        scif_putc(' ');
+        sha1_ic(cartdb_ic_off[idx], cartdb_ic_size[idx], digest);
+        if (sha1_eq(digest, cartdb_sha1[idx])) {
+            scif_puts(" GOOD\n");
+        } else {
+            scif_puts(" BAD\n");
+            bad++;
+        }
+    }
+    if (bad) {
+        scif_puts("  ");
+        scif_putdec(bad);
+        scif_puts(" cartridge IC(s) DEFECTIVE (see list above)\n");
+    }
+    log_result("Cartridge content (SHA1 per IC)", CLIP_CART,
+               bad ? T_FAIL : T_OK, 0, 0);
+}
+
 /* spoken replay of everything acquired before audio came up */
 static void audio_replay_log(void)
 {
@@ -737,6 +871,7 @@ void cmain(void)
     test_settings_eeprom();
     test_serial_eeprom();
     test_x76();
+    test_cartridge();
 
     scif_puts("\n==== SUMMARY ====\n");
     for (u32 i = 0; i < g_log_n; i++) {
