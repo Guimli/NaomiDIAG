@@ -55,6 +55,8 @@ CLIPS = [
     ("board_unk",   "Carte non identifiée."),
     ("vram_b",      "Seconde mémoire vidéo."),
     ("elan",        "Mémoire du processeur géométrique."),
+    ("eeprom",      "Mémoire des réglages."),
+    ("x76",         "Puce de sécurité cartouche."),
 ]
 
 RATE = 22050

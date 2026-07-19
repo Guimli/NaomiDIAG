@@ -3,6 +3,7 @@
  * Register/protocol references: KallistiOS maple driver, MAME maple-dc. */
 #include "maple.h"
 #include "timer.h"
+#include "scif.h"
 
 #define SB_MDSTAR   REG32(0xA05F6C04)   /* DMA descriptor table (phys)   */
 #define SB_MDTSEL   REG32(0xA05F6C10)   /* trigger: 0 = software         */
@@ -17,7 +18,7 @@
 #define MAPLE_RX_P2     0xAC0FF100u
 #define MAPLE_RX_PHY    0x0C0FF100u
 
-static u32 maple_txn(u32 port, u32 cmd)
+static u32 maple_txn(u32 port, u32 cmd, u32 nwords, const u32 *payload)
 {
     volatile u32 *desc = (volatile u32 *)MAPLE_DESC_P2;
     volatile u32 *rx   = (volatile u32 *)MAPLE_RX_P2;
@@ -25,12 +26,14 @@ static u32 maple_txn(u32 port, u32 cmd)
     for (int i = 0; i < 64; i++)
         rx[i] = 0xDEADDEAD;
 
-    /* dst = port main device (port<<6|0x20), src = host, no payload */
+    /* dst = port main device (port<<6|0x20), src = host */
     u32 dst = (port << 6) | 0x20;
     u32 src = (port << 6);
-    desc[0] = 0x80000000 | (port << 16);        /* last, len=0 (1 word)  */
+    desc[0] = 0x80000000 | (port << 16) | nwords;   /* last, frame words-1 */
     desc[1] = MAPLE_RX_PHY;
-    desc[2] = (0u << 24) | (src << 16) | (dst << 8) | (cmd & 0xFF);
+    desc[2] = (nwords << 24) | (src << 16) | (dst << 8) | (cmd & 0xFF);
+    for (u32 i = 0; i < nwords; i++)
+        desc[3 + i] = payload[i];
 
     SB_MDTSEL = 0;
     SB_MDEN   = 1;
@@ -58,7 +61,7 @@ void maple_scan(maple_result *mr)
 
     for (u32 port = 0; port < 4; port++) {
         /* MIE protocol (libnaomi): 0x82 = version request -> 0x83 */
-        u32 hdr = maple_txn(port, 0x82);
+        u32 hdr = maple_txn(port, 0x82, 0, 0);
         u32 cmd = hdr & 0xFF;
         if (hdr == 0xFFFFFFFF || hdr == 0xDEADDEAD || cmd == 0xFF)
             continue;                            /* no device / timeout  */
@@ -79,4 +82,39 @@ void maple_scan(maple_result *mr)
         mr->id[o] = 0;
         return;
     }
+}
+
+u32 maple_eeprom_read(u32 port, u8 *out128)
+{
+    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    u32 pay;
+
+    pay = 0x00000001;                       /* start EEPROM -> MIE read */
+    u32 hdr = maple_txn(port, 0x86, 1, &pay);
+    scif_puts("  [mie] start-read resp hdr ");
+    scif_puthex(hdr);
+    scif_puts(" w1 ");
+    scif_puthex(rx[1]);
+    scif_puts("\n");
+
+    for (u32 tries = 0; tries < 50; tries++) {
+        delay_ms(10);
+        pay = 0x00000003;                   /* fetch read result */
+        hdr = maple_txn(port, 0x86, 1, &pay);
+        if (tries < 1) {
+            scif_puts("  [mie] fetch resp hdr ");
+            scif_puthex(hdr);
+            scif_puts(" w1 ");
+            scif_puthex(rx[1]);
+            scif_puts("\n");
+        }
+        if ((hdr & 0xFF) == 0x87 && ((hdr >> 24) & 0xFF) >= 32) {
+            /* fetch response: 32 payload words = the 128 EEPROM bytes */
+            const volatile u8 *src = (const volatile u8 *)&rx[1];
+            for (u32 i = 0; i < 128; i++)
+                out128[i] = src[i];
+            return 0;
+        }
+    }
+    return 1;
 }

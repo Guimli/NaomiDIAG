@@ -34,6 +34,22 @@ nouveau canal de sortie qui devient disponible.
 - Validation MAME : `-wavwrite` + analyse RMS → salves de parole aux bons
   instants, sans chevauchement.
 
+### Nouveau en v0.6 : EEPROM et puce de sécurité
+- **93C46 « numéro de série »** (GPIO SH4, PDTRA : DI=b3, DO=b4, CS=b5,
+  CLK=b2, PORTEN de BCR2 requis, PCTRA=0x450) : lecture directe des 128
+  octets validée à l'octet près sous MAME + test de plausibilité du
+  contenu (ASCII, ni tout-0 ni tout-1).
+- **X76F100** (sécurité cartouche, bit-bang via BOARDID 0x5F7078/7C) :
+  présence par response-to-reset (RTR lu : 0xAB540032) ; absence normale
+  sans cartouche.
+- **93C46 « réglages » derrière le MIE** : le firmware d'usine 315-6146
+  n'a pas de handler 0x86 — le BIOS comme libnaomi uploadent un programme
+  Z80 dans le MIE pour y accéder. Documenté, skip propre, travail futur
+  (upload de code MIE). CRC SEGA implémenté et validé (sega_eeprom_crc,
+  algo netboot, vérifié sur une EEPROM écrite par le BIOS).
+- L'EEPROM de config du FPGA (EPC1064, IC31) n'est pas lisible par le CPU
+  (chargement direct FPGA) : diagnostic par symptôme uniquement.
+
 ### Nouveau en v0.5 : support Naomi 2 validé, ROM universelle
 - **Le BIOS Naomi 2 fait aussi 2 Mo (27C160, IC27)** : la même EPROM
   27C160 avec `naomi_diag.bin` fonctionne physiquement sur les deux

@@ -35,6 +35,7 @@
 static u32 g_audio_ready;           /* sound RAM validated, AICA usable */
 static u32 g_ic_valid;              /* identified board: IC tables apply */
 static board_type g_board_type;     /* set by test_board() */
+static u32 g_mie_port1;             /* MIE maple port + 1; 0 = none  */
 
 /* IC tables were extracted from the Naomi 1 BIOS; on any other board we
  * fall back to numbered positions instead of announcing wrong ICs. */
@@ -575,8 +576,100 @@ static void test_maple_mie(u32 ram_ok)
     scif_puts(mr.id);
     scif_puts("\"\n");
     /* 0x83 = version response from the 315-6146 firmware */
+    if (mr.response_cmd == 0x83)
+        g_mie_port1 = mr.found_port + 1;
     log_result("Maple bus / MIE (JVS)", CLIP_JVS,
                mr.response_cmd == 0x83 ? T_OK : T_FAIL, 0, 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings EEPROM (93C46 behind the MIE): read all 128 bytes through
+ * the MIE protocol, then verify SEGA CRCs and the duplicated copies of
+ * the system area. Read-only. */
+static void test_settings_eeprom(void)
+{
+    if (!g_mie_port1) {
+        scif_puts("\nSettings EEPROM test skipped (no MIE).\n");
+        return;
+    }
+    u8 ee[128];
+    if (maple_eeprom_read(g_mie_port1 - 1, ee)) {
+        /* Stock 315-6146 firmware has no 0x86 handler: reading this
+         * EEPROM needs a code upload into the MIE (as the BIOS does).
+         * Not a fault -> reported as a documented skip. */
+        scif_puts("  (stock MIE firmware: EEPROM read needs a Z80 code"
+                  " upload - future work)\n");
+        return;
+    }
+    u16 stored1 = (u16)(ee[0] | (ee[1] << 8));
+    u16 calc1   = sega_eeprom_crc(&ee[2], 16);
+    u16 stored2 = (u16)(ee[18] | (ee[19] << 8));
+    u16 calc2   = sega_eeprom_crc(&ee[20], 16);
+    u32 mirror_ok = 1;
+    for (u32 i = 0; i < 18; i++)
+        if (ee[i] != ee[18 + i])
+            mirror_ok = 0;
+
+    scif_puts("\nSettings EEPROM: crc1 ");
+    scif_puthex(stored1);
+    scif_puts(stored1 == calc1 ? " ok" : " BAD");
+    scif_puts(", crc2 ");
+    scif_puthex(stored2);
+    scif_puts(stored2 == calc2 ? " ok" : " BAD");
+    scif_puts(mirror_ok ? ", copies match\n" : ", copies DIFFER\n");
+
+    t_status st = (stored1 == calc1 && stored2 == calc2 && mirror_ok)
+                      ? T_OK : T_FAIL;
+    log_result("Settings EEPROM (93C46 via MIE)", CLIP_EEPROM, st, 0, 0);
+}
+
+/* Serial-number 93C46 (SH4 GPIO): direct read + content plausibility
+ * (the factory content is ASCII; all-0/all-1 = dead chip or open line). */
+static void test_serial_eeprom(void)
+{
+    u8 ee[128];
+    serial_eeprom_read(ee);
+
+    u32 printable = 0, zeros = 0, ones = 0;
+    for (u32 i = 0; i < 128; i++) {
+        if (ee[i] >= 32 && ee[i] < 127)
+            printable++;
+        if (ee[i] == 0x00)
+            zeros++;
+        if (ee[i] == 0xFF)
+            ones++;
+    }
+    scif_puts("\nSerial EEPROM (93C46 on SH4 GPIO): \"");
+    for (u32 i = 0; i < 24; i++)
+        scif_putc((ee[i] >= 32 && ee[i] < 127) ? (char)ee[i] : '.');
+    scif_puts("\" printable ");
+    scif_putdec(printable);
+    scif_puts("/128\n");
+
+    t_status st = (zeros == 128 || ones == 128 || printable < 16)
+                      ? T_FAIL : T_OK;
+    log_result("Serial EEPROM (93C46, GPIO)", CLIP_EEPROM, st, 0, 0);
+}
+
+/* X76F100 cart security chip: presence via response-to-reset. Absence is
+ * normal without a cartridge (e.g. DIMM setups). */
+static void test_x76(void)
+{
+    u32 rtr = x76f100_rtr();
+    scif_puts("X76F100 response-to-reset: ");
+    scif_puthex(rtr);
+    scif_puts("\n");
+    if (rtr == 0x00000000 || rtr == 0xFFFFFFFF) {
+        log_result("Cart security (X76F100): not present", CLIP_NONE,
+                   T_OK, 0, 0);
+        say(CLIP_X76, 250);
+        say(CLIP_ABSENT, REPORT_GAP_MS);
+        return;
+    }
+    log_result("Cart security (X76F100): present", CLIP_NONE, T_OK, 0, 0);
+    say(CLIP_X76, 250);
+    say(CLIP_PRESENT, 250);
+    say(CLIP_OK, REPORT_GAP_MS);
 }
 
 /* spoken replay of everything acquired before audio came up */
@@ -628,6 +721,9 @@ void cmain(void)
     test_sram_rtc();
     test_dimm();
     test_maple_mie(usable);
+    test_settings_eeprom();
+    test_serial_eeprom();
+    test_x76();
 
     scif_puts("\n==== SUMMARY ====\n");
     for (u32 i = 0; i < g_log_n; i++) {

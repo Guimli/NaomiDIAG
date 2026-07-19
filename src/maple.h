@@ -17,4 +17,10 @@ typedef struct {
 
 void maple_scan(maple_result *mr);
 
+/* Read the 128-byte settings EEPROM (93C46 behind the MIE) using the
+ * proprietary MIE protocol: 0x86/{0x01} starts the read, 0x86/{0x03}
+ * fetches the result (0x87 response, 33 payload words: status + data).
+ * Returns 0 on success. */
+u32 maple_eeprom_read(u32 port, u8 *out128);
+
 #endif
