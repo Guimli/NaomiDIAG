@@ -38,6 +38,24 @@ void pvr_vram_enable(void)
     PVR_VRAM_REFRESH = 0x00000020;
 }
 
+/* Naomi 2 slave PVR: same controller at the +0x02000000 register window. */
+void pvr2_vram_enable(void)
+{
+    REG32(0xA25F8008) = 0;
+    REG32(0xA25F80A4) = 0x0000001F;
+    REG32(0xA25F80A8) = 0x15D1C951;
+    REG32(0xA25F80A0) = 0x00000020;
+}
+
+/* Elan T&L chip: control (bit 1..2 = enable slave/broadcast) and SDRAM
+ * refresh, per the register defaults documented in the MAME driver.
+ * Real-hardware init sequence still to be confirmed on a live 837-14009. */
+void elan_init(void)
+{
+    REG32(0xA8800010) = 6;
+    REG32(0xA8800014) = 0x2029;
+}
+
 /* ---- VRAM tests: identical suite to the SDRAM one ---- */
 
 u32 vram_test_databus(u32 base)

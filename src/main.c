@@ -33,7 +33,8 @@
 #define CLIP_NONE   0xFFFFFFFFu
 
 static u32 g_audio_ready;           /* sound RAM validated, AICA usable */
-static u32 g_ic_valid;              /* board is a Naomi 1: IC tables apply */
+static u32 g_ic_valid;              /* identified board: IC tables apply */
+static board_type g_board_type;     /* set by test_board() */
 
 /* IC tables were extracted from the Naomi 1 BIOS; on any other board we
  * fall back to numbered positions instead of announcing wrong ICs. */
@@ -233,6 +234,7 @@ static void test_board(void)
 {
     board_info b;
     board_detect(&b);
+    g_board_type = b.type;
 
     scif_puts("Board probe: SH4 ver ");
     scif_puthex(b.sh4_ver);
@@ -465,10 +467,27 @@ static u32 test_vram(void)
     pvr_vram_enable();
     u32 tex0_ok = 1, tex1_ok = 1;
     test_vram_region(g_ic_valid ? "VRAM TEX0 (IC9-12)" : "VRAM TEX0", VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
-                     tex0_comps, CLIP_VRAM, &tex0_ok);
+                     IC(tex0_comps), CLIP_VRAM, &tex0_ok);
     test_vram_region(g_ic_valid ? "VRAM TEX1 (IC35)" : "VRAM TEX1", VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
-                     tex1_comps, CLIP_VRAM, &tex1_ok);
+                     IC(tex1_comps), CLIP_VRAM, &tex1_ok);
     return tex0_ok;                     /* the framebuffer lives in TEX0 */
+}
+
+/* Naomi 2 only: the slave PVR's 16MB VRAM (32-bit path) and the Elan
+ * T&L chip's 32MB RAM. IC designators for these are not known yet ->
+ * numbered positions. */
+static void test_naomi2_ram(void)
+{
+    if (g_board_type != BOARD_NAOMI2)
+        return;
+    scif_puts("\nNaomi 2: testing slave PVR VRAM and Elan RAM...\n");
+    u32 ok = 1;
+    pvr2_vram_enable();
+    test_vram_region("VRAM PVR-B (Naomi 2)", VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
+                     0, CLIP_VRAM_B, &ok);
+    elan_init();
+    test_vram_region("Elan RAM (Naomi 2)", ELAN_RAM_BASE, ELAN_RAM_SIZE,
+                     0, CLIP_ELAN, &ok);
 }
 
 /* ------------------------------------------------------------------ */
@@ -601,6 +620,9 @@ void cmain(void)
         screen_render();
         scif_puts("Screen online: report displayed on VGA output.\n");
     }
+
+    /* Naomi 2 extra memories (no-op on other boards) */
+    test_naomi2_ram();
 
     /* peripheral stage: backup SRAM (non-destructive), RTC, DIMM, MIE */
     test_sram_rtc();

@@ -20,6 +20,15 @@
  * VRAM access; values lifted from the original BIOS. */
 void pvr_vram_enable(void);
 
+/* Naomi 2 only: slave PVR VRAM (32-bit path) and Elan T&L RAM. */
+#define VRAM_PVRB_BASE  0xA7000000u
+#define VRAM_PVRB_SIZE  0x01000000u     /* 16 MB */
+#define ELAN_RAM_BASE   0xAA000000u
+#define ELAN_RAM_SIZE   0x02000000u     /* 32 MB */
+
+void pvr2_vram_enable(void);            /* slave PVR SDRAM controller */
+void elan_init(void);                   /* Elan control + SDRAM refresh */
+
 /* VRAM tests (plain bus accesses, same suite as SDRAM). */
 u32  vram_test_databus(u32 base);
 void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r);

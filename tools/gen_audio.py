@@ -53,6 +53,8 @@ CLIPS = [
     ("naomi1",      "Carte Naomi un."),
     ("naomi2",      "Carte Naomi deux."),
     ("board_unk",   "Carte non identifiée."),
+    ("vram_b",      "Seconde mémoire vidéo."),
+    ("elan",        "Mémoire du processeur géométrique."),
 ]
 
 RATE = 22050
