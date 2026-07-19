@@ -1,0 +1,12 @@
+*.o
+*.elf
+*.map
+*.dis
+naomi_diag.bin
+mame_*.txt
+tm_dbg.txt
+audio_*.wav
+replay_*.wav
+snap/
+tools/.venv/
+tools/voices/
