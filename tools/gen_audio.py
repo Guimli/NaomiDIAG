@@ -49,7 +49,10 @@ CLIPS = [
     ("dimm",        "Carte dime."),
     ("absent",      "absente."),
     ("present",     "présente."),
-    ("jvs",         "Contrôleur d'entrées sorties, émi.")
+    ("jvs",         "Contrôleur d'entrées sorties, émi."),
+    ("naomi1",      "Carte Naomi un."),
+    ("naomi2",      "Carte Naomi deux."),
+    ("board_unk",   "Carte non identifiée."),
 ]
 
 RATE = 22050

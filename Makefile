@@ -14,12 +14,12 @@ CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
 LDFLAGS := -nostdlib -Wl,-T,linker.ld -Wl,--build-id=none -Wl,-Map,naomi_diag.map
 
 OBJS := src/crt0.o src/main.o src/scif.o src/sdram.o src/ramtest.o \
-        src/timer.o src/aica.o src/pvr.o src/periph.o src/dimm.o src/maple.o
+        src/timer.o src/aica.o src/pvr.o src/periph.o src/dimm.o src/maple.o src/board.o
 
 all: naomi_diag.bin
 
 src/%.o: src/%.c src/hw.h src/scif.h src/sdram.h src/ramtest.h \
-         src/timer.h src/aica.h src/pvr.h src/periph.h src/dimm.h src/maple.h src/audio_clips.h
+         src/timer.h src/aica.h src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/audio_clips.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # regenerate the spoken clips (needs espeak-ng + sox)

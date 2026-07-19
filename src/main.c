@@ -20,6 +20,7 @@
 #include "periph.h"
 #include "dimm.h"
 #include "maple.h"
+#include "board.h"
 #include "audio_clips.h"
 
 #ifndef QUICK_TEST
@@ -32,6 +33,11 @@
 #define CLIP_NONE   0xFFFFFFFFu
 
 static u32 g_audio_ready;           /* sound RAM validated, AICA usable */
+static u32 g_ic_valid;              /* board is a Naomi 1: IC tables apply */
+
+/* IC tables were extracted from the Naomi 1 BIOS; on any other board we
+ * fall back to numbered positions instead of announcing wrong ICs. */
+#define IC(table) (g_ic_valid ? (table) : 0)
 
 /* ------------------------------------------------------------------ */
 /* Replayable result log (lives in OC-RAM .bss, survives until reset) */
@@ -222,6 +228,39 @@ static void report_fails(const ram_result *r)
 }
 
 /* ------------------------------------------------------------------ */
+/* Board identification: read-only, first thing after the cache test. */
+static void test_board(void)
+{
+    board_info b;
+    board_detect(&b);
+
+    scif_puts("Board probe: SH4 ver ");
+    scif_puthex(b.sh4_ver);
+    scif_puts(", HOLLY id ");
+    scif_puthex(b.holly_id);
+    scif_puts(" rev ");
+    scif_puthex(b.holly_rev);
+    scif_puts(", Elan id ");
+    scif_puthex(b.elan_id);
+    scif_puts("\n");
+
+    switch (b.type) {
+    case BOARD_NAOMI1:
+        g_ic_valid = 1;
+        log_result("Board: Naomi 1 (837-13544)", CLIP_NAOMI1, T_OK, 0, 0);
+        break;
+    case BOARD_NAOMI2:
+        log_result("Board: Naomi 2 - IC names off", CLIP_NAOMI2, T_OK, 0, 0);
+        scif_puts("  Naomi 2 IC tables not embedded yet: reports will use\n"
+                  "  numbered positions instead of silkscreen names.\n");
+        break;
+    default:
+        log_result("Board: UNKNOWN - IC names off", CLIP_BOARD_UNK, T_FAIL, 0, 0);
+        break;
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* BIOS EPROM (IC27) self-test: CRC32 of the whole ROM but its last 4
  * bytes, where the build system stored the expected value. Catches worn
  * EPROM cells and oxidised DIP42 socket contacts. Runs from ROM with the
@@ -247,7 +286,7 @@ static void test_bios_rom(void)
     u32 expect = rom[n];
     t_status st = (crc == expect) ? T_OK : T_FAIL;
     log_result("BIOS ROM (IC27) CRC32", CLIP_BIOS, st, st == T_FAIL ? 1 : 0,
-               bios_comps);
+               IC(bios_comps));
     if (st == T_FAIL) {
         scif_puts("  computed ");
         scif_puthex(crc);
@@ -270,10 +309,10 @@ static u32 test_sdram(void)
     u32 bad = ram_test_databus(SDRAM_P2_BASE);
     u32 comps = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
     log_result("SDRAM data bus", CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
-                work_comps);
+                IC(work_comps));
     if (bad) {
         report_badbits(bad);
-        report_comps("CPU RAM", comps, work_comps);
+        report_comps("CPU RAM", comps, IC(work_comps));
     }
 
     bad = ram_test_addrbus(SDRAM_P2_BASE, size);
@@ -310,10 +349,10 @@ static u32 test_sdram(void)
 
     t_status st = res.errors ? T_FAIL : T_OK;
     log_result("SDRAM cell test (10 passes)", CLIP_CPU_RAM, st,
-               ram_comp_mask(&res), work_comps);
+               ram_comp_mask(&res), IC(work_comps));
     if (res.errors) {
         report_badbits(res.badbits);
-        report_comps("CPU RAM", ram_comp_mask(&res), work_comps);
+        report_comps("CPU RAM", ram_comp_mask(&res), IC(work_comps));
         report_fails(&res);
         return 0;
     }
@@ -329,10 +368,10 @@ static u32 test_aram(void)
     u32 bad = aram_test_databus();
     u32 comps = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
     log_result("Sound RAM data bus", CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
-                aram_comps);
+                IC(aram_comps));
     if (bad) {
         report_badbits(bad);
-        report_comps("SOUND RAM", comps, aram_comps);
+        report_comps("SOUND RAM", comps, IC(aram_comps));
     }
 
 #if QUICK_TEST
@@ -361,10 +400,10 @@ static u32 test_aram(void)
 
     t_status st = res.errors ? T_FAIL : T_OK;
     log_result("Sound RAM cell test (10 passes)", CLIP_SOUND_RAM, st,
-               ram_comp_mask(&res), aram_comps);
+               ram_comp_mask(&res), IC(aram_comps));
     if (res.errors) {
         report_badbits(res.badbits);
-        report_comps("SOUND RAM", ram_comp_mask(&res), aram_comps);
+        report_comps("SOUND RAM", ram_comp_mask(&res), IC(aram_comps));
         report_fails(&res);
         return 0;
     }
@@ -421,9 +460,9 @@ static u32 test_vram(void)
     scif_puts("\nPVR: enabling VRAM controller, testing texture RAM...\n");
     pvr_vram_enable();
     u32 tex0_ok = 1, tex1_ok = 1;
-    test_vram_region("VRAM TEX0 (IC9-12)", VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
+    test_vram_region(g_ic_valid ? "VRAM TEX0 (IC9-12)" : "VRAM TEX0", VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
                      tex0_comps, CLIP_VRAM, &tex0_ok);
-    test_vram_region("VRAM TEX1 (IC35)", VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
+    test_vram_region(g_ic_valid ? "VRAM TEX1 (IC35)" : "VRAM TEX1", VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
                      tex1_comps, CLIP_VRAM, &tex1_ok);
     return tex0_ok;                     /* the framebuffer lives in TEX0 */
 }
@@ -537,6 +576,7 @@ void cmain(void)
      * crt0 reports it on SCIF and halts before ever reaching this point. */
     log_result("CPU OC-RAM (cache as RAM)", CLIP_CPU_CACHE, T_OK, 0, 0);
 
+    test_board();
     test_bios_rom();
 
     u32 usable = test_sdram();
