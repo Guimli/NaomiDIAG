@@ -19,6 +19,7 @@
 #include "pvr.h"
 #include "periph.h"
 #include "dimm.h"
+#include "maple.h"
 #include "audio_clips.h"
 
 #ifndef QUICK_TEST
@@ -87,7 +88,7 @@ static void screen_render(void)
     if (!g_screen_ready)
         return;
     fb_clear(0);
-    fb_text(112, 8, "NAOMI DIAG ROM v0.3", COL_TITLE);
+    fb_text(112, 8, "NAOMI DIAG ROM v0.4", COL_TITLE);
     u32 y = 48;
     for (u32 i = 0; i < g_log_n && y < FB_H - 20; i++) {
         const log_entry *e = &g_log[i];
@@ -488,6 +489,34 @@ static void test_dimm(void)
     say(st == T_OK ? CLIP_OK : CLIP_FAIL, REPORT_GAP_MS);
 }
 
+/* ------------------------------------------------------------------ */
+/* Maple bus + MIE (315-6146): a Device Request must be answered by the
+ * MIE's Z80. Needs validated main RAM for the DMA descriptors. */
+static void test_maple_mie(u32 ram_ok)
+{
+    if (!ram_ok) {
+        scif_puts("\nMaple/MIE test skipped (main RAM unusable).\n");
+        return;
+    }
+    maple_result mr;
+    maple_scan(&mr);
+
+    if (mr.found_port == 0xFFFFFFFF) {
+        log_result("Maple bus / MIE (JVS): no response", CLIP_JVS, T_FAIL, 0, 0);
+        return;
+    }
+    scif_puts("  MIE on maple port ");
+    scif_putdec(mr.found_port);
+    scif_puts(", resp cmd 0x");
+    scif_puthex(mr.response_cmd);
+    scif_puts("\n  MIE version: \"");
+    scif_puts(mr.id);
+    scif_puts("\"\n");
+    /* 0x83 = version response from the 315-6146 firmware */
+    log_result("Maple bus / MIE (JVS)", CLIP_JVS,
+               mr.response_cmd == 0x83 ? T_OK : T_FAIL, 0, 0);
+}
+
 /* spoken replay of everything acquired before audio came up */
 static void audio_replay_log(void)
 {
@@ -529,9 +558,10 @@ void cmain(void)
         scif_puts("Screen online: report displayed on VGA output.\n");
     }
 
-    /* peripheral stage: backup SRAM (non-destructive), RTC, DIMM board */
+    /* peripheral stage: backup SRAM (non-destructive), RTC, DIMM, MIE */
     test_sram_rtc();
     test_dimm();
+    test_maple_mie(usable);
 
     scif_puts("\n==== SUMMARY ====\n");
     for (u32 i = 0; i < g_log_n; i++) {
@@ -547,7 +577,7 @@ void cmain(void)
     if (vram_ok)
         scif_puts("VRAM usable, on-screen report active.\n");
 
-    scif_puts("\n*** DIAG COMPLETE (v0.3: SCIF + OC-RAM + BIOS + SDRAM + AICA + VRAM) ***\n");
+    scif_puts("\n*** DIAG COMPLETE (v0.4: SCIF+CACHE+BIOS+SDRAM+AICA+VRAM+SRAM+RTC+DIMM+MIE) ***\n");
     say(CLIP_TESTS_DONE, REPORT_GAP_MS);
     scif_flush();
     for (;;)

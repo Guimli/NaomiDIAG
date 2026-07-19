@@ -168,7 +168,7 @@ Locram_ok:  .long ocram_ok_str
 Locram_ko:  .long ocram_ko_str
 
 banner_str:
-    .asciz "\r\n\r\n==== NAOMI DIAG ROM v0.3 (SH4/SCIF, no-RAM boot) ====\r\n"
+    .asciz "\r\n\r\n==== NAOMI DIAG ROM v0.4 (SH4/SCIF, no-RAM boot) ====\r\n"
 ocram_ok_str:
     .asciz "CPU OC-RAM (cache as RAM, 2x4KB) ........ OK\r\n"
 ocram_ko_str:

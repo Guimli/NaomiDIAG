@@ -49,6 +49,7 @@ CLIPS = [
     ("dimm",        "Carte dime."),
     ("absent",      "absente."),
     ("present",     "présente."),
+    ("jvs",         "Contrôleur d'entrées sorties, émi.")
 ]
 
 RATE = 22050
