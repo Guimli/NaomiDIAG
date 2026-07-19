@@ -34,6 +34,22 @@ nouveau canal de sortie qui devient disponible.
 - Validation MAME : `-wavwrite` + analyse RMS → salves de parole aux bons
   instants, sans chevauchement.
 
+### Nouveau en v0.5 : support Naomi 2 validé, ROM universelle
+- **Le BIOS Naomi 2 fait aussi 2 Mo (27C160, IC27)** : la même ROM
+  fonctionne physiquement sur les deux générations (le 27C322 doublé
+  reste une option de chip alternative, pas une nécessité).
+- Détection affinée : signature Elan (0x08800000 = 0xE1AD0000 rev 0x12)
+  **plus** test d'aliasing des VRAM (0xA4000000/0xA6000000 : miroir d'une
+  même mémoire sur Naomi 1, deux VRAM distinctes sur Naomi 2).
+- **Tables IC identiques** : le BIOS Naomi 2 (epr-23605c, tables à ROM
+  0x5C800) affiche les mêmes désignateurs (IC29, IC35, IC9-12, IC16-22)
+  → les annonces IC restent actives sur Naomi 2.
+- Attentes SCIF bornées (jamais de blocage sur la console série ; requis
+  aussi par l'émulation SCIF partielle de MAME ≥ 0.288).
+- Validation MAME 0.288 : driver `naomi` (Naomi 1) et machine `clubk2k3`
+  (vraie config Naomi 2 : Elan + 2× PVR) — cascade complète OK sur les
+  deux, détection correcte de part et d'autre.
+
 ### Nouveau en v0.4 : bus Maple + MIE (JVS)
 - `maple.c` : transaction DMA Maple complète (descripteurs en SDRAM
   validée, registres 0xA05F6C04-6C8C) ; requête de version MIE (commande

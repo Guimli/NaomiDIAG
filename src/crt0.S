@@ -123,7 +123,10 @@ ocram_fail:
 
 ! ---------------------------------------------------------------------------
 ! asm_puts: send NUL-terminated string at r4 to the SCIF.
-! Clobbers r0,r1,r3,r5. No stack, no RAM.
+! Clobbers r0,r1,r3,r5,r6. No stack, no RAM.
+! The TDFE wait is BOUNDED: exits early when the FIFO frees up (real HW),
+! or times out and writes anyway (diag must never hang on its own console;
+! also works around emulators with partial SCIF models).
 ! ---------------------------------------------------------------------------
     .global asm_puts
 asm_puts:
@@ -132,10 +135,13 @@ asm_puts:
 1:  mov.b   @r4+, r3
     tst     r3, r3
     bt      9f
+    mov.l   Ltxspin, r6         ! bounded wait for TX FIFO room
 2:  mov.w   @(16, r1), r0       ! SCFSR2
     tst     #0x20, r0           ! TDFE set (room in TX FIFO)?
-    bt      2b
-    mov     r3, r0
+    bf      3f
+    dt      r6
+    bf      2b
+3:  mov     r3, r0
     mov.b   r0, @(12, r1)       ! SCFTDR2 = char
     mov.w   @(16, r1), r0
     and     r5, r0
@@ -152,6 +158,7 @@ Lccr:       .long 0xFF00001C
 Lccr_val:   .long 0x000009A9    ! ICI|ICE|ORA|OIX|OCI|OCE
 Lscif:      .long 0xFFE80000
 Ldelay:     .long 0x00010000
+Ltxspin:    .long 0x00020000
 Lfsr_keep:  .long 0x0000FF9F
 Locram0:    .long 0x7C000000
 Locram0e:   .long 0x7C000FFC

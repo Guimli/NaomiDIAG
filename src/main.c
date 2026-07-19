@@ -242,6 +242,8 @@ static void test_board(void)
     scif_puthex(b.holly_rev);
     scif_puts(", Elan id ");
     scif_puthex(b.elan_id);
+    scif_puts(", dual PVR ");
+    scif_putdec(b.dual_pvr);
     scif_puts("\n");
 
     switch (b.type) {
@@ -250,9 +252,11 @@ static void test_board(void)
         log_result("Board: Naomi 1 (837-13544)", CLIP_NAOMI1, T_OK, 0, 0);
         break;
     case BOARD_NAOMI2:
-        log_result("Board: Naomi 2 - IC names off", CLIP_NAOMI2, T_OK, 0, 0);
-        scif_puts("  Naomi 2 IC tables not embedded yet: reports will use\n"
-                  "  numbered positions instead of silkscreen names.\n");
+        /* the Naomi 2 BIOS (epr-23605c, tables at ROM 0x5C800) uses the
+         * exact same RAM TEST IC designators as the Naomi 1 for all the
+         * regions we test -> the IC tables apply here too */
+        g_ic_valid = 1;
+        log_result("Board: Naomi 2 (837-14009)", CLIP_NAOMI2, T_OK, 0, 0);
         break;
     default:
         log_result("Board: UNKNOWN - IC names off", CLIP_BOARD_UNK, T_FAIL, 0, 0);

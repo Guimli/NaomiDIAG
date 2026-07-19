@@ -2,18 +2,25 @@
  * existed; these helpers only need a few bytes of stack (OC-RAM). */
 #include "scif.h"
 
+/* Bounded waits: exit early when the flag rises (real hardware), or time
+ * out and proceed — a diagnostic must never hang on its own console, and
+ * some emulators model the SCIF status flags only partially. */
+#define SCIF_SPIN 0x20000
+
 void scif_putc(char c)
 {
-    while (!(SCFSR2 & SCFSR2_TDFE))
-        ;
+    for (u32 spin = 0; spin < SCIF_SPIN; spin++)
+        if (SCFSR2 & SCFSR2_TDFE)
+            break;
     SCFTDR2 = (u8)c;
     SCFSR2 &= (u16)~(SCFSR2_TDFE | SCFSR2_TEND);
 }
 
 void scif_flush(void)
 {
-    while (!(SCFSR2 & SCFSR2_TEND))
-        ;
+    for (u32 spin = 0; spin < SCIF_SPIN; spin++)
+        if (SCFSR2 & SCFSR2_TEND)
+            break;
 }
 
 void scif_puts(const char *s)
