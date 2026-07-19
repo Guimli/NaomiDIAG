@@ -34,6 +34,14 @@ nouveau canal de sortie qui devient disponible.
 - Validation MAME : `-wavwrite` + analyse RMS → salves de parole aux bons
   instants, sans chevauchement.
 
+### Nouveau en v0.4 : bus Maple + MIE (JVS)
+- `maple.c` : transaction DMA Maple complète (descripteurs en SDRAM
+  validée, registres 0xA05F6C04-6C8C) ; requête de version MIE (commande
+  propriétaire 0x82, réf. libnaomi) → réponse 0x83 du **vrai firmware
+  315-6146** avec sa chaîne d'identité « 315-6149 COPYRIGHT SEGA ».
+  Teste d'un coup : moteur DMA Maple du HOLLY, liaison, Z80 MIE, firmware.
+  Validé sous MAME avec le dump 315-6146 authentique.
+
 ### Nouveau en v0.3c : carte DIMM (bus G1) et ventilateur
 - `dimm.c` : sonde **lecture seule** de la mailbox DIMM (0xA05F703C-704C,
   protocole documenté dans MAME naomigd.cpp) : absence détectée par
