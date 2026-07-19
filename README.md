@@ -35,9 +35,9 @@ nouveau canal de sortie qui devient disponible.
   instants, sans chevauchement.
 
 ### Nouveau en v0.5 : support Naomi 2 validé, ROM universelle
-- **Le BIOS Naomi 2 fait aussi 2 Mo (27C160, IC27)** : la même ROM
-  fonctionne physiquement sur les deux générations (le 27C322 doublé
-  reste une option de chip alternative, pas une nécessité).
+- **Le BIOS Naomi 2 fait aussi 2 Mo (27C160, IC27)** : la même EPROM
+  27C160 avec `naomi_diag.bin` fonctionne physiquement sur les deux
+  générations — aucune variante d'image nécessaire.
 - Détection affinée : signature Elan (0x08800000 = 0xE1AD0000 rev 0x12)
   **plus** test d'aliasing des VRAM (0xA4000000/0xA6000000 : miroir d'une
   même mémoire sur Naomi 1, deux VRAM distinctes sur Naomi 2).

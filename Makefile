@@ -37,12 +37,6 @@ naomi_diag.bin: naomi_diag.elf
 	truncate -s 2M $@
 	python3 tools/patch_crc.py $@
 
-# Universal 27C322 image (4MB = the 2MB image twice): boots on Naomi 1
-# (pin 32 / A20 tied either way selects one copy) and on Naomi 2 (native
-# 27C322 socket); board detection picks the right behaviour at runtime.
-naomi_diag_27c322.bin: naomi_diag.bin
-	cat naomi_diag.bin naomi_diag.bin > $@
-
 dis: naomi_diag.elf
 	$(OBJDUMP) -d $< > naomi_diag.dis
 
