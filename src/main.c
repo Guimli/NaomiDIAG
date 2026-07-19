@@ -580,6 +580,19 @@ static void test_maple_mie(u32 ram_ok)
         g_mie_port1 = mr.found_port + 1;
     log_result("Maple bus / MIE (JVS)", CLIP_JVS,
                mr.response_cmd == 0x83 ? T_OK : T_FAIL, 0, 0);
+
+    /* factory self-test: the Z80 checks its own ROM/RAM (status 0 = ok).
+     * Black-box coverage — to be reworked with an uploaded Z80 test
+     * program (see README). */
+    if (mr.response_cmd == 0x83) {
+        u32 st_word;
+        u32 bad = maple_mie_selftest(mr.found_port, &st_word);
+        scif_puts("  MIE self-test status word: ");
+        scif_puthex(st_word);
+        scif_puts("\n");
+        log_result("MIE self-test (Z80 ROM+RAM)", CLIP_JVS,
+                   bad ? T_FAIL : T_OK, 0, 0);
+    }
 }
 
 /* ------------------------------------------------------------------ */

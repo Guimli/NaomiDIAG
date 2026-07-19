@@ -34,6 +34,17 @@ nouveau canal de sortie qui devient disponible.
 - Validation MAME : `-wavwrite` + analyse RMS → salves de parole aux bons
   instants, sans chevauchement.
 
+### Nouveau en v0.6b : auto-test du MIE (voie A — à retravailler)
+- Commande 0x84 du noyau d'usine → réponse 0x85, mot de statut 0 = OK :
+  le Z80 du MIE exécute son propre test ROM+RAM interne.
+- **⚠ À RETRAVAILLER (voie B)** : ce test est une boîte noire SEGA — la
+  couverture réelle et la sémantique fine du statut sont inconnues. Le
+  plan cible est d'**uploader notre propre routine Z80** dans la RAM du
+  MIE (commande 0x80, protocole documenté par libnaomi) appliquant nos
+  motifs multi-passes (55/AA/PRNG) avec localisation précise, ce qui
+  ouvrira du même coup la lecture de l'EEPROM des réglages (handler
+  0x86) et le test JVS complet de la carte I/O 837-13551.
+
 ### Nouveau en v0.6 : EEPROM et puce de sécurité
 - **93C46 « numéro de série »** (GPIO SH4, PDTRA : DI=b3, DO=b4, CS=b5,
   CLK=b2, PORTEN de BCR2 requis, PCTRA=0x450) : lecture directe des 128

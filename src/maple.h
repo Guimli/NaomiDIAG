@@ -23,4 +23,9 @@ void maple_scan(maple_result *mr);
  * Returns 0 on success. */
 u32 maple_eeprom_read(u32 port, u8 *out128);
 
+/* MIE self-test (stock kernel command 0x84 -> 0x85): the Z80 runs its
+ * own ROM/RAM test; status word 0x00000000 = pass. Returns 0 on pass,
+ * with the raw status in *status. */
+u32 maple_mie_selftest(u32 port, u32 *status);
+
 #endif

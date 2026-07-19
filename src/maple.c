@@ -84,6 +84,23 @@ void maple_scan(maple_result *mr)
     }
 }
 
+u32 maple_mie_selftest(u32 port, u32 *status)
+{
+    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    *status = 0xFFFFFFFF;
+    for (u32 tries = 0; tries < 100; tries++) {
+        u32 hdr = maple_txn(port, 0x84, 0, 0);
+        if ((hdr & 0xFF) == 0x85) {
+            if (((hdr >> 24) & 0xFF) != 1)
+                return 1;                   /* malformed response */
+            *status = rx[1];
+            return (*status == 0) ? 0 : 1;  /* all-zero word = pass */
+        }
+        delay_ms(20);                       /* test still running */
+    }
+    return 1;
+}
+
 u32 maple_eeprom_read(u32 port, u8 *out128)
 {
     volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
