@@ -6,8 +6,9 @@ les composants de la carte un par un, en rapportant les résultats sur trois
 canaux — **série (SCIF)**, **écran (VGA)** et **voix** — sans jamais
 dépendre d'une mémoire dont le bon fonctionnement n'a pas encore été prouvé.
 
-Disponible en **anglais** et en **français** (`NaomiDIAG_EN.bin` /
-`NaomiDIAG_FR.bin`), texte et voix localisés.
+Disponible en **anglais** et en **français**, texte et voix localisés —
+ROMs pré-compilées prêtes à graver : [NaomiDIAG_EN.bin](NaomiDIAG_EN.bin) /
+[NaomiDIAG_FR.bin](NaomiDIAG_FR.bin).
 
 > English: see [README.md](README.md).
 

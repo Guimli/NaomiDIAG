@@ -6,8 +6,9 @@ board's components one by one, reporting results on up to three channels —
 **serial (SCIF)**, **on-screen (VGA)** and **spoken audio** — without ever
 relying on memory it has not yet proven good.
 
-Available in **English** and **French** (`NaomiDIAG_EN.bin` /
-`NaomiDIAG_FR.bin`), text and voice both localized.
+Available in **English** and **French**, text and voice both localized —
+pre-built ROMs ready to burn: [NaomiDIAG_EN.bin](NaomiDIAG_EN.bin) /
+[NaomiDIAG_FR.bin](NaomiDIAG_FR.bin).
 
 > Français : voir [README.fr.md](README.fr.md).
 
