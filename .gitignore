@@ -1,15 +1,59 @@
+# =============================================================================
+# Proprietary SEGA content -- MUST never be committed (copyright)
+# =============================================================================
+# BIOS / ROM dump folders
+BIOS*/
+[Bb]ios*/
+roms/
+roms_diag*/
+MIE/
+# SEGA ROM chip dumps (BIOS, cartridge mask ROMs, boot ROMs)
+*.ic25
+*.ic27
+*.ic31
+*.ic606
+epr-*
+mpr-*
+opr-*
+fpr-*
+# JVS / MIE device ROMs and NVRAM/EEPROM dumps
+315-*.bin
+sp500*.bin
+*_eeprom.bin
+main_eeprom.bin
+x76f100_eeprom.bin
+# packed romsets and disc images
+*.zip
+*.chd
+# any raw binary (build outputs are covered here too; no source .bin exists)
+*.bin
+
+# =============================================================================
+# Build artifacts
+# =============================================================================
 *.o
 *.elf
 *.map
 *.dis
-naomi_diag.bin
+.build_*
+src/audio_clips.h          # generated per-language copy (see audio_clips_*.h)
+
+# =============================================================================
+# Test / debug outputs
+# =============================================================================
+*.wav                      # rendered audio samples and MAME captures
 mame_*.txt
 tm_dbg.txt
-audio_*.wav
-replay_*.wav
-snap/
-tools/.venv/
-tools/voices/
+snap/                      # MAME screenshots
+mamelist.xml               # huge `mame -listxml` dump (regenerate for `make cartdb`)
+
+# =============================================================================
+# Local dev tooling (large / machine-specific, regenerated on demand)
+# =============================================================================
+tools/.venv/               # Piper Python venv
+tools/voices/              # Piper voice models (~60 MB each, downloadable)
+
+# ad-hoc probe/fault Lua scripts (kept local, not part of the shipped set)
 id_probe.lua
 n2_probe.lua
 n2_dev.lua
@@ -18,10 +62,13 @@ diag_snap*.lua
 elan_fault.lua
 sram_fault.lua
 fault_dbg.lua
-src/audio_clips.h
-.build_*
-NaomiDIAG_*.bin
-naomi_diag_*.elf
-naomi_diag_*.map
-naomi_diag_*.dis
-mamelist.xml
+
+# =============================================================================
+# Editor / OS noise
+# =============================================================================
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
