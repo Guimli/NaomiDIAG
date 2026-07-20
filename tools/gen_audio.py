@@ -42,9 +42,9 @@ CLIPS = [
     ("ic_29",       "I C vingt-neuf,"),
     ("ic_35",       "I C trente-cinq,"),
     ("ic_27",       "I C vingt-sept,"),
-    ("bios",        "ROM BIOS."),
+    ("bios",        "rome bioss."),   # phonetic: 'ROM BIOS' (avoid 'ron'/silent S)
     ("vram",        "Mémoire vidéo."),
-    ("sram",        "NVRAM."),
+    ("sram",        "enne vé ram."),   # phonetic: 'NVRAM'
     ("rtc",         "Horloge temps réel."),
     ("dimm",        "Carte dime."),
     ("absent",      "absente."),
