@@ -887,7 +887,7 @@ void cmain(void)
     if (vram_ok)
         scif_puts("VRAM usable, on-screen report active.\n");
 
-    scif_puts("\n*** DIAG COMPLETE (v0.4: SCIF+CACHE+BIOS+SDRAM+AICA+VRAM+SRAM+RTC+DIMM+MIE) ***\n");
+    scif_puts("\n*** DIAG COMPLETE ***\n");
     say(CLIP_TESTS_DONE, REPORT_GAP_MS);
     scif_flush();
     for (;;)
