@@ -308,13 +308,27 @@ static void test_bios_rom(void)
 }
 
 /* ------------------------------------------------------------------ */
-static u32 test_sdram(void)
+static u32 g_ram_size;
+
+/* Fast: configure the bus/SDRAM controller (BSC) and detect 16/32MB.
+ * Done EARLY, before the audio/video stages, because the AICA and PVR
+ * buses rely on the BSC being set up — and because it takes only a few
+ * milliseconds. The slow part (the 10-pass cell test) is deferred to
+ * test_sdram_cells() so the screen and audio come up first. */
+static void sdram_setup(void)
 {
     scif_puts("\nSDRAM init (BSC values from original BIOS)...\n");
-    u32 size = sdram_init();
+    g_ram_size = sdram_init();
     scif_puts("SDRAM detected size: ");
-    scif_putdec(size >> 20);
+    scif_putdec(g_ram_size >> 20);
     scif_puts(" MB\n");
+}
+
+/* Slow (~1 min on 32MB): the actual CPU-RAM cell test. Runs after the
+ * screen and audio are live so the machine never looks frozen. */
+static u32 test_sdram_cells(void)
+{
+    u32 size = g_ram_size;
 
     /* data bus test runs at an even word address (A2=0): comps 1/2 */
     u32 bad = ram_test_databus(SDRAM_P2_BASE);
@@ -843,7 +857,10 @@ void cmain(void)
     test_board();
     test_bios_rom();
 
-    u32 usable = test_sdram();
+    /* configure the bus + detect RAM size (fast) — needed by AICA/PVR,
+     * but the long CPU-RAM cell test is deferred until after audio/video
+     * are up, so the ~1 min test never looks like a freeze. */
+    sdram_setup();
 
     /* audio stage: test sound RAM, then it becomes an output channel */
     u32 aram_ok = test_aram();
@@ -861,6 +878,10 @@ void cmain(void)
         screen_render();
         scif_puts("Screen online: report displayed on VGA output.\n");
     }
+
+    /* now the slow CPU-RAM cell test, with screen + audio already live:
+     * each result is shown/spoken as it lands, SCIF prints pass progress */
+    u32 usable = test_sdram_cells();
 
     /* Naomi 2 extra memories (no-op on other boards) */
     test_naomi2_ram();
