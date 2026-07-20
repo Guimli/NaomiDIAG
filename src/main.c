@@ -23,6 +23,7 @@
 #include "board.h"
 #include "cart.h"
 #include "sha1.h"
+#include "version.inc"
 #include "audio_clips.h"
 #include "cartdb.h"
 
@@ -99,7 +100,7 @@ static void screen_render(void)
     if (!g_screen_ready)
         return;
     fb_clear(0);
-    fb_text(112, 8, "NAOMI DIAG ROM v0.4", COL_TITLE);
+    fb_text(112, 8, "NAOMI DIAG ROM v" DIAG_VERSION, COL_TITLE);
     u32 y = 48;
     for (u32 i = 0; i < g_log_n && y < FB_H - 20; i++) {
         const log_entry *e = &g_log[i];

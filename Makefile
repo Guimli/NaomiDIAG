@@ -19,14 +19,14 @@ OBJS := src/crt0.o src/main.o src/scif.o src/sdram.o src/ramtest.o \
 all: naomi_diag.bin
 
 src/%.o: src/%.c src/hw.h src/scif.h src/sdram.h src/ramtest.h \
-         src/timer.h src/aica.h src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/sha1.h src/cart.h src/cartdb.h src/audio_clips.h
+         src/timer.h src/aica.h src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/sha1.h src/cart.h src/cartdb.h src/version.inc src/audio_clips.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # regenerate the spoken clips (needs espeak-ng + sox)
 audio:
 	python3 tools/gen_audio.py src/audio_clips.h
 
-src/%.o: src/%.S
+src/%.o: src/%.S src/version.inc
 	$(CC) $(CFLAGS) -c $< -o $@
 
 naomi_diag.elf: $(OBJS) linker.ld

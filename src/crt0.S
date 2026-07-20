@@ -14,6 +14,8 @@
 !   5. Stack up, .bss cleared, jump to C (cmain)
 ! =============================================================================
 
+#include "version.inc"
+
     .section .text.start, "ax"
     .global _start
 _start:
@@ -175,7 +177,9 @@ Locram_ok:  .long ocram_ok_str
 Locram_ko:  .long ocram_ko_str
 
 banner_str:
-    .asciz "\r\n\r\n==== NAOMI DIAG ROM v0.4 (SH4/SCIF, no-RAM boot) ====\r\n"
+    .ascii "\r\n\r\n==== NAOMI DIAG ROM v"
+    .ascii DIAG_VERSION
+    .asciz " (SH4/SCIF, no-RAM boot) ====\r\n"
 ocram_ok_str:
     .asciz "CPU OC-RAM (cache as RAM, 2x4KB) ........ OK\r\n"
 ocram_ko_str:
