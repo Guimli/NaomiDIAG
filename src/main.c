@@ -24,6 +24,7 @@
 #include "cart.h"
 #include "sha1.h"
 #include "version.inc"
+#include "strings.h"
 #include "audio_clips.h"
 #include "cartdb.h"
 
@@ -106,9 +107,9 @@ static void screen_render(void)
         const log_entry *e = &g_log[i];
         fb_text(16, y, e->name, COL_WHITE);
         if (e->status == T_OK) {
-            fb_text(FB_W - 16 * 3, y, "OK", COL_GREEN);
+            fb_text(FB_W - 16 * 3, y, S_SCR_OK, COL_GREEN);
         } else {
-            fb_text(FB_W - 16 * 5, y, "FAIL", COL_RED);
+            fb_text(FB_W - 16 * 5, y, S_SCR_FAIL, COL_RED);
             if (e->detail && e->comps) {
                 y += 20;
                 u32 x = 32;
@@ -132,11 +133,11 @@ static void say(u32 clip, u32 gap_ms)
         aica_say(audio_clips[clip].pcm, audio_clips[clip].len, gap_ms);
 }
 
-/* speak one result. OK: "<name> test réussi". FAIL with located
+/* speak one result. OK: "<name> test passed". FAIL with located
  * components: one full report per component, using the silkscreen IC
- * name when the mapping is known ("Mémoire principale, I C seize,
- * défectueuse") and the position number otherwise. Duplicate IC clips
- * (single-chip RAMs) are only spoken once. */
+ * name when the mapping is known ("Main memory, I C sixteen, defective")
+ * and the position number otherwise. Duplicate IC clips (single-chip
+ * RAMs) are only spoken once. */
 static void say_entry(const log_entry *e)
 {
     if (!g_audio_ready || e->clip == CLIP_NONE)
@@ -180,7 +181,7 @@ static void log_result(const char *name, u32 clip, t_status st, u32 detail,
         g_log_n++;
     }
     scif_puts(name);
-    scif_puts(st == T_OK ? " ........ OK\n" : " ........ FAIL\n");
+    scif_puts(st == T_OK ? S_SUF_OK : S_SUF_FAIL);
     /* live multi-channel report: screen refresh, then speech */
     screen_render();
     if (g_log_n)
@@ -211,7 +212,7 @@ static void report_comps(const char *ramname, u32 compmask,
             scif_puts(comps[i].name);
             scif_puts(")");
         }
-        scif_puts(" DEFECTIVE\n");
+        scif_puts(S_DEFECTIVE);
     }
 }
 
@@ -256,17 +257,17 @@ static void test_board(void)
     switch (b.type) {
     case BOARD_NAOMI1:
         g_ic_valid = 1;
-        log_result("Board: Naomi 1 (837-13544)", CLIP_NAOMI1, T_OK, 0, 0);
+        log_result(S_L_BOARD_N1, CLIP_NAOMI1, T_OK, 0, 0);
         break;
     case BOARD_NAOMI2:
         /* the Naomi 2 BIOS (epr-23605c, tables at ROM 0x5C800) uses the
          * exact same RAM TEST IC designators as the Naomi 1 for all the
          * regions we test -> the IC tables apply here too */
         g_ic_valid = 1;
-        log_result("Board: Naomi 2 (837-14009)", CLIP_NAOMI2, T_OK, 0, 0);
+        log_result(S_L_BOARD_N2, CLIP_NAOMI2, T_OK, 0, 0);
         break;
     default:
-        log_result("Board: UNKNOWN - IC names off", CLIP_BOARD_UNK, T_FAIL, 0, 0);
+        log_result(S_L_BOARD_UNK, CLIP_BOARD_UNK, T_FAIL, 0, 0);
         break;
     }
 }
@@ -296,7 +297,7 @@ static void test_bios_rom(void)
     crc = ~crc;
     u32 expect = rom[n];
     t_status st = (crc == expect) ? T_OK : T_FAIL;
-    log_result("BIOS ROM (IC27) CRC32", CLIP_BIOS, st, st == T_FAIL ? 1 : 0,
+    log_result(S_L_BIOS, CLIP_BIOS, st, st == T_FAIL ? 1 : 0,
                IC(bios_comps));
     if (st == T_FAIL) {
         scif_puts("  computed ");
@@ -317,11 +318,11 @@ static u32 g_ram_size;
  * test_sdram_cells() so the screen and audio come up first. */
 static void sdram_setup(void)
 {
-    scif_puts("\nSDRAM init (BSC values from original BIOS)...\n");
+    scif_puts(S_SDRAM_INIT);
     g_ram_size = sdram_init();
-    scif_puts("SDRAM detected size: ");
+    scif_puts(S_SDRAM_SIZE);
     scif_putdec(g_ram_size >> 20);
-    scif_puts(" MB\n");
+    scif_puts(S_MB);
 }
 
 /* Slow (~1 min on 32MB): the actual CPU-RAM cell test. Runs after the
@@ -333,15 +334,15 @@ static u32 test_sdram_cells(void)
     /* data bus test runs at an even word address (A2=0): comps 1/2 */
     u32 bad = ram_test_databus(SDRAM_P2_BASE);
     u32 comps = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
-    log_result("SDRAM data bus", CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
+    log_result(S_L_SDRAM_DBUS, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
                 IC(work_comps));
     if (bad) {
         report_badbits(bad);
-        report_comps("CPU RAM", comps, IC(work_comps));
+        report_comps(S_CG_CPU, comps, IC(work_comps));
     }
 
     bad = ram_test_addrbus(SDRAM_P2_BASE, size);
-    log_result("SDRAM address bus", CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0);
+    log_result(S_L_SDRAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0);
     if (bad) {
         scif_puts("  bad address bits mask: ");
         scif_puthex(bad);
@@ -350,7 +351,7 @@ static u32 test_sdram_cells(void)
 
 #if QUICK_TEST
     u32 len = 0x00100000;
-    scif_puts("QUICK build: testing first 1MB only\n");
+    scif_puts(S_QUICK);
 #else
     u32 len = size;
 #endif
@@ -358,7 +359,7 @@ static u32 test_sdram_cells(void)
     ram_result res;
     ram_result_clear(&res);
     for (u32 pass = 0; pass < N_PASSES; pass++) {
-        scif_puts("pass ");
+        scif_puts(S_PASS);
         scif_putdec(pass + 1);
         scif_puts("/10: 5555");
         ram_test_pattern(SDRAM_P2_BASE, len, 0x55555555, &res);
@@ -373,11 +374,11 @@ static u32 test_sdram_cells(void)
     }
 
     t_status st = res.errors ? T_FAIL : T_OK;
-    log_result("SDRAM cell test (10 passes)", CLIP_CPU_RAM, st,
+    log_result(S_L_SDRAM_CELL, CLIP_CPU_RAM, st,
                ram_comp_mask(&res), IC(work_comps));
     if (res.errors) {
         report_badbits(res.badbits);
-        report_comps("CPU RAM", ram_comp_mask(&res), IC(work_comps));
+        report_comps(S_CG_CPU, ram_comp_mask(&res), IC(work_comps));
         report_fails(&res);
         return 0;
     }
@@ -387,21 +388,21 @@ static u32 test_sdram_cells(void)
 /* ------------------------------------------------------------------ */
 static u32 test_aram(void)
 {
-    scif_puts("\nAICA: ARM7 held in reset, testing sound RAM (8MB, G2 bus)...\n");
+    scif_puts(S_AICA_HDR);
     aica_init();
 
     u32 bad = aram_test_databus();
     u32 comps = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
-    log_result("Sound RAM data bus", CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
+    log_result(S_L_ARAM_DBUS, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
                 IC(aram_comps));
     if (bad) {
         report_badbits(bad);
-        report_comps("SOUND RAM", comps, IC(aram_comps));
+        report_comps(S_CG_SOUND, comps, IC(aram_comps));
     }
 
 #if QUICK_TEST
     u32 len = 0x00100000;
-    scif_puts("QUICK build: testing first 1MB only\n");
+    scif_puts(S_QUICK);
 #else
     u32 len = ARAM_SIZE;
 #endif
@@ -409,7 +410,7 @@ static u32 test_aram(void)
     ram_result res;
     ram_result_clear(&res);
     for (u32 pass = 0; pass < N_PASSES; pass++) {
-        scif_puts("pass ");
+        scif_puts(S_PASS);
         scif_putdec(pass + 1);
         scif_puts("/10: 5555");
         aram_test_pattern(0, len, 0x55555555, &res);
@@ -424,11 +425,11 @@ static u32 test_aram(void)
     }
 
     t_status st = res.errors ? T_FAIL : T_OK;
-    log_result("Sound RAM cell test (10 passes)", CLIP_SOUND_RAM, st,
+    log_result(S_L_ARAM_CELL, CLIP_SOUND_RAM, st,
                ram_comp_mask(&res), IC(aram_comps));
     if (res.errors) {
         report_badbits(res.badbits);
-        report_comps("SOUND RAM", ram_comp_mask(&res), IC(aram_comps));
+        report_comps(S_CG_SOUND, ram_comp_mask(&res), IC(aram_comps));
         report_fails(&res);
         return 0;
     }
@@ -482,12 +483,12 @@ static void test_vram_region(const char *name, u32 base, u32 size,
 
 static u32 test_vram(void)
 {
-    scif_puts("\nPVR: enabling VRAM controller, testing texture RAM...\n");
+    scif_puts(S_PVR_HDR);
     pvr_vram_enable();
     u32 tex0_ok = 1, tex1_ok = 1;
-    test_vram_region(g_ic_valid ? "VRAM TEX0 (IC9-12)" : "VRAM TEX0", VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
+    test_vram_region(g_ic_valid ? S_L_VRAM_TEX0_IC : S_L_VRAM_TEX0, VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
                      IC(tex0_comps), CLIP_VRAM, &tex0_ok);
-    test_vram_region(g_ic_valid ? "VRAM TEX1 (IC35)" : "VRAM TEX1", VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
+    test_vram_region(g_ic_valid ? S_L_VRAM_TEX1_IC : S_L_VRAM_TEX1, VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
                      IC(tex1_comps), CLIP_VRAM, &tex1_ok);
     return tex0_ok;                     /* the framebuffer lives in TEX0 */
 }
@@ -499,39 +500,39 @@ static void test_naomi2_ram(void)
 {
     if (g_board_type != BOARD_NAOMI2)
         return;
-    scif_puts("\nNaomi 2: testing slave PVR VRAM and Elan RAM...\n");
+    scif_puts(S_N2_HDR);
     u32 ok = 1;
     pvr2_vram_enable();
-    test_vram_region("VRAM PVR-B (Naomi 2)", VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
+    test_vram_region(S_L_VRAM_B, VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
                      0, CLIP_VRAM_B, &ok);
     elan_init();
-    test_vram_region("Elan RAM (Naomi 2)", ELAN_RAM_BASE, ELAN_RAM_SIZE,
+    test_vram_region(S_L_ELAN, ELAN_RAM_BASE, ELAN_RAM_SIZE,
                      0, CLIP_ELAN, &ok);
 }
 
 /* ------------------------------------------------------------------ */
 static void test_sram_rtc(void)
 {
-    scif_puts("\nBackup SRAM (2x 62256, non-destructive) + AICA RTC...\n");
+    scif_puts(S_PERIPH_HDR);
 
     ram_result res;
     u32 mask = sram_test(&res, N_PASSES);
     /* positions 1/2 = even/odd byte lane; IC designators pending the
      * user's silkscreen readout -> spoken as numbered positions */
-    log_result("Backup SRAM (non-destructive)", CLIP_SRAM,
+    log_result(S_L_BACKSRAM, CLIP_SRAM,
                mask ? T_FAIL : T_OK, mask, 0);
     if (mask) {
         report_badbits(res.badbits);
-        report_comps("SRAM", mask, 0);
+        report_comps(S_CG_SRAM, mask, 0);
         report_fails(&res);
     }
 
     u32 rtcval = 0;
     u32 bad = rtc_test(&rtcval);
-    log_result("RTC (AICA, must tick)", CLIP_RTC, bad ? T_FAIL : T_OK, 0, 0);
-    scif_puts("  RTC counter: ");
+    log_result(S_L_RTC, CLIP_RTC, bad ? T_FAIL : T_OK, 0, 0);
+    scif_puts(S_RTC_COUNTER);
     scif_puthex(rtcval);
-    scif_puts(bad ? " (stuck or implausible)\n" : " (ticking)\n");
+    scif_puts(bad ? S_RTC_STUCK : S_RTC_TICK);
 }
 
 /* ------------------------------------------------------------------ */
@@ -557,14 +558,14 @@ static void test_dimm(void)
     scif_puts("\n");
 
     if (!di.present) {
-        log_result("DIMM board: not present", CLIP_NONE, T_OK, 0, 0);
+        log_result(S_L_DIMM_ABSENT, CLIP_NONE, T_OK, 0, 0);
         say(CLIP_DIMM, 250);
         say(CLIP_ABSENT, REPORT_GAP_MS);
         return;
     }
     /* present: sanity — the handshake bits must not be all stuck low */
     t_status st = (di.status == 0x0000) ? T_FAIL : T_OK;
-    log_result("DIMM board: present, mailbox", CLIP_NONE, st, 0, 0);
+    log_result(S_L_DIMM_PRESENT, CLIP_NONE, st, 0, 0);
     say(CLIP_DIMM, 250);
     say(CLIP_PRESENT, 250);
     say(st == T_OK ? CLIP_OK : CLIP_FAIL, REPORT_GAP_MS);
@@ -576,14 +577,14 @@ static void test_dimm(void)
 static void test_maple_mie(u32 ram_ok)
 {
     if (!ram_ok) {
-        scif_puts("\nMaple/MIE test skipped (main RAM unusable).\n");
+        scif_puts(S_MAPLE_SKIP);
         return;
     }
     maple_result mr;
     maple_scan(&mr);
 
     if (mr.found_port == 0xFFFFFFFF) {
-        log_result("Maple bus / MIE (JVS): no response", CLIP_JVS, T_FAIL, 0, 0);
+        log_result(S_L_MIE_NORESP, CLIP_JVS, T_FAIL, 0, 0);
         return;
     }
     scif_puts("  MIE on maple port ");
@@ -596,7 +597,7 @@ static void test_maple_mie(u32 ram_ok)
     /* 0x83 = version response from the 315-6146 firmware */
     if (mr.response_cmd == 0x83)
         g_mie_port1 = mr.found_port + 1;
-    log_result("Maple bus / MIE (JVS)", CLIP_JVS,
+    log_result(S_L_MIE, CLIP_JVS,
                mr.response_cmd == 0x83 ? T_OK : T_FAIL, 0, 0);
 
     /* factory self-test: the Z80 checks its own ROM/RAM (status 0 = ok).
@@ -608,7 +609,7 @@ static void test_maple_mie(u32 ram_ok)
         scif_puts("  MIE self-test status word: ");
         scif_puthex(st_word);
         scif_puts("\n");
-        log_result("MIE self-test (Z80 ROM+RAM)", CLIP_JVS,
+        log_result(S_L_MIE_SELFTEST, CLIP_JVS,
                    bad ? T_FAIL : T_OK, 0, 0);
     }
 }
@@ -620,7 +621,7 @@ static void test_maple_mie(u32 ram_ok)
 static void test_settings_eeprom(void)
 {
     if (!g_mie_port1) {
-        scif_puts("\nSettings EEPROM test skipped (no MIE).\n");
+        scif_puts(S_EEPROM_SKIP);
         return;
     }
     u8 ee[128];
@@ -628,8 +629,7 @@ static void test_settings_eeprom(void)
         /* Stock 315-6146 firmware has no 0x86 handler: reading this
          * EEPROM needs a code upload into the MIE (as the BIOS does).
          * Not a fault -> reported as a documented skip. */
-        scif_puts("  (stock MIE firmware: EEPROM read needs a Z80 code"
-                  " upload - future work)\n");
+        scif_puts(S_EEPROM_MIE_NOTE);
         return;
     }
     u16 stored1 = (u16)(ee[0] | (ee[1] << 8));
@@ -651,7 +651,7 @@ static void test_settings_eeprom(void)
 
     t_status st = (stored1 == calc1 && stored2 == calc2 && mirror_ok)
                       ? T_OK : T_FAIL;
-    log_result("Settings EEPROM (93C46 via MIE)", CLIP_EEPROM, st, 0, 0);
+    log_result(S_L_EEPROM_MIE, CLIP_EEPROM, st, 0, 0);
 }
 
 /* Serial-number 93C46 (SH4 GPIO): direct read + content plausibility
@@ -679,7 +679,7 @@ static void test_serial_eeprom(void)
 
     t_status st = (zeros == 128 || ones == 128 || printable < 16)
                       ? T_FAIL : T_OK;
-    log_result("Serial EEPROM (93C46, GPIO)", CLIP_EEPROM, st, 0, 0);
+    log_result(S_L_EEPROM_GPIO, CLIP_EEPROM, st, 0, 0);
 }
 
 /* X76F100 cart security chip: presence via response-to-reset. Absence is
@@ -691,13 +691,13 @@ static void test_x76(void)
     scif_puthex(rtr);
     scif_puts("\n");
     if (rtr == 0x00000000 || rtr == 0xFFFFFFFF) {
-        log_result("Cart security (X76F100): not present", CLIP_NONE,
+        log_result(S_L_X76_ABSENT, CLIP_NONE,
                    T_OK, 0, 0);
         say(CLIP_X76, 250);
         say(CLIP_ABSENT, REPORT_GAP_MS);
         return;
     }
-    log_result("Cart security (X76F100): present", CLIP_NONE, T_OK, 0, 0);
+    log_result(S_L_X76_PRESENT, CLIP_NONE, T_OK, 0, 0);
     say(CLIP_X76, 250);
     say(CLIP_PRESENT, 250);
     say(CLIP_OK, REPORT_GAP_MS);
@@ -739,7 +739,7 @@ static u32 sha1_eq(const u8 *a, const u8 *b)
 static void test_cartridge(void)
 {
     if (!cart_present()) {
-        log_result("Cartridge: not present", CLIP_NONE, T_OK, 0, 0);
+        log_result(S_L_CART_ABSENT, CLIP_NONE, T_OK, 0, 0);
         say(CLIP_CART, 250);
         say(CLIP_ABSENT, REPORT_GAP_MS);
         return;
@@ -748,7 +748,7 @@ static void test_cartridge(void)
     /* header peek: "NAOMI" magic + ASCII titles live in the first bytes */
     u8 hdr[80];
     cart_read(0, hdr, sizeof hdr);
-    scif_puts("\nCartridge header: \"");
+    scif_puts(S_CART_HDR);
     for (u32 i = 0; i < 64; i++)
         scif_putc((hdr[i] >= 32 && hdr[i] < 127) ? (char)hdr[i] : '.');
     scif_puts("\"\n");
@@ -760,7 +760,7 @@ static void test_cartridge(void)
     sha1_init(&c);
     cart_seek(0);
     u32 done = 0;
-    scif_puts("Identifying");
+    scif_puts(S_IDENTIFYING);
     for (u32 s = 0; s < CARTDB_NFIRST && game == 0xFFFFFFFF; s++) {
         u32 target = cartdb_first_sizes[s];
         while (done < target) {
@@ -794,13 +794,12 @@ static void test_cartridge(void)
     scif_puts("\n");
 
     if (game == 0xFFFFFFFF) {
-        scif_puts("  cartridge not in database (unknown or corrupted"
-                  " first IC)\n");
-        log_result("Cartridge: unknown content", CLIP_CART, T_FAIL, 0, 0);
+        scif_puts(S_CART_NOTINDB);
+        log_result(S_L_CART_UNKNOWN, CLIP_CART, T_FAIL, 0, 0);
         return;
     }
 
-    scif_puts("  identified: ");
+    scif_puts(S_IDENTIFIED);
     scif_puts(cartdb_title[game]);
     scif_puts("\n");
 
@@ -819,25 +818,25 @@ static void test_cartridge(void)
         scif_putc(' ');
         sha1_ic(cartdb_ic_off[idx], cartdb_ic_size[idx], digest);
         if (sha1_eq(digest, cartdb_sha1[idx])) {
-            scif_puts(" GOOD\n");
+            scif_puts(S_GOOD);
         } else {
-            scif_puts(" BAD\n");
+            scif_puts(S_BAD);
             bad++;
         }
     }
     if (bad) {
-        scif_puts("  ");
+        scif_puts(S_CART_NDEF_A);
         scif_putdec(bad);
-        scif_puts(" cartridge IC(s) DEFECTIVE (see list above)\n");
+        scif_puts(S_CART_NDEF_B);
     }
-    log_result("Cartridge content (SHA1 per IC)", CLIP_CART,
+    log_result(S_L_CART_CONTENT, CLIP_CART,
                bad ? T_FAIL : T_OK, 0, 0);
 }
 
 /* spoken replay of everything acquired before audio came up */
 static void audio_replay_log(void)
 {
-    scif_puts("Audio online: replaying acquired results on speaker...\n");
+    scif_puts(S_AUDIO_ONLINE);
     say(CLIP_AUDIO_OK, REPORT_GAP_MS);
     for (u32 i = 0; i < g_log_n; i++)
         say_entry(&g_log[i]);
@@ -847,12 +846,12 @@ static void audio_replay_log(void)
 void cmain(void)
 {
     timer_init();
-    scif_puts("SCIF console up, 115200 8N1\n");
+    scif_puts(S_SCIF_UP);
 
     /* crt0 already proved OC-RAM works, put it in the log.
      * A failure here means the SH4 itself (IC designator TBD) is dead —
      * crt0 reports it on SCIF and halts before ever reaching this point. */
-    log_result("CPU OC-RAM (cache as RAM)", CLIP_CPU_CACHE, T_OK, 0, 0);
+    log_result(S_L_OCRAM, CLIP_CPU_CACHE, T_OK, 0, 0);
 
     test_board();
     test_bios_rom();
@@ -876,7 +875,7 @@ void cmain(void)
         pvr_display_init();
         g_screen_ready = 1;
         screen_render();
-        scif_puts("Screen online: report displayed on VGA output.\n");
+        scif_puts(S_SCREEN_ONLINE);
     }
 
     /* now the slow CPU-RAM cell test, with screen + audio already live:
@@ -895,21 +894,21 @@ void cmain(void)
     test_x76();
     test_cartridge();
 
-    scif_puts("\n==== SUMMARY ====\n");
+    scif_puts(S_SUMMARY);
     for (u32 i = 0; i < g_log_n; i++) {
         scif_puts(g_log[i].name);
-        scif_puts(g_log[i].status == T_OK ? ": OK\n" : ": FAIL\n");
+        scif_puts(g_log[i].status == T_OK ? S_SUM_OK : S_SUM_FAIL);
     }
     if (usable)
-        scif_puts("Main RAM usable.\n");
+        scif_puts(S_MAINRAM_OK);
     else
-        scif_puts("Main RAM NOT usable -> staying in OC-RAM only mode.\n");
+        scif_puts(S_MAINRAM_KO);
     if (aram_ok)
-        scif_puts("Sound RAM usable, audio reports active.\n");
+        scif_puts(S_ARAM_OK_MSG);
     if (vram_ok)
-        scif_puts("VRAM usable, on-screen report active.\n");
+        scif_puts(S_VRAM_OK_MSG);
 
-    scif_puts("\n*** DIAG COMPLETE ***\n");
+    scif_puts(S_COMPLETE);
     say(CLIP_TESTS_DONE, REPORT_GAP_MS);
     scif_flush();
     for (;;)

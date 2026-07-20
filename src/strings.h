@@ -1,0 +1,193 @@
+/* =============================================================================
+ * strings.h -- compile-time localized user-facing strings.
+ *
+ * Pick the language at build time with -DLANG_FR (French) or nothing / any
+ * other value (English, the base language). One language is baked into each
+ * ROM: NaomiDIAG_EN.bin / NaomiDIAG_FR.bin.
+ *
+ * Only operator-facing narrative + result labels are localized. Low-level
+ * technical fragments (hex register dumps, "crc=", per-address fail dumps)
+ * stay in English on purpose: they are diagnostic detail read by a
+ * technician and are language-neutral.
+ *
+ * Also included by crt0.S (macros are plain string literals, cpp-safe).
+ * ========================================================================== */
+#ifndef STRINGS_H
+#define STRINGS_H
+
+#if defined(LANG_FR)
+/* ------------------------------- French -------------------------------- */
+
+/* boot (crt0.S) */
+#define S_BANNER_A          "\r\n\r\n==== NAOMI DIAG ROM v"
+#define S_BANNER_B          " (SH4/SCIF, boot sans RAM) ====\r\n"
+#define S_BOOT_OCRAM_OK     "OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK\r\n"
+#define S_BOOT_OCRAM_KO     "OC-RAM CPU (cache en RAM) ........ ECHEC -- CPU inutilisable, arret\r\n"
+
+/* result labels (SCIF + screen + drive the spoken clip) */
+#define S_L_OCRAM           "OC-RAM CPU (cache en RAM)"
+#define S_L_BOARD_N1        "Carte : Naomi 1 (837-13544)"
+#define S_L_BOARD_N2        "Carte : Naomi 2 (837-14009)"
+#define S_L_BOARD_UNK       "Carte : INCONNUE - noms IC desactives"
+#define S_L_BIOS            "ROM BIOS (IC27) CRC32"
+#define S_L_SDRAM_DBUS      "SDRAM bus de donnees"
+#define S_L_SDRAM_ABUS      "SDRAM bus d'adresses"
+#define S_L_SDRAM_CELL      "SDRAM test cellules (10 passes)"
+#define S_L_ARAM_DBUS       "RAM son bus de donnees"
+#define S_L_ARAM_CELL       "RAM son test cellules (10 passes)"
+#define S_L_VRAM_TEX0_IC    "VRAM TEX0 (IC9-12)"
+#define S_L_VRAM_TEX0       "VRAM TEX0"
+#define S_L_VRAM_TEX1_IC    "VRAM TEX1 (IC35)"
+#define S_L_VRAM_TEX1       "VRAM TEX1"
+#define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
+#define S_L_ELAN            "RAM Elan (Naomi 2)"
+#define S_L_BACKSRAM        "NVRAM sauvegarde (non destructif)"
+#define S_L_RTC             "RTC (AICA, doit avancer)"
+#define S_L_DIMM_ABSENT     "Carte DIMM : absente"
+#define S_L_DIMM_PRESENT    "Carte DIMM : presente, mailbox"
+#define S_L_MIE             "Bus Maple / MIE (JVS)"
+#define S_L_MIE_NORESP      "Bus Maple / MIE (JVS) : aucune reponse"
+#define S_L_MIE_SELFTEST    "Auto-test MIE (Z80 ROM+RAM)"
+#define S_L_EEPROM_MIE      "EEPROM reglages (93C46 via MIE)"
+#define S_L_EEPROM_GPIO     "EEPROM serie (93C46, GPIO)"
+#define S_L_X76_ABSENT      "Securite cartouche (X76F100) : absente"
+#define S_L_X76_PRESENT     "Securite cartouche (X76F100) : presente"
+#define S_L_CART_ABSENT     "Cartouche : absente"
+#define S_L_CART_UNKNOWN    "Cartouche : contenu inconnu"
+#define S_L_CART_CONTENT    "Contenu cartouche (SHA1 par IC)"
+
+/* status suffixes / words */
+#define S_SUF_OK            " ........ OK\n"
+#define S_SUF_FAIL          " ........ ECHEC\n"
+#define S_SUM_OK            ": OK\n"
+#define S_SUM_FAIL          ": ECHEC\n"
+#define S_SCR_OK            "OK"
+#define S_SCR_FAIL          "ECHEC"
+#define S_GOOD              " CORRECT\n"
+#define S_BAD               " MAUVAIS\n"
+#define S_DEFECTIVE         " DEFECTUEUX\n"
+
+/* component group names (report_comps) */
+#define S_CG_CPU            "RAM CPU"
+#define S_CG_SOUND          "RAM son"
+#define S_CG_SRAM           "NVRAM"
+
+/* phase headers / narrative */
+#define S_SCIF_UP           "Console SCIF active, 115200 8N1\n"
+#define S_SDRAM_INIT        "\nInit SDRAM (valeurs BSC du BIOS d'origine)...\n"
+#define S_SDRAM_SIZE        "Taille SDRAM detectee : "
+#define S_MB                " Mo\n"
+#define S_QUICK             "Build QUICK : test du 1er Mo seulement\n"
+#define S_PASS              "passe "
+#define S_AICA_HDR          "\nAICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...\n"
+#define S_PVR_HDR           "\nPVR : activation controleur VRAM, test RAM texture...\n"
+#define S_N2_HDR            "\nNaomi 2 : test VRAM du PVR esclave et RAM Elan...\n"
+#define S_SCREEN_ONLINE     "Ecran actif : rapport affiche sur la sortie VGA.\n"
+#define S_PERIPH_HDR        "\nNVRAM sauvegarde (2x 62256, non destructif) + RTC AICA...\n"
+#define S_RTC_COUNTER       "  Compteur RTC : "
+#define S_RTC_TICK          " (avance)\n"
+#define S_RTC_STUCK         " (fige ou incoherent)\n"
+#define S_MAPLE_SKIP        "\nTest Maple/MIE ignore (RAM principale inutilisable).\n"
+#define S_EEPROM_SKIP       "\nTest EEPROM reglages ignore (pas de MIE).\n"
+#define S_EEPROM_MIE_NOTE   "  (firmware MIE d'usine : la lecture EEPROM exige un upload de code Z80 - a venir)\n"
+#define S_CART_HDR          "\nEn-tete cartouche : \""
+#define S_IDENTIFYING       "Identification"
+#define S_CART_NOTINDB      "  cartouche absente de la base (inconnue ou 1ere IC corrompue)\n"
+#define S_IDENTIFIED        "  identifiee : "
+#define S_CART_NDEF_A       "  "
+#define S_CART_NDEF_B       " IC de cartouche DEFECTUEUSE(S) (voir liste ci-dessus)\n"
+#define S_AUDIO_ONLINE      "Audio actif : relecture des resultats acquis sur haut-parleur...\n"
+#define S_SUMMARY           "\n==== RESUME ====\n"
+#define S_MAINRAM_OK        "RAM principale utilisable.\n"
+#define S_MAINRAM_KO        "RAM principale INUTILISABLE -> mode OC-RAM uniquement.\n"
+#define S_ARAM_OK_MSG       "RAM son utilisable, rapports audio actifs.\n"
+#define S_VRAM_OK_MSG       "VRAM utilisable, rapport a l'ecran actif.\n"
+#define S_COMPLETE          "\n*** DIAGNOSTIC TERMINE ***\n"
+
+#else
+/* ------------------------------- English (base) ------------------------ */
+
+#define S_BANNER_A          "\r\n\r\n==== NAOMI DIAG ROM v"
+#define S_BANNER_B          " (SH4/SCIF, no-RAM boot) ====\r\n"
+#define S_BOOT_OCRAM_OK     "CPU OC-RAM (cache as RAM, 2x4KB) ........ OK\r\n"
+#define S_BOOT_OCRAM_KO     "CPU OC-RAM (cache as RAM) ........ FAIL -- CPU unusable, halting\r\n"
+
+#define S_L_OCRAM           "CPU OC-RAM (cache as RAM)"
+#define S_L_BOARD_N1        "Board: Naomi 1 (837-13544)"
+#define S_L_BOARD_N2        "Board: Naomi 2 (837-14009)"
+#define S_L_BOARD_UNK       "Board: UNKNOWN - IC names off"
+#define S_L_BIOS            "BIOS ROM (IC27) CRC32"
+#define S_L_SDRAM_DBUS      "SDRAM data bus"
+#define S_L_SDRAM_ABUS      "SDRAM address bus"
+#define S_L_SDRAM_CELL      "SDRAM cell test (10 passes)"
+#define S_L_ARAM_DBUS       "Sound RAM data bus"
+#define S_L_ARAM_CELL       "Sound RAM cell test (10 passes)"
+#define S_L_VRAM_TEX0_IC    "VRAM TEX0 (IC9-12)"
+#define S_L_VRAM_TEX0       "VRAM TEX0"
+#define S_L_VRAM_TEX1_IC    "VRAM TEX1 (IC35)"
+#define S_L_VRAM_TEX1       "VRAM TEX1"
+#define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
+#define S_L_ELAN            "Elan RAM (Naomi 2)"
+#define S_L_BACKSRAM        "Backup SRAM (non-destructive)"
+#define S_L_RTC             "RTC (AICA, must tick)"
+#define S_L_DIMM_ABSENT     "DIMM board: not present"
+#define S_L_DIMM_PRESENT    "DIMM board: present, mailbox"
+#define S_L_MIE             "Maple bus / MIE (JVS)"
+#define S_L_MIE_NORESP      "Maple bus / MIE (JVS): no response"
+#define S_L_MIE_SELFTEST    "MIE self-test (Z80 ROM+RAM)"
+#define S_L_EEPROM_MIE      "Settings EEPROM (93C46 via MIE)"
+#define S_L_EEPROM_GPIO     "Serial EEPROM (93C46, GPIO)"
+#define S_L_X76_ABSENT      "Cart security (X76F100): not present"
+#define S_L_X76_PRESENT     "Cart security (X76F100): present"
+#define S_L_CART_ABSENT     "Cartridge: not present"
+#define S_L_CART_UNKNOWN    "Cartridge: unknown content"
+#define S_L_CART_CONTENT    "Cartridge content (SHA1 per IC)"
+
+#define S_SUF_OK            " ........ OK\n"
+#define S_SUF_FAIL          " ........ FAIL\n"
+#define S_SUM_OK            ": OK\n"
+#define S_SUM_FAIL          ": FAIL\n"
+#define S_SCR_OK            "OK"
+#define S_SCR_FAIL          "FAIL"
+#define S_GOOD              " GOOD\n"
+#define S_BAD               " BAD\n"
+#define S_DEFECTIVE         " DEFECTIVE\n"
+
+#define S_CG_CPU            "CPU RAM"
+#define S_CG_SOUND          "SOUND RAM"
+#define S_CG_SRAM           "SRAM"
+
+#define S_SCIF_UP           "SCIF console up, 115200 8N1\n"
+#define S_SDRAM_INIT        "\nSDRAM init (BSC values from original BIOS)...\n"
+#define S_SDRAM_SIZE        "SDRAM detected size: "
+#define S_MB                " MB\n"
+#define S_QUICK             "QUICK build: testing first 1MB only\n"
+#define S_PASS              "pass "
+#define S_AICA_HDR          "\nAICA: ARM7 held in reset, testing sound RAM (8MB, G2 bus)...\n"
+#define S_PVR_HDR           "\nPVR: enabling VRAM controller, testing texture RAM...\n"
+#define S_N2_HDR            "\nNaomi 2: testing slave PVR VRAM and Elan RAM...\n"
+#define S_SCREEN_ONLINE     "Screen online: report displayed on VGA output.\n"
+#define S_PERIPH_HDR        "\nBackup SRAM (2x 62256, non-destructive) + AICA RTC...\n"
+#define S_RTC_COUNTER       "  RTC counter: "
+#define S_RTC_TICK          " (ticking)\n"
+#define S_RTC_STUCK         " (stuck or implausible)\n"
+#define S_MAPLE_SKIP        "\nMaple/MIE test skipped (main RAM unusable).\n"
+#define S_EEPROM_SKIP       "\nSettings EEPROM test skipped (no MIE).\n"
+#define S_EEPROM_MIE_NOTE   "  (stock MIE firmware: EEPROM read needs a Z80 code upload - future work)\n"
+#define S_CART_HDR          "\nCartridge header: \""
+#define S_IDENTIFYING       "Identifying"
+#define S_CART_NOTINDB      "  cartridge not in database (unknown or corrupted first IC)\n"
+#define S_IDENTIFIED        "  identified: "
+#define S_CART_NDEF_A       "  "
+#define S_CART_NDEF_B       " cartridge IC(s) DEFECTIVE (see list above)\n"
+#define S_AUDIO_ONLINE      "Audio online: replaying acquired results on speaker...\n"
+#define S_SUMMARY           "\n==== SUMMARY ====\n"
+#define S_MAINRAM_OK        "Main RAM usable.\n"
+#define S_MAINRAM_KO        "Main RAM NOT usable -> staying in OC-RAM only mode.\n"
+#define S_ARAM_OK_MSG       "Sound RAM usable, audio reports active.\n"
+#define S_VRAM_OK_MSG       "VRAM usable, on-screen report active.\n"
+#define S_COMPLETE          "\n*** DIAG COMPLETE ***\n"
+
+#endif
+
+#endif /* STRINGS_H */

@@ -18,3 +18,10 @@ diag_snap*.lua
 elan_fault.lua
 sram_fault.lua
 fault_dbg.lua
+src/audio_clips.h
+.build_*
+NaomiDIAG_*.bin
+naomi_diag_*.elf
+naomi_diag_*.map
+naomi_diag_*.dis
+mamelist.xml

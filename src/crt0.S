@@ -15,6 +15,7 @@
 ! =============================================================================
 
 #include "version.inc"
+#include "strings.h"
 
     .section .text.start, "ax"
     .global _start
@@ -177,10 +178,10 @@ Locram_ok:  .long ocram_ok_str
 Locram_ko:  .long ocram_ko_str
 
 banner_str:
-    .ascii "\r\n\r\n==== NAOMI DIAG ROM v"
+    .ascii S_BANNER_A
     .ascii DIAG_VERSION
-    .asciz " (SH4/SCIF, no-RAM boot) ====\r\n"
+    .asciz S_BANNER_B
 ocram_ok_str:
-    .asciz "CPU OC-RAM (cache as RAM, 2x4KB) ........ OK\r\n"
+    .asciz S_BOOT_OCRAM_OK
 ocram_ko_str:
-    .asciz "CPU OC-RAM (cache as RAM) ........ FAIL -- CPU unusable, halting\r\n"
+    .asciz S_BOOT_OCRAM_KO

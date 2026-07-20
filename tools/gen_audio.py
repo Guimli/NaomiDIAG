@@ -1,86 +1,106 @@
 #!/usr/bin/env python3
 """Generate spoken diagnostic clips as signed 16-bit LE 22050 Hz mono PCM
-embedded in a C header (src/audio_clips.h) for the AICA to play (PCMS=0).
+embedded in a C header for the AICA to play (PCMS=0).
 
-Engine: Piper neural TTS (tools/.venv) with the fr_FR-siwis-medium voice.
-Falls back to espeak-ng if Piper/model are missing."""
-import subprocess, tempfile, os, sys, shutil
+Usage: gen_audio.py <fr|en> [out.h]
 
-HERE  = os.path.dirname(os.path.abspath(__file__))
-PIPER = os.path.join(HERE, ".venv", "bin", "piper")
-MODEL = os.path.join(HERE, "voices", "fr_FR-siwis-medium.onnx")
+Engine: Piper neural TTS (tools/.venv), one voice model per language.
+Some entries use phonetic spelling so the TTS pronounces acronyms right
+(e.g. FR 'rome bioss' -> 'ROM BIOS', 'enne ve ram' -> 'NVRAM')."""
+import subprocess, tempfile, os, sys
 
-CLIPS = [
-    ("tests_done",  "Fin des tests."),
-    ("audio_ok",    "Sortie audio fonctionnelle."),
-    ("cpu_cache",   "Mémoire cache du processeur."),
-    ("cpu_ram",     "Mémoire principale."),
-    ("data_bus",    "Bus de données."),
-    ("addr_bus",    "Bus d'adresses."),
-    ("sound_ram",   "Mémoire son."),
-    ("ok",          "Test réussi."),
-    ("fail",        "Test échoué."),
-    ("defect",      "défectueuse."),
-    ("num_1",       "numéro un,"),
-    ("num_2",       "numéro deux,"),
-    ("num_3",       "numéro trois,"),
-    ("num_4",       "numéro quatre,"),
-    ("num_5",       "numéro cinq,"),
-    ("num_6",       "numéro six,"),
-    ("num_7",       "numéro sept,"),
-    ("num_8",       "numéro huit,"),
-    # silkscreen IC designators (mapping extracted from the original BIOS
-    # RAM TEST tables; WORK lane order still to be confirmed on real HW)
-    ("ic_9",        "I C neuf,"),
-    ("ic_10",       "I C dix,"),
-    ("ic_11",       "I C onze,"),
-    ("ic_12",       "I C douze,"),
-    ("ic_16",       "I C seize,"),
-    ("ic_18",       "I C dix-huit,"),
-    ("ic_20",       "I C vingt,"),
-    ("ic_22",       "I C vingt-deux,"),
-    ("ic_29",       "I C vingt-neuf,"),
-    ("ic_35",       "I C trente-cinq,"),
-    ("ic_27",       "I C vingt-sept,"),
-    ("bios",        "rome bioss."),   # phonetic: 'ROM BIOS' (avoid 'ron'/silent S)
-    ("vram",        "Mémoire vidéo."),
-    ("sram",        "enne vé ram."),   # phonetic: 'NVRAM'
-    ("rtc",         "Horloge temps réel."),
-    ("dimm",        "Carte dime."),
-    ("absent",      "absente."),
-    ("present",     "présente."),
-    ("jvs",         "Contrôleur d'entrées sorties, émi."),
-    ("naomi1",      "Carte Naomi un."),
-    ("naomi2",      "Carte Naomi deux."),
-    ("board_unk",   "Carte non identifiée."),
-    ("vram_b",      "Seconde mémoire vidéo."),
-    ("elan",        "Mémoire du processeur géométrique."),
-    ("eeprom",      "Mémoire des réglages."),
-    ("x76",         "Puce de sécurité cartouche."),
-    ("cart",        "Cartouche de jeu."),
-]
+HERE   = os.path.dirname(os.path.abspath(__file__))
+PIPER  = os.path.join(HERE, ".venv", "bin", "piper")
+VOICES = os.path.join(HERE, "voices")
+
+MODEL = {
+    "fr": os.path.join(VOICES, "fr_FR-siwis-medium.onnx"),
+    "en": os.path.join(VOICES, "en_US-lessac-medium.onnx"),
+}
+
+# clip key -> spoken text per language. Keys and order MUST match between
+# languages (they drive the shared CLIP_* enum consumed by the C code).
+CLIPS = {
+    "tests_done": {"fr": "Fin des tests.",                    "en": "Tests complete."},
+    "audio_ok":   {"fr": "Sortie audio fonctionnelle.",       "en": "Audio output working."},
+    "cpu_cache":  {"fr": "Mémoire cache du processeur.",      "en": "C P U cache memory."},
+    "cpu_ram":    {"fr": "Mémoire principale.",               "en": "Main memory."},
+    "data_bus":   {"fr": "Bus de données.",                   "en": "Data bus."},
+    "addr_bus":   {"fr": "Bus d'adresses.",                   "en": "Address bus."},
+    "sound_ram":  {"fr": "Mémoire son.",                      "en": "Sound memory."},
+    "ok":         {"fr": "Test réussi.",                      "en": "Test passed."},
+    "fail":       {"fr": "Test échoué.",                      "en": "Test failed."},
+    "defect":     {"fr": "défectueuse.",                      "en": "defective."},
+    "num_1":      {"fr": "numéro un,",                        "en": "number one,"},
+    "num_2":      {"fr": "numéro deux,",                      "en": "number two,"},
+    "num_3":      {"fr": "numéro trois,",                     "en": "number three,"},
+    "num_4":      {"fr": "numéro quatre,",                    "en": "number four,"},
+    "num_5":      {"fr": "numéro cinq,",                      "en": "number five,"},
+    "num_6":      {"fr": "numéro six,",                       "en": "number six,"},
+    "num_7":      {"fr": "numéro sept,",                      "en": "number seven,"},
+    "num_8":      {"fr": "numéro huit,",                      "en": "number eight,"},
+    # silkscreen IC designators (mapping from the original BIOS RAM TEST)
+    "ic_9":       {"fr": "I C neuf,",                         "en": "I C nine,"},
+    "ic_10":      {"fr": "I C dix,",                          "en": "I C ten,"},
+    "ic_11":      {"fr": "I C onze,",                         "en": "I C eleven,"},
+    "ic_12":      {"fr": "I C douze,",                        "en": "I C twelve,"},
+    "ic_16":      {"fr": "I C seize,",                        "en": "I C sixteen,"},
+    "ic_18":      {"fr": "I C dix-huit,",                     "en": "I C eighteen,"},
+    "ic_20":      {"fr": "I C vingt,",                        "en": "I C twenty,"},
+    "ic_22":      {"fr": "I C vingt-deux,",                   "en": "I C twenty two,"},
+    "ic_29":      {"fr": "I C vingt-neuf,",                   "en": "I C twenty nine,"},
+    "ic_35":      {"fr": "I C trente-cinq,",                  "en": "I C thirty five,"},
+    "ic_27":      {"fr": "I C vingt-sept,",                   "en": "I C twenty seven,"},
+    "bios":       {"fr": "rome bioss.",                       "en": "Rom bios."},
+    "vram":       {"fr": "Mémoire vidéo.",                    "en": "Video memory."},
+    "sram":       {"fr": "enne vé ram.",                      "en": "N V ram."},
+    "rtc":        {"fr": "Horloge temps réel.",              "en": "Real time clock."},
+    "dimm":       {"fr": "Carte dime.",                       "en": "Dimm board."},
+    "absent":     {"fr": "absente.",                          "en": "not present."},
+    "present":    {"fr": "présente.",                         "en": "present."},
+    "jvs":        {"fr": "Contrôleur d'entrées sorties, émi.","en": "I O controller, M I E."},
+    "naomi1":     {"fr": "Carte Naomi un.",                   "en": "Naomi one board."},
+    "naomi2":     {"fr": "Carte Naomi deux.",                 "en": "Naomi two board."},
+    "board_unk":  {"fr": "Carte non identifiée.",            "en": "Unknown board."},
+    "vram_b":     {"fr": "Seconde mémoire vidéo.",           "en": "Second video memory."},
+    "elan":       {"fr": "Mémoire du processeur géométrique.","en": "Geometry processor memory."},
+    "eeprom":     {"fr": "Mémoire des réglages.",            "en": "Settings memory."},
+    "x76":        {"fr": "Puce de sécurité cartouche.",      "en": "Cartridge security chip."},
+    "cart":       {"fr": "Cartouche de jeu.",                 "en": "Game cartridge."},
+}
 
 RATE = 22050
 MAX_SAMPLES = 0xFFF0            # AICA LEA is 16-bit
 
+def usage():
+    print("usage: gen_audio.py <fr|en> [out.h]")
+    sys.exit(1)
+
+if len(sys.argv) < 2 or sys.argv[1] not in MODEL:
+    usage()
+lang = sys.argv[1]
+out_path = sys.argv[2] if len(sys.argv) > 2 else f"src/audio_clips_{lang}.h"
+model = MODEL[lang]
+
 def tts(text, wav):
-    if os.path.exists(PIPER) and os.path.exists(MODEL):
-        subprocess.run([PIPER, "-m", MODEL, "-f", wav],
+    if os.path.exists(PIPER) and os.path.exists(model):
+        subprocess.run([PIPER, "-m", model, "-f", wav],
                        input=text.encode(), check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
+        ev = "fr" if lang == "fr" else "en"
         print("WARNING: Piper missing, falling back to espeak-ng")
-        subprocess.run(["espeak-ng", "-v", "fr", "-s", "150", "-w", wav, text],
+        subprocess.run(["espeak-ng", "-v", ev, "-s", "150", "-w", wav, text],
                        check=True)
 
-out = ["/* Auto-generated by tools/gen_audio.py — do not edit.",
+out = ["/* Auto-generated by tools/gen_audio.py -- do not edit.",
        f" * Signed 16-bit LE mono PCM @ {RATE} Hz for AICA (PCMS=0).",
-       " * Voice: Piper fr_FR-siwis-medium (neural TTS). */",
+       f" * Language: {lang}. Voice: Piper neural TTS. */",
        "#ifndef AUDIO_CLIPS_H", "#define AUDIO_CLIPS_H", ""]
 
-names = []
-total = 0
-for name, text in CLIPS:
+names, total = [], 0
+for name, texts in CLIPS.items():
+    text = texts[lang]
     with tempfile.TemporaryDirectory() as td:
         wav = os.path.join(td, "c.wav")
         raw = os.path.join(td, "c.raw")
@@ -103,7 +123,7 @@ for name, text in CLIPS:
     names.append(name)
     print(f"{name}: {len(data)} bytes ({len(data)/2/RATE:.2f} s)")
 
-print(f"total embedded audio: {total} bytes")
+print(f"[{lang}] total embedded audio: {total} bytes")
 out += ["", "typedef struct { const signed char *pcm; unsigned len; } audio_clip;",
         "enum {"]
 out += [f"    CLIP_{n.upper()}," for n in names]
@@ -112,5 +132,5 @@ out += ["    CLIP_COUNT", "};", "",
 out += [f"    {{ clip_{n}, sizeof clip_{n} }}," for n in names]
 out += ["};", "", "#endif"]
 
-with open(sys.argv[1] if len(sys.argv) > 1 else "src/audio_clips.h", "w") as f:
+with open(out_path, "w") as f:
     f.write("\n".join(out) + "\n")
