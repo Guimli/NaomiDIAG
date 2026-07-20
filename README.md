@@ -49,8 +49,7 @@ In order:
    self-tested; this is also the stack/`.bss` for the whole ROM (no external
    RAM used until proven).
 2. **Board identification** — Naomi 1 vs Naomi 2 (Elan T&L signature + VRAM
-   aliasing); the correct silkscreen IC table is selected, or numbered
-   positions are used on an unknown board.
+   aliasing).
 3. **BIOS EPROM (IC27)** — CRC32 self-check.
 4. **Sound RAM** (AICA, 8 MB, G2 bus) — then audio becomes a channel.
 5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — then the VGA report
@@ -73,7 +72,7 @@ In order:
    (OC-RAM) and completes every test that does not need main RAM — only the
    Maple/MIE test, which needs RAM for its DMA descriptors, is skipped.
 7. **Naomi 2 only** — slave PVR VRAM (16 MB) and Elan RAM (32 MB).
-8. **Backup SRAM** (2× 62256) — non-destructive save/restore test.
+8. **Backup SRAM** — non-destructive save/restore test.
 9. **RTC** (AICA) — non-destructive tick check.
 10. **DIMM board** (G1 mailbox) — presence and mailbox sanity.
 11. **Maple bus / MIE** (315-6146 Z80) — version request + factory
@@ -133,8 +132,7 @@ under the DRC, so fault injection into it needs `-nodrc`.
   and the ROM halts.
 - A CPU exception restarts the ROM (the banner reprints) — a repeating
   banner is itself a diagnostic signal.
-- The DIMM-board fan is monitored only by the DIMM firmware; the mainboard
-  cannot read it directly. The motherboard fan has no tachometer.
+- The DIMM-board fan is monitored only by the DIMM firmware.
 
 ## Status and limitations
 
@@ -145,8 +143,6 @@ under the DRC, so fault injection into it needs `-nodrc`.
   known (the BIOS never prints them); to be read off a real board.
 - The settings EEPROM read and full JVS I/O-board testing need a Z80 code
   upload into the MIE (future work).
-- MAME faithfully models the digital buses but not drive/analog mechanics;
-  real hardware is the final judge.
 
 ## Credits
 

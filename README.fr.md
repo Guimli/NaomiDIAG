@@ -51,8 +51,7 @@ Dans l'ordre :
    il sert aussi de pile/`.bss` à toute la ROM (aucune RAM externe utilisée
    avant d'être validée).
 2. **Identification de la carte** — Naomi 1 ou Naomi 2 (signature Elan +
-   aliasing VRAM) ; la bonne table de sérigraphies IC est choisie, sinon on
-   utilise des positions numérotées sur une carte inconnue.
+   aliasing VRAM).
 3. **EPROM BIOS (IC27)** — auto-contrôle CRC32.
 4. **RAM son** (AICA, 8 Mo, bus G2) — puis l'audio devient un canal.
 5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — puis l'écran de rapport
@@ -76,8 +75,7 @@ Dans l'ordre :
    RAM principale — seul le test Maple/MIE, qui a besoin de RAM pour ses
    descripteurs DMA, est ignoré.
 7. **Naomi 2 uniquement** — VRAM du PVR esclave (16 Mo) et RAM Elan (32 Mo).
-8. **NVRAM de sauvegarde** (2× 62256) — test non destructif (sauvegarde/
-   restauration).
+8. **NVRAM de sauvegarde** — test non destructif (sauvegarde/restauration).
 9. **RTC** (AICA) — vérification non destructive de l'avance de l'horloge.
 10. **Carte DIMM** (mailbox G1) — présence et cohérence de la mailbox.
 11. **Bus Maple / MIE** (Z80 315-6146) — requête de version + auto-test
@@ -139,9 +137,7 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   rapporté sur SCIF puis la ROM s'arrête.
 - Une exception CPU redémarre la ROM (la bannière se réaffiche) — une
   bannière qui se répète est en soi un signal de diagnostic.
-- Le ventilateur de la carte DIMM n'est surveillé que par le firmware DIMM ;
-  la carte mère ne peut pas le lire directement. Le ventilateur de la carte
-  mère n'a pas de tachymètre.
+- Le ventilateur de la carte DIMM n'est surveillé que par le firmware DIMM.
 
 ## État et limites
 
@@ -152,8 +148,6 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   encore inconnus (le BIOS ne les affiche jamais) ; à relever sur une carte.
 - La lecture de l'EEPROM des réglages et le test JVS complet de la carte
   I/O nécessitent un upload de code Z80 dans le MIE (travail futur).
-- MAME modélise fidèlement les bus numériques mais pas la mécanique des
-  lecteurs ni l'analogique ; le vrai matériel reste le juge final.
 
 ## Crédits
 
