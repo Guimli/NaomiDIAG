@@ -6,9 +6,13 @@ les composants de la carte un par un, en rapportant les résultats sur trois
 canaux — **série (SCIF)**, **écran (VGA)** et **voix** — sans jamais
 dépendre d'une mémoire dont le bon fonctionnement n'a pas encore été prouvé.
 
-Disponible en **anglais** et en **français**, texte et voix localisés —
-ROMs pré-compilées prêtes à graver : [NaomiDIAG_EN.bin](NaomiDIAG_EN.bin) /
-[NaomiDIAG_FR.bin](NaomiDIAG_FR.bin).
+Disponible en **anglais** et en **français**, texte et voix localisés.
+Les ROMs pré-compilées prêtes à graver sont sur la page
+[**Releases**](https://github.com/Guimli/NaomiDIAG/releases/latest) —
+téléchargement direct :
+[NaomiDIAG_EN.bin](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_EN.bin)
+·
+[NaomiDIAG_FR.bin](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_FR.bin).
 
 > English: see [README.md](README.md).
 

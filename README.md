@@ -6,9 +6,13 @@ board's components one by one, reporting results on up to three channels —
 **serial (SCIF)**, **on-screen (VGA)** and **spoken audio** — without ever
 relying on memory it has not yet proven good.
 
-Available in **English** and **French**, text and voice both localized —
-pre-built ROMs ready to burn: [NaomiDIAG_EN.bin](NaomiDIAG_EN.bin) /
-[NaomiDIAG_FR.bin](NaomiDIAG_FR.bin).
+Available in **English** and **French**, text and voice both localized.
+Pre-built ROMs ready to burn are on the
+[**Releases**](https://github.com/Guimli/NaomiDIAG/releases/latest) page —
+direct downloads:
+[NaomiDIAG_EN.bin](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_EN.bin)
+·
+[NaomiDIAG_FR.bin](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_FR.bin).
 
 > Français : voir [README.fr.md](README.fr.md).
 

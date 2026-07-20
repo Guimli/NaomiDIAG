@@ -25,11 +25,9 @@ x76f100_eeprom.bin
 # packed romsets and disc images
 *.zip
 *.chd
-# any raw binary (proprietary dumps, stray build outputs)...
+# any raw binary: proprietary dumps and our own build outputs alike.
+# The shippable ROMs are distributed via GitHub Releases, not committed.
 *.bin
-# ...except our own shippable ROM images (built from this source)
-!NaomiDIAG_EN.bin
-!NaomiDIAG_FR.bin
 
 # =============================================================================
 # Build artifacts
