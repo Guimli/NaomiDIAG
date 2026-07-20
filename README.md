@@ -11,15 +11,30 @@ Available in **English** and **French** (`NaomiDIAG_EN.bin` /
 
 > Français : voir [README.fr.md](README.fr.md).
 
-## Why three output channels, in this order
+## Three simultaneous output channels
 
-The SCIF serial port is the only output fully internal to the SH-4 CPU: it
-works from reset with **no external RAM at all**, so it is the primary and
-always-available channel. Sound and video need their own memories (sound
-RAM behind the AICA, VRAM behind the PowerVR), so they are tested first and,
-once proven good, become additional report channels. The slow main-RAM
-test then runs with audio and screen already live, so the machine never
-looks frozen during it.
+Every test result is reported **at the same time on every channel that is
+currently available** — serial, then serial + audio, then serial + audio +
+video — so the operator can watch, listen, or capture the log, whichever is
+convenient. As each result is produced it is printed on the SCIF, spoken
+aloud, and drawn on the VGA report screen together.
+
+The order in which the channels come up follows what each one needs:
+
+- **SCIF serial** is the only output fully internal to the SH-4 CPU: it
+  works from reset with **no external RAM at all**, so it is the primary and
+  always-available channel.
+- **Audio** needs the sound RAM (behind the AICA) and **video** needs the
+  VRAM (behind the PowerVR); those memories are tested first, and each
+  channel switches on only once its own memory has passed. When audio comes
+  up it first replays every result acquired so far, then reports live.
+
+Because sound and video are brought up before the long main-RAM test, the
+machine never looks frozen during that ~1-minute test — the screen already
+shows the earlier results and the SCIF prints per-pass progress.
+
+Spoken reports are blocking, with at least one second of silence between two
+messages so clips never overlap.
 
 ## What it tests
 
@@ -35,11 +50,23 @@ In order:
 4. **Sound RAM** (AICA, 8 MB, G2 bus) — then audio becomes a channel.
 5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — then the VGA report
    screen comes up.
-6. **Main CPU RAM** (SDRAM, 16/32 MB, IC16/18/20/22) — data bus, address
-   bus, then **10 passes of `0x55555555`, `0xAAAAAAAA` and a per-pass
-   pseudo-random stream whose CRC32 is kept in a CPU register and compared
-   read-vs-write**. Any bad cell marks the chip (and thus the whole
-   interleaved RAM) unusable; it is never used afterwards.
+6. **Main CPU RAM** (SDRAM, 16/32 MB, IC16/18/20/22) — first a data-bus
+   walking-ones test and an address-bus test, then **10 passes**, each pass
+   running three patterns in this order:
+   - write `0x55555555` (0101…) over the whole region, then read it all back
+     and compare;
+   - write `0xAAAAAAAA` (1010…) over the whole region, then read back and
+     compare;
+   - write a pseudo-random stream (a different seed each pass) while
+     accumulating a **CRC32 kept in a CPU register**, then read the region
+     back recomputing the CRC and compare it against the write-side CRC as
+     well as word by word.
+
+   Any single bad cell marks the whole chip (and thus the entire interleaved
+   RAM) defective; that RAM is never used for the rest of the program. If
+   **all** CPU RAM is bad, the program keeps running from the SH-4 cache
+   (OC-RAM) and completes every test that does not need main RAM — only the
+   Maple/MIE test, which needs RAM for its DMA descriptors, is skipped.
 7. **Naomi 2 only** — slave PVR VRAM (16 MB) and Elan RAM (32 MB).
 8. **Backup SRAM** (2× 62256) — non-destructive save/restore test.
 9. **RTC** (AICA) — non-destructive tick check.
@@ -68,8 +95,8 @@ make LANG=FR            # -> NaomiDIAG_FR.bin (French text + voice)
 make LANG=EN QUICK=1    # 1 MB per RAM pass, for fast emulator bring-up
 ```
 
-Both a 2 MB image is produced, ready to burn on a 27C160 EPROM (IC27). The
-build refuses to produce an image larger than 2 MB (no silent truncation).
+A 2 MB image is produced, ready to burn on a 27C160 EPROM (IC27). The build
+refuses to produce an image larger than 2 MB (no silent truncation).
 
 The same 27C160 image works on both Naomi 1 and Naomi 2 (both use a 2 MB
 BIOS); the board is detected at runtime.

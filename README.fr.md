@@ -11,16 +11,32 @@ Disponible en **anglais** et en **français** (`NaomiDIAG_EN.bin` /
 
 > English: see [README.md](README.md).
 
-## Pourquoi trois canaux de sortie, dans cet ordre
+## Trois canaux de sortie simultanés
 
-Le port série SCIF est la seule sortie entièrement interne au processeur
-SH-4 : il fonctionne dès le reset **sans aucune RAM externe**, c'est donc le
-canal primaire, toujours disponible. Le son et la vidéo ont besoin de leurs
-propres mémoires (RAM son derrière l'AICA, VRAM derrière le PowerVR) ; elles
-sont donc testées d'abord et, une fois validées, deviennent des canaux de
-rapport supplémentaires. Le long test de la RAM principale se déroule alors
-avec l'audio et l'écran déjà actifs, si bien que la machine ne paraît jamais
-figée pendant ce test.
+Chaque résultat de test est rapporté **en même temps sur tous les canaux
+alors disponibles** — série, puis série + audio, puis série + audio + vidéo
+— pour que l'opérateur puisse au choix regarder, écouter ou capturer le
+journal. À mesure qu'un résultat est produit, il est imprimé sur le SCIF,
+énoncé à voix haute et affiché à l'écran VGA, ensemble.
+
+L'ordre d'activation des canaux suit ce dont chacun a besoin :
+
+- Le **port série SCIF** est la seule sortie entièrement interne au SH-4 :
+  il fonctionne dès le reset **sans aucune RAM externe**, c'est le canal
+  primaire, toujours disponible.
+- L'**audio** a besoin de la RAM son (derrière l'AICA) et la **vidéo** de la
+  VRAM (derrière le PowerVR) ; ces mémoires sont testées d'abord, et chaque
+  canal ne s'active qu'une fois sa propre mémoire validée. Quand l'audio
+  s'active, il rejoue d'abord tous les résultats déjà acquis, puis rapporte
+  en direct.
+
+Comme le son et la vidéo sont activés avant le long test de la RAM
+principale, la machine ne paraît jamais figée pendant ce test d'environ une
+minute — l'écran affiche déjà les résultats précédents et le SCIF imprime la
+progression passe par passe.
+
+Les rapports vocaux sont bloquants, avec au moins une seconde de silence
+entre deux messages pour éviter tout chevauchement.
 
 ## Ce qui est testé
 
@@ -36,12 +52,24 @@ Dans l'ordre :
 4. **RAM son** (AICA, 8 Mo, bus G2) — puis l'audio devient un canal.
 5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — puis l'écran de rapport
    VGA s'active.
-6. **RAM CPU principale** (SDRAM, 16/32 Mo, IC16/18/20/22) — bus de données,
-   bus d'adresses, puis **10 passes de `0x55555555`, `0xAAAAAAAA` et un flux
-   pseudo-aléatoire (graine différente par passe) dont le CRC32 est conservé
-   dans un registre CPU et comparé écriture/lecture**. Toute cellule
-   défectueuse condamne la puce (et donc toute la RAM entrelacée), qui n'est
-   plus utilisée ensuite.
+6. **RAM CPU principale** (SDRAM, 16/32 Mo, IC16/18/20/22) — d'abord un test
+   bus de données (walking-ones) et un test bus d'adresses, puis **10
+   passes**, chaque passe enchaînant trois motifs dans cet ordre :
+   - écriture de `0x55555555` (0101…) sur toute la zone, puis relecture
+     complète et comparaison ;
+   - écriture de `0xAAAAAAAA` (1010…) sur toute la zone, puis relecture et
+     comparaison ;
+   - écriture d'un flux pseudo-aléatoire (graine différente à chaque passe)
+     en accumulant un **CRC32 conservé dans un registre CPU**, puis relecture
+     de la zone en recalculant le CRC et comparaison avec le CRC d'écriture
+     ainsi que mot à mot.
+
+   Toute cellule défectueuse condamne la puce entière (et donc toute la RAM
+   entrelacée), qui n'est plus utilisée pour la suite du programme. Si
+   **toute** la RAM CPU est défectueuse, le programme continue depuis le
+   cache du SH-4 (OC-RAM) et effectue tous les tests ne nécessitant pas la
+   RAM principale — seul le test Maple/MIE, qui a besoin de RAM pour ses
+   descripteurs DMA, est ignoré.
 7. **Naomi 2 uniquement** — VRAM du PVR esclave (16 Mo) et RAM Elan (32 Mo).
 8. **NVRAM de sauvegarde** (2× 62256) — test non destructif (sauvegarde/
    restauration).
