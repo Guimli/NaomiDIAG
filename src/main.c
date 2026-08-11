@@ -736,6 +736,71 @@ static u32 sha1_eq(const u8 *a, const u8 *b)
     return 1;
 }
 
+/* Per-data-line health of the cartridge bus. Two things are looked at:
+ *  - the share of 1s each line reads over a large sample: a line that
+ *    never toggles (0% or 100%) is stuck -- broken trace, dead
+ *    transceiver output, bent connector pin;
+ *  - mismatches between two reads of the very same addresses: any
+ *    difference means the line is unstable, the classic signature of a
+ *    tired bus transceiver or an oxidised edge connector. A checksum
+ *    alone cannot tell that apart from genuinely wrong ROM data. */
+/* unsigned divide, shift-and-subtract: this ROM links no libgcc, so the
+ * compiler's __udivsi3 helper is not available */
+static u32 udiv(u32 n, u32 d)
+{
+    if (!d)
+        return 0;
+    u32 q = 0, r = 0;
+    for (int i = 31; i >= 0; i--) {
+        r = (r << 1) | ((n >> i) & 1u);
+        if (r >= d) {
+            r -= d;
+            q |= 1u << i;
+        }
+    }
+    return q;
+}
+
+static void test_cart_pins(void)
+{
+    cart_pin_stats st;
+#if QUICK_TEST
+    const u32 span = 0x00010000;        /* 64 KB sample */
+#else
+    const u32 span = 0x00100000;        /* 1 MB sample */
+#endif
+    cart_pin_scan(0, span, &st);
+
+    scif_puts(S_PINS_HDR);
+    scif_puts(S_PINS_SAMPLED);
+    scif_putdec(st.words);
+    scif_puts("\n");
+
+    u32 faults = 0;
+    for (u32 b = 0; b < 16; b++) {
+        u32 pct = udiv(st.ones[b] * 100u, st.words);
+        scif_puts(S_PIN);
+        scif_putdec(b);
+        scif_puts(S_PIN_ONES);
+        scif_putdec(pct);
+        scif_puts(S_PIN_PCT);
+        if (st.words && (st.ones[b] == 0 || st.ones[b] == st.words)) {
+            scif_puts(S_PIN_STUCK);     /* never toggles */
+            faults++;
+        }
+        if (st.flaky[b]) {
+            scif_puts(S_PIN_FLAKY);     /* differs between two reads */
+            scif_putdec(st.flaky[b]);
+            faults++;
+        }
+        scif_puts("\n");
+    }
+    if (!faults)
+        scif_puts(S_PINS_OK);
+
+    log_result(S_L_CART_PINS, CLIP_DATA_BUS, faults ? T_FAIL : T_OK, 0, 0);
+}
+
 static void test_cartridge(void)
 {
     if (!cart_present()) {
@@ -796,6 +861,10 @@ static void test_cartridge(void)
     if (game == 0xFFFFFFFF) {
         scif_puts(S_CART_NOTINDB);
         log_result(S_L_CART_UNKNOWN, CLIP_CART, T_FAIL, 0, 0);
+        /* A dead or unstable data line corrupts every read, so the game
+         * cannot be identified -- run the per-line test anyway: it tells
+         * a bus/connector fault apart from a genuinely unknown cart. */
+        test_cart_pins();
         return;
     }
 
@@ -803,10 +872,12 @@ static void test_cartridge(void)
     scif_puts(cartdb_title[game]);
     scif_puts("\n");
 
-    /* verify every IC of the identified game */
+    /* verify every IC of the identified game: first that the chip answers
+     * at all (a missing or unseated EPROM is a different fault from bad
+     * content), then its SHA-1 */
     u32 nics = cartdb_game_nics[game];
     u32 base = cartdb_game_first[game];
-    u32 bad = 0;
+    u32 bad = 0, missing = 0;
 #if QUICK_TEST
     if (nics > 2)
         nics = 2;                       /* emulator bring-up: 2 ICs only */
@@ -815,6 +886,11 @@ static void test_cartridge(void)
         u32 idx = base + i;
         scif_puts("  ");
         scif_puts(cartdb_ic_name[idx]);   /* name already includes "ic" */
+        if (!cart_ic_responds(cartdb_ic_off[idx], cartdb_ic_size[idx])) {
+            scif_puts(S_NO_RESPONSE);
+            missing++;
+            continue;                     /* no point hashing dead silence */
+        }
         scif_putc(' ');
         sha1_ic(cartdb_ic_off[idx], cartdb_ic_size[idx], digest);
         if (sha1_eq(digest, cartdb_sha1[idx])) {
@@ -824,13 +900,22 @@ static void test_cartridge(void)
             bad++;
         }
     }
+    if (missing) {
+        scif_puts(S_CART_NMISS_A);
+        scif_putdec(missing);
+        scif_puts(S_CART_NMISS_B);
+    }
+    log_result(S_L_CART_PRESENCE, CLIP_CART, missing ? T_FAIL : T_OK, 0, 0);
+
     if (bad) {
         scif_puts(S_CART_NDEF_A);
         scif_putdec(bad);
         scif_puts(S_CART_NDEF_B);
     }
     log_result(S_L_CART_CONTENT, CLIP_CART,
-               bad ? T_FAIL : T_OK, 0, 0);
+               (bad || missing) ? T_FAIL : T_OK, 0, 0);
+
+    test_cart_pins();
 }
 
 /* spoken replay of everything acquired before audio came up */

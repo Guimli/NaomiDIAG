@@ -88,6 +88,17 @@ Dans l'ordre :
 15. **Contenu cartouche** — identifie le jeu dans une base embarquée de tous
     les jeux cartouche Naomi/Naomi 2 connus (192 jeux, 2298 IC) et vérifie
     chaque puce ROM par SHA-1, en nommant l'IC fautive par sa sérigraphie.
+16. **Présence des ROM cartouche** — avant le hachage, chaque mask ROM du jeu
+    identifié est sondée : une puce qui répond un 0xFFFF/0x0000 constant
+    partout est signalée comme *ne répondant pas* (absente, mal enfichée,
+    morte) plutôt que comme contenu erroné.
+17. **Lignes de données cartouche** — statistiques par broche sur le bus
+    16 bits : proportion de 1 lue par chaque ligne (une ligne qui ne bascule
+    jamais est figée), plus la comparaison de deux lectures des mêmes
+    adresses — tout bit qui diffère trahit une ligne instable, signature
+    d'un transceiver fatigué ou d'un connecteur encrassé. Ce test tourne
+    même quand le jeu n'est pas identifiable, puisqu'une ligne morte est
+    précisément ce qui empêche l'identification.
 
 Les pannes RAM sont rapportées par composant : masque de bits, lanes de
 données concernées, et désignateur IC sérigraphié (ex.

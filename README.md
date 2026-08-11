@@ -85,6 +85,17 @@ In order:
     database of every known Naomi/Naomi 2 cartridge (192 games, 2298 ICs)
     and verifies each ROM chip by SHA-1, reporting the failing IC by its
     silkscreen name.
+16. **Cartridge ROM presence** — before hashing, each mask ROM of the
+    identified game is probed: a chip that answers a constant 0xFFFF/0x0000
+    everywhere is reported as *not responding* (missing, unseated, dead)
+    rather than as bad content.
+17. **Cartridge data lines** — per-pin statistics over the 16-bit cartridge
+    bus: the share of 1s each line reads (a line that never toggles is
+    stuck), plus a comparison of two reads of the same addresses — any bit
+    that differs is an unstable line, the signature of a tired bus
+    transceiver or a dirty edge connector. This runs even when the game
+    cannot be identified, since a dead line is precisely what prevents
+    identification.
 
 RAM faults are reported per component: a bit mask, the affected data lanes,
 and the silkscreen IC designator (e.g. `CPU RAM 1 (IC16) DEFECTIVE`).
