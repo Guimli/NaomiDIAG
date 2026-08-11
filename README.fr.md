@@ -88,10 +88,16 @@ Dans l'ordre :
 15. **Contenu cartouche** — identifie le jeu dans une base embarquée de tous
     les jeux cartouche Naomi/Naomi 2 connus (192 jeux, 2298 IC) et vérifie
     chaque puce ROM par SHA-1, en nommant l'IC fautive par sa sérigraphie.
-16. **Présence des ROM cartouche** — avant le hachage, chaque mask ROM du jeu
-    identifié est sondée : une puce qui répond un 0xFFFF/0x0000 constant
-    partout est signalée comme *ne répondant pas* (absente, mal enfichée,
-    morte) plutôt que comme contenu erroné.
+16. **Complétude du jeu de ROM cartouche** — une fois le jeu identifié,
+    **l'ensemble des puces nécessaires à ce jeu** est vérifié : chaque mask
+    ROM de la fiche de la base est sondée et le résultat est affirmé
+    explicitement (`jeu de ROM : 13 / 13 puces presentes`). Une puce qui
+    répond un 0xFFFF/0x0000 constant partout est signalée comme *ne
+    répondant pas* (absente, mal enfichée, morte) plutôt que comme contenu
+    erroné, et une puce renvoyant les mêmes octets qu'une autre est
+    signalée comme miroir d'adresses — un support vide auquel une puce
+    voisine répond. La présence est vérifiée sur toutes les puces même en
+    build QUICK ; seul le hachage est réduit.
 17. **Lignes de données cartouche** — statistiques par broche sur le bus
     16 bits : proportion de 1 lue par chaque ligne (une ligne qui ne bascule
     jamais est figée), plus la comparaison de deux lectures des mêmes

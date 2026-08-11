@@ -85,10 +85,15 @@ In order:
     database of every known Naomi/Naomi 2 cartridge (192 games, 2298 ICs)
     and verifies each ROM chip by SHA-1, reporting the failing IC by its
     silkscreen name.
-16. **Cartridge ROM presence** — before hashing, each mask ROM of the
-    identified game is probed: a chip that answers a constant 0xFFFF/0x0000
-    everywhere is reported as *not responding* (missing, unseated, dead)
-    rather than as bad content.
+16. **Cartridge ROM set completeness** — once the game is identified, the
+    **whole set of chips that game needs** is checked: every mask ROM in the
+    database entry is probed and the result is stated affirmatively
+    (`ROM set: 13 / 13 chips present`). A chip answering a constant
+    0xFFFF/0x0000 everywhere is reported as *not responding* (missing,
+    unseated, dead) rather than as bad content, and a chip returning the
+    same bytes as another one is flagged as an address-aliasing mirror —
+    an empty socket that a neighbouring chip answers for. Presence is
+    checked on every chip even on QUICK builds; only hashing is trimmed.
 17. **Cartridge data lines** — per-pin statistics over the 16-bit cartridge
     bus: the share of 1s each line reads (a line that never toggles is
     stuck), plus a comparison of two reads of the same addresses — any bit

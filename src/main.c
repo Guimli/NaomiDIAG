@@ -878,10 +878,22 @@ static void test_cartridge(void)
     u32 nics = cartdb_game_nics[game];
     u32 base = cartdb_game_first[game];
     u32 bad = 0, missing = 0;
+    /* Presence is probed on EVERY chip the game needs (16 samples each,
+     * cheap). Only the slow SHA-1 hashing is trimmed on QUICK builds. */
 #if QUICK_TEST
-    if (nics > 2)
-        nics = 2;                       /* emulator bring-up: 2 ICs only */
+    const u32 nhash = (nics > 2) ? 2 : nics;
+#else
+    const u32 nhash = nics;
 #endif
+
+    /* keep every digest so identical chips can be spotted: an empty
+     * socket often mirrors a neighbouring chip through address decoding
+     * instead of reading back 0xFF, which the presence probe cannot see */
+#define CART_MAX_TRACK 32
+    u8  seen_digest[CART_MAX_TRACK][20];
+    u32 seen_idx[CART_MAX_TRACK];
+    u32 nseen = 0;
+
     for (u32 i = 0; i < nics; i++) {
         u32 idx = base + i;
         scif_puts("  ");
@@ -891,15 +903,45 @@ static void test_cartridge(void)
             missing++;
             continue;                     /* no point hashing dead silence */
         }
+        if (i >= nhash) {                 /* present, hashing skipped */
+            scif_puts(S_PRESENT_ONLY);
+            continue;
+        }
         scif_putc(' ');
         sha1_ic(cartdb_ic_off[idx], cartdb_ic_size[idx], digest);
-        if (sha1_eq(digest, cartdb_sha1[idx])) {
-            scif_puts(S_GOOD);
-        } else {
-            scif_puts(S_BAD);
+        u32 ok = sha1_eq(digest, cartdb_sha1[idx]);
+        scif_puts(ok ? S_GOOD : S_BAD);
+        if (!ok)
             bad++;
+
+        /* alias check: same bytes as an earlier chip = one of them is
+         * not really there (only meaningful when the content is wrong) */
+        u32 aliased = 0xFFFFFFFF;
+        for (u32 s = 0; s < nseen; s++) {
+            if (sha1_eq(digest, seen_digest[s])) {
+                aliased = seen_idx[s];
+                break;
+            }
+        }
+        if (aliased != 0xFFFFFFFF && !ok) {
+            scif_puts(S_ALIAS_A);
+            scif_puts(cartdb_ic_name[aliased]);
+            scif_puts(S_ALIAS_B);
+            missing++;                    /* chip is effectively absent */
+        } else if (nseen < CART_MAX_TRACK) {
+            for (u32 b = 0; b < 20; b++)
+                seen_digest[nseen][b] = digest[b];
+            seen_idx[nseen] = idx;
+            nseen++;
         }
     }
+
+    /* affirmative count: how many of the chips this game needs answered */
+    scif_puts(S_ROMSET_A);
+    scif_putdec(nics - missing);
+    scif_puts(S_ROMSET_B);
+    scif_putdec(nics);
+    scif_puts(S_ROMSET_C);
     if (missing) {
         scif_puts(S_CART_NMISS_A);
         scif_putdec(missing);
