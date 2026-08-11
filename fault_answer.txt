@@ -1,0 +1,2 @@
+SOUND RAM (AICA) bit D31 stuck at 0
+range 0x00840000-0x0087ffff

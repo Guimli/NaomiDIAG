@@ -192,7 +192,7 @@ void fb_clear(u16 color)
 }
 
 /* 8x8 public-domain font, rendered x2 -> 16x16 cells, 40 cols x 30 rows */
-void fb_text(u32 x, u32 y, const char *s, u16 color)
+void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax)
 {
     volatile u16 *base = fb();
     while (*s) {
@@ -214,7 +214,8 @@ void fb_text(u32 x, u32 y, const char *s, u16 color)
             }
         }
         x += 16;
-        if (x + 16 > FB_W)
-            return;
+        if (x + 16 > xmax)
+            return;                     /* clipped: keeps clear of the
+                                           status column on the right */
     }
 }

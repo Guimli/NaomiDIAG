@@ -37,7 +37,12 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r);
 /* Display: VGA 640x480@31kHz, RGB565, timings from the original BIOS. */
 void pvr_display_init(void);
 void fb_clear(u16 color);
-void fb_text(u32 x, u32 y, const char *s, u16 color);   /* 8x8 font, x2 scale */
+/* 8x8 font at x2 scale. Drawing stops before xmax so a long label can
+ * never run into the status column on the right. */
+void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax);
+
+/* column where the OK/FAIL status is drawn; labels are clipped before it */
+#define FB_STATUS_X  (FB_W - 16 * 6)
 
 #define RGB565(r, g, b) (u16)(((r) & 0x1F) << 11 | ((g) & 0x3F) << 5 | ((b) & 0x1F))
 #define COL_WHITE   RGB565(31, 63, 31)

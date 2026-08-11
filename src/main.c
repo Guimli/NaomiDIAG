@@ -101,15 +101,15 @@ static void screen_render(void)
     if (!g_screen_ready)
         return;
     fb_clear(0);
-    fb_text(112, 8, "NAOMI DIAG ROM v" DIAG_VERSION, COL_TITLE);
+    fb_text(112, 8, "NAOMI DIAG ROM v" DIAG_VERSION, COL_TITLE, FB_W);
     u32 y = 48;
     for (u32 i = 0; i < g_log_n && y < FB_H - 20; i++) {
         const log_entry *e = &g_log[i];
-        fb_text(16, y, e->name, COL_WHITE);
+        fb_text(16, y, e->name, COL_WHITE, FB_STATUS_X);
         if (e->status == T_OK) {
-            fb_text(FB_W - 16 * 3, y, S_SCR_OK, COL_GREEN);
+            fb_text(FB_W - 16 * 3, y, S_SCR_OK, COL_GREEN, FB_W);
         } else {
-            fb_text(FB_W - 16 * 5, y, S_SCR_FAIL, COL_RED);
+            fb_text(FB_W - 16 * 6, y, S_SCR_FAIL, COL_RED, FB_W);
             if (e->detail && e->comps) {
                 y += 20;
                 u32 x = 32;
@@ -118,7 +118,7 @@ static void screen_render(void)
                     if (!(e->detail & (1u << b)) || e->comps[b].name == last)
                         continue;
                     last = e->comps[b].name;
-                    fb_text(x, y, e->comps[b].name, COL_RED);
+                    fb_text(x, y, e->comps[b].name, COL_RED, FB_W);
                     x += 16 * 5;
                 }
             }

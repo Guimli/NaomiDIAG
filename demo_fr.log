@@ -1,0 +1,24 @@
+ALSA lib seq_hw.c:540:(snd_seq_hw_open) open /dev/snd/seq failed: Permission denied
+epr-21576h.ic27 WRONG CHECKSUMS:
+    EXPECTED: CRC(d4895685) SHA1(91424d481ff99a8d3f4c45cea6d3f0eada049a6d)
+       FOUND: CRC(2144df1c) SHA1(e3397443453203288e28f6348bbcdfd6a1c3283a)
+WARNING: the machine might not run correctly.
+[random_fault] a fault was injected (see fault_answer.txt)
+
+
+==== NAOMI DIAG ROM v0.9 (SH4/SCIF, boot sans RAM) ====
+OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
+Console SCIF active, 115200 8N1
+OC-RAM CPU (cache en RAM) ........ OK
+Board probe: SH4 ver 040205C1, HOLLY id 17FD11DB rev 00000011, Elan id 00000000, dual PVR 0
+Carte : Naomi 1 (837-13544) ........ OK
+ROM BIOS (IC27) CRC32 ........ OK
+
+Init SDRAM (valeurs BSC du BIOS d'origine)...
+Taille SDRAM detectee : 32 Mo
+
+AICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...
+RAM son bus de donnees ........ OK
+Build QUICK : test du 1er Mo seulement
+passe 1/10: 5555Caught unhandled N3sol5errorE exception: integer value will be misrepresented in lua
+Average speed: 91.00% (2 seconds)
