@@ -7,11 +7,16 @@
  * anything else until ramtest.c has validated it. */
 #include "sdram.h"
 
+/* Wait for a few refresh cycles to elapse. BOUNDED: if the refresh
+ * counter never advances (misconfigured controller, dead SDRAM clock),
+ * a diagnostic ROM must not hang here -- it gives up and carries on, and
+ * the SDRAM cell test that follows will report the memory as bad. */
 static void refresh_wait(void)
 {
     RFCR = RFCR_VAL;                 /* reset refresh counter (0xA4xx key) */
-    while ((RFCR & 0x03FF) <= 8)
-        ;
+    for (u32 guard = 0; guard < 1000000u; guard++)
+        if ((RFCR & 0x03FF) > 8)
+            return;
 }
 
 static void mode_set(u32 mcr_val)

@@ -26,8 +26,11 @@ void delay_ms(u32 ms)
         TCNT0 = (TMU_HZ / 1000) * slice;
         TCOR0 = 0xFFFFFFFF;
         TSTR |= 1;
-        while (!(TCR0 & TCR_UNF))
-            ;
+        /* BOUNDED: never hang on a dead timer -- the guard is far longer
+         * than the slice itself, so a healthy TMU always wins the race. */
+        for (u32 guard = slice * 50000u; guard; guard--)
+            if (TCR0 & TCR_UNF)
+                break;
         TSTR &= (u8)~1;
         TCR0 = 0;
     }

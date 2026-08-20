@@ -57,6 +57,8 @@
 #define S_L_CART_CONTENT    "Contenu cartouche (SHA1 par IC)"
 #define S_L_CART_PRESENCE   "Presence des ROM cartouche"
 #define S_L_CART_PINS       "Lignes de donnees cartouche"
+#define S_L_AUDIO_QUICK     "RAM son zone clips (rapide)"
+#define S_L_VIDEO_QUICK     "VRAM framebuffer (rapide)"
 
 /* status suffixes / words */
 #define S_SUF_OK            " ........ OK\n"
@@ -163,6 +165,8 @@
 #define S_L_CART_CONTENT    "Cartridge content (SHA1 per IC)"
 #define S_L_CART_PRESENCE   "Cartridge ROM presence"
 #define S_L_CART_PINS       "Cartridge data lines"
+#define S_L_AUDIO_QUICK     "Sound RAM clip zone quick check"
+#define S_L_VIDEO_QUICK     "VRAM framebuffer quick check"
 
 #define S_SUF_OK            " ........ OK\n"
 #define S_SUF_FAIL          " ........ FAIL\n"

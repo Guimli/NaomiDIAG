@@ -468,6 +468,9 @@ static void test_vram_region(const char *name, u32 base, u32 size,
         u32 seed = 0x7E0CBEEF ^ (0x9E3779B9u * (pass + 1)) ^ base;
         vram_test_prng(base, len, seed, &res);
         scif_putc('.');
+        /* this test scribbles over the framebuffer: repaint after every
+         * pass so the screen stays readable (and shows progress) */
+        screen_render();
     }
     scif_putc('\n');
 
@@ -960,6 +963,70 @@ static void test_cartridge(void)
     test_cart_pins();
 }
 
+/* ------------------------------------------------------------------ */
+/* Fast channel bring-up.
+ *
+ * The exhaustive memory tests take minutes on real hardware (the ROM runs
+ * uncached straight from the EPROM), so waiting for them before lighting
+ * up a channel leaves the operator staring at a dead machine. Instead we
+ * prove ONLY the small region each channel actually uses -- the clip
+ * landing zone for audio, the framebuffer for video -- which takes
+ * seconds, and bring the channel up right away. The full memory is still
+ * tested exhaustively straight afterwards, with its results reported on
+ * the channels now available.
+ *
+ * Rule 1 is preserved: nothing is used before being proven; we simply
+ * prove the part we need first. */
+
+static void audio_replay_log(void);   /* defined below */
+
+#define AUDIO_ZONE_OFF  0x00010000u     /* clip landing zone in sound RAM */
+#define AUDIO_ZONE_LEN  0x00020000u     /* 128 KB: longest clip fits */
+#define FB_ZONE_LEN     ((u32)FB_W * FB_H * 2)   /* 640x480 RGB565 */
+
+static void quick_audio_bringup(void)
+{
+    aica_init();                        /* ARM7 held in reset */
+
+    ram_result res;
+    ram_result_clear(&res);
+    u32 bad = aram_test_databus();
+    if (!bad) {
+        aram_test_pattern(AUDIO_ZONE_OFF, AUDIO_ZONE_LEN, 0x55555555, &res);
+        aram_test_pattern(AUDIO_ZONE_OFF, AUDIO_ZONE_LEN, 0xAAAAAAAA, &res);
+        aram_test_prng(AUDIO_ZONE_OFF, AUDIO_ZONE_LEN, 0xA1CA5EED, &res);
+    }
+    t_status st = (bad || res.errors) ? T_FAIL : T_OK;
+    log_result(S_L_AUDIO_QUICK, CLIP_NONE, st, 0, 0);
+    if (st == T_OK) {
+        g_audio_ready = 1;              /* channel 3 live, in seconds */
+        audio_replay_log();
+    }
+}
+
+static void quick_video_bringup(void)
+{
+    pvr_vram_enable();
+
+    ram_result res;
+    ram_result_clear(&res);
+    u32 bad = vram_test_databus(VRAM_TEX0_BASE);
+    u32 fb = VRAM_TEX0_BASE + FB_VRAM_OFFSET;
+    if (!bad) {
+        vram_test_pattern(fb, FB_ZONE_LEN, 0x55555555, &res);
+        vram_test_pattern(fb, FB_ZONE_LEN, 0xAAAAAAAA, &res);
+        vram_test_prng(fb, FB_ZONE_LEN, 0x7EC0FFEE, &res);
+    }
+    t_status st = (bad || res.errors) ? T_FAIL : T_OK;
+    log_result(S_L_VIDEO_QUICK, CLIP_NONE, st, 0, 0);
+    if (st == T_OK) {
+        pvr_display_init();
+        g_screen_ready = 1;             /* channel 2 live, in seconds */
+        screen_render();
+        scif_puts(S_SCREEN_ONLINE);
+    }
+}
+
 /* spoken replay of everything acquired before audio came up */
 static void audio_replay_log(void)
 {
@@ -988,22 +1055,14 @@ void cmain(void)
      * are up, so the ~1 min test never looks like a freeze. */
     sdram_setup();
 
-    /* audio stage: test sound RAM, then it becomes an output channel */
-    u32 aram_ok = test_aram();
-    if (aram_ok) {
-        g_audio_ready = 1;
-        audio_replay_log();
-    }
+    /* light up the audio and video channels within seconds, by proving
+     * only the region each one needs (see quick_*_bringup above) */
+    quick_video_bringup();   /* screen first: richest channel, no replay */
+    quick_audio_bringup();   /* then audio, which replays the history */
 
-    /* video stage: test VRAM, then the screen becomes an output channel
-     * (the framebuffer sits in TEX0, validated just before) */
+    /* now the exhaustive memory tests, reported live on those channels */
+    u32 aram_ok = test_aram();
     u32 vram_ok = test_vram();
-    if (vram_ok) {
-        pvr_display_init();
-        g_screen_ready = 1;
-        screen_render();
-        scif_puts(S_SCREEN_ONLINE);
-    }
 
     /* now the slow CPU-RAM cell test, with screen + audio already live:
      * each result is shown/spoken as it lands, SCIF prints pass progress */
