@@ -1,5 +1,17 @@
 #include "cart.h"
 
+/* G1 bus timing, with the values the original BIOS programs before it
+ * touches the ROM board (0x5F7490/7494 <- 0x511, 0x5F74A0 <- 5). The exact
+ * semantics are unverified and the BIOS writes them conditionally, on a
+ * condition we have not identified -- but running the cartridge tests on a
+ * completely unconfigured bus is worse. */
+void g1_bus_init(void)
+{
+    REG32(0xA05F7490) = 0x00000511;
+    REG32(0xA05F7494) = 0x00000511;
+    REG32(0xA05F74A0) = 0x00000005;
+}
+
 void cart_seek(u32 offset)
 {
     /* bit31 = PIO auto-advance; bit29 = linear raw addressing on M2 carts

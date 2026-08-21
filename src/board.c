@@ -39,14 +39,25 @@ void board_detect(board_info *b)
     b->sh4_ver   = SH4_VERSION;
     b->holly_id  = HOLLY_ID;
     b->holly_rev = HOLLY_REV;
-    b->elan_id   = ELAN_ID;
-    b->elan_rev  = ELAN_REV;
-    b->dual_pvr  = detect_dual_pvr();
+    b->elan_id   = 0;
+    b->elan_rev  = 0;
 
-    if ((b->elan_id & 0xFFFF0000) == 0xE1AD0000 || b->dual_pvr)
+    /* Decide from the VRAM aliasing probe ALONE. It only ever touches
+     * addresses mapped on both boards (on a Naomi 1 the second window is a
+     * documented mirror of the first). The Elan sits in an area that is
+     * UNPOPULATED on a Naomi 1 -- MAME maps it as 'Unassigned' and returns
+     * 0, but on real silicon reading empty space is a blind probe, exactly
+     * what this project's own methodology warns against. So the Elan is
+     * only read once we already know this is a Naomi 2. */
+    b->dual_pvr = detect_dual_pvr();
+
+    if (b->dual_pvr) {
         b->type = BOARD_NAOMI2;
-    else if (b->holly_id == 0x17FD11DB)
+        b->elan_id  = ELAN_ID;          /* safe: populated on this board */
+        b->elan_rev = ELAN_REV;
+    } else if (b->holly_id == 0x17FD11DB) {
         b->type = BOARD_NAOMI1;
-    else
+    } else {
         b->type = BOARD_UNKNOWN;
+    }
 }

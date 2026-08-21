@@ -10,6 +10,7 @@
 #define CART_ROM_OFFSETL    REG16(0xA05F7004)
 #define CART_ROM_DATA       REG16(0xA05F7008)
 
+void g1_bus_init(void);
 void cart_seek(u32 offset);
 void cart_read(u32 offset, u8 *buf, u32 len);
 

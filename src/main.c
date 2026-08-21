@@ -806,6 +806,7 @@ static void test_cart_pins(void)
 
 static void test_cartridge(void)
 {
+    g1_bus_init();
     if (!cart_present()) {
         log_result(S_L_CART_ABSENT, CLIP_NONE, T_OK, 0, 0);
         say(CLIP_CART, 250);
@@ -1040,6 +1041,10 @@ static void audio_replay_log(void)
 void cmain(void)
 {
     timer_init();
+    /* Enable the SH-4 DMA controller. The original BIOS does this early and
+     * JinGasa documents why: without it the Maple bus does not work. We only
+     * declared the register until now, never wrote it. */
+    DMAOR = 0x00008201;
     scif_puts(S_SCIF_UP);
 
     /* crt0 already proved OC-RAM works, put it in the log.
@@ -1047,7 +1052,6 @@ void cmain(void)
      * crt0 reports it on SCIF and halts before ever reaching this point. */
     log_result(S_L_OCRAM, CLIP_CPU_CACHE, T_OK, 0, 0);
 
-    test_board();
     test_bios_rom();
 
     /* configure the bus + detect RAM size (fast) — needed by AICA/PVR,
@@ -1059,6 +1063,12 @@ void cmain(void)
      * only the region each one needs (see quick_*_bringup above) */
     quick_video_bringup();   /* screen first: richest channel, no replay */
     quick_audio_bringup();   /* then audio, which replays the history */
+
+    /* Board identification runs only now: it probes addresses whose
+     * behaviour on real hardware is less certain than plain memory, so if
+     * it ever misbehaves the operator already has screen and audio up to
+     * see how far the diagnostic got. */
+    test_board();
 
     /* now the exhaustive memory tests, reported live on those channels */
     u32 aram_ok = test_aram();

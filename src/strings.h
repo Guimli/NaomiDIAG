@@ -59,6 +59,9 @@
 #define S_L_CART_PINS       "Lignes de donnees cartouche"
 #define S_L_AUDIO_QUICK     "RAM son zone clips (rapide)"
 #define S_L_VIDEO_QUICK     "VRAM framebuffer (rapide)"
+#define S_EXC_A             "\r\n*** EXCEPTION CPU : EXPEVT="
+#define S_EXC_B             "  PC="
+#define S_EXC_C             "  -- arret ***\r\n"
 
 /* status suffixes / words */
 #define S_SUF_OK            " ........ OK\n"
@@ -167,6 +170,9 @@
 #define S_L_CART_PINS       "Cartridge data lines"
 #define S_L_AUDIO_QUICK     "Sound RAM clip zone quick check"
 #define S_L_VIDEO_QUICK     "VRAM framebuffer quick check"
+#define S_EXC_A             "\r\n*** CPU EXCEPTION: EXPEVT="
+#define S_EXC_B             "  PC="
+#define S_EXC_C             "  -- halted ***\r\n"
 
 #define S_SUF_OK            " ........ OK\n"
 #define S_SUF_FAIL          " ........ FAIL\n"

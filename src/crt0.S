@@ -64,6 +64,21 @@ scif_setup:
     nop
 
 ! ---------------------------------------------------------------------------
+! Exception vectors. Until now SR.BL=1, which on the SH-4 turns ANY exception
+! into a jump to the reset vector -- i.e. a silent restart of this ROM, in a
+! loop, indistinguishable from a hardware watchdog. MAME never shows it (its
+! SH-4 core raises no exception on unmapped accesses), so a diagnostic ROM
+! must report the exception instead of vanishing. Point VBR at our table and
+! let exceptions through.
+! ---------------------------------------------------------------------------
+    mov.l   Lvbr, r0
+    ldc     r0, vbr
+    stc     sr, r0
+    mov.l   Lnobl, r1           ! ~BL
+    and     r1, r0
+    ldc     r0, sr              ! exceptions now vector through VBR
+
+! ---------------------------------------------------------------------------
 ! OC-RAM self-test: both 4KB banks, first and last word, two patterns.
 ! Uses only registers. If the CPU cache is bad, the CPU itself is unusable:
 ! report on SCIF and halt.
@@ -173,9 +188,18 @@ Lstack:     .long 0x7C001000
 Lbss_s:     .long __bss_start
 Lbss_e:     .long __bss_end
 Lcmain:     .long _cmain
+Lvbr:       .long _vbr_base
+Lnobl:      .long 0xEFFFFFFF
 Lbanner:    .long banner_str
 Locram_ok:  .long ocram_ok_str
 Locram_ko:  .long ocram_ko_str
+
+exc_a_str:
+    .asciz S_EXC_A
+exc_b_str:
+    .asciz S_EXC_B
+exc_c_str:
+    .asciz S_EXC_C
 
 banner_str:
     .ascii S_BANNER_A
@@ -185,3 +209,103 @@ ocram_ok_str:
     .asciz S_BOOT_OCRAM_OK
 ocram_ko_str:
     .asciz S_BOOT_OCRAM_KO
+
+! =============================================================================
+! Exception vector table and handler.
+! The SH-4 vectors to VBR+0x100 (general), VBR+0x400 (TLB miss) and
+! VBR+0x600 (interrupt). Each stub is exactly 4 bytes so the fixed offsets
+! below are exact; exc_common sits just past the table, well inside the
+! +-4 KB reach of bra.
+! =============================================================================
+    .balign 1024
+    .global _vbr_base
+_vbr_base:
+    .space  0x100
+_vec_general:                   ! VBR + 0x100
+    bra     exc_common
+    nop
+    .space  0x400 - 0x104
+_vec_tlbmiss:                   ! VBR + 0x400
+    bra     exc_common
+    nop
+    .space  0x600 - 0x404
+_vec_irq:                       ! VBR + 0x600
+    bra     exc_common
+    nop
+
+! Report and halt. No stack is used: this may run before one exists, and the
+! stack is exactly what a bad exception is likely to have destroyed.
+exc_common:
+    mov.l   Hexc_a, r4
+    mov.l   Hputs, r0
+    jsr     @r0                 ! PR is clobbered: we never return
+    nop
+    mov.l   Hexpevt, r0
+    mov.l   @r0, r4             ! exception cause
+    bsr     asm_puthex
+    nop
+    mov.l   Hexc_b, r4
+    mov.l   Hputs, r0
+    jsr     @r0
+    nop
+    stc     spc, r4             ! address the exception came from
+    bsr     asm_puthex
+    nop
+    mov.l   Hexc_c, r4
+    mov.l   Hputs, r0
+    jsr     @r0
+    nop
+exc_halt:
+    bra     exc_halt
+    nop
+
+    .align 4
+Hexc_a:     .long exc_a_str
+Hexc_b:     .long exc_b_str
+Hexc_c:     .long exc_c_str
+Hputs:      .long asm_puts
+Hexpevt:    .long 0xFF000024
+
+! ---------------------------------------------------------------------------
+! asm_puthex: print r4 as 8 hex digits on the SCIF. Leaf, no stack, no RAM.
+! Clobbers r0,r1,r2,r4,r5,r6,r7.
+! ---------------------------------------------------------------------------
+    .global asm_puthex
+asm_puthex:
+    mov.l   Lscif_h, r1
+    mov.l   Lfsr_keep_h, r5
+    mov     #8, r7
+1:  mov     r4, r0
+    shlr16  r0
+    shlr8   r0
+    shlr2   r0
+    shlr2   r0                  ! r0 = top nibble
+    and     #15, r0
+    mov     #10, r2
+    cmp/hs  r2, r0
+    bf      2f
+    add     #7, r0              ! 'A'-'0'-10
+2:  add     #48, r0             ! '0'
+    mov     r0, r2
+    mov.l   Ltxspin_h, r6
+3:  mov.w   @(16, r1), r0       ! SCFSR2: room in TX FIFO?
+    tst     #0x20, r0
+    bf      4f
+    dt      r6
+    bf      3b
+4:  mov     r2, r0
+    mov.b   r0, @(12, r1)       ! SCFTDR2
+    mov.w   @(16, r1), r0
+    and     r5, r0
+    mov.w   r0, @(16, r1)
+    shll2   r4
+    shll2   r4                  ! next nibble
+    dt      r7
+    bf      1b
+    rts
+    nop
+
+    .align 4
+Lscif_h:     .long 0xFFE80000
+Lfsr_keep_h: .long 0x0000FF9F
+Ltxspin_h:   .long 0x00020000
