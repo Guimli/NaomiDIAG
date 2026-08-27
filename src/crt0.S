@@ -38,6 +38,31 @@ _start:
     nop
 
 ! ---------------------------------------------------------------------------
+! Leave P2 for P1 -- the single biggest speed factor on real hardware.
+!
+! The SH-4 boots at 0xA0000000 (P2), a window the hardware NEVER caches, by
+! design: it is where you configure the cache from. Everything we ran there
+! fetched every single instruction from the boot EPROM. CCR enables the
+! instruction cache but that has no effect until the code lives in a
+! cacheable window, so the whole diagnostic crawled -- the 2 MB ROM checksum
+! alone kept the screen black for minutes on a real board.
+!
+! The image is linked for P1 (0x80000000, cached alias of the same area 0),
+! so this is the last instruction sequence that runs uncached: the literal
+! below already holds a P1 address, and every absolute address from here on
+! -- functions, strings, VBR, audio clips -- is a P1 address too. Hardware
+! registers are untouched by this: they are all reached through explicit
+! 0xA0.../0xFF... addresses, which stay uncached as required.
+!
+! Must be done from P2, after CCR is programmed (ICI has just invalidated
+! the instruction cache) and after the nops above have let the write settle.
+! ---------------------------------------------------------------------------
+    mov.l   Lp1_entry, r0
+    jmp     @r0                 ! ... and we are running cached
+    nop
+p1_entry:
+
+! ---------------------------------------------------------------------------
 ! SCIF init: 115200 8N1, FIFOs on. Registers only, no memory involved.
 ! ---------------------------------------------------------------------------
 scif_setup:
@@ -188,6 +213,7 @@ Lstack:     .long 0x7C001000
 Lbss_s:     .long __bss_start
 Lbss_e:     .long __bss_end
 Lcmain:     .long _cmain
+Lp1_entry:  .long p1_entry
 Lvbr:       .long _vbr_base
 Lnobl:      .long 0xEFFFFFFF
 Lbanner:    .long banner_str

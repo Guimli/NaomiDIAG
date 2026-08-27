@@ -19,7 +19,8 @@ ELF     := naomi_diag_$(lang_lc).elf
 
 CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
            -Wall -Wextra -std=c11 -DQUICK_TEST=$(QUICK) -DLANG_$(LANG)
-LDFLAGS := -nostdlib -Wl,-T,linker.ld -Wl,--build-id=none -Wl,-Map,$(ELF).map
+ROM_BASE ?= 0x80000000
+LDFLAGS := -nostdlib -Wl,-T,linker.gen.ld -Wl,--build-id=none -Wl,-Map,$(ELF).map
 
 OBJS := src/crt0.o src/main.o src/scif.o src/sdram.o src/ramtest.o \
         src/timer.o src/aica.o src/pvr.o src/periph.o src/dimm.o src/maple.o \
@@ -48,7 +49,10 @@ src/%.o: src/%.c $(HDRS) src/audio_clips.h $(STAMP)
 src/%.o: src/%.S src/version.inc src/strings.h $(STAMP)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(ELF): $(OBJS) linker.ld
+linker.gen.ld: linker.ld
+	sed 's/@ROM_BASE@/$(ROM_BASE)/' $< > $@
+
+$(ELF): $(OBJS) linker.gen.ld
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $@
 
 $(BIN): $(ELF)
@@ -93,6 +97,6 @@ run-mame: mame-rom
 
 clean:
 	rm -f src/*.o naomi_diag_*.elf naomi_diag_*.map naomi_diag_*.dis \
-	      NaomiDIAG_*.bin src/audio_clips.h .build_*
+	      NaomiDIAG_*.bin src/audio_clips.h .build_* linker.gen.ld
 
 .PHONY: all audio cartdb dis mame-rom run-mame clean

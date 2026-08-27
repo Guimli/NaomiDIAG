@@ -286,7 +286,10 @@ static const u32 bios_crc4tab[16] = {
 
 static void test_bios_rom(void)
 {
-    const volatile u32 *rom = (const volatile u32 *)0xA0000000;
+    /* read through P1: cached, so one 32-byte line fill serves 8 words
+     * instead of 8 separate EPROM cycles. Correct for a checksum -- the
+     * content is read-only and the cache was invalidated at reset. */
+    const volatile u32 *rom = (const volatile u32 *)0x80000000;
     u32 n = (0x00200000 - 4) >> 2;
     register u32 crc = 0xFFFFFFFF;
     for (u32 i = 0; i < n; i++) {
@@ -1060,12 +1063,15 @@ void cmain(void)
      * BIOS CRC below used to run at that crippled speed. */
     sdram_setup();
 
-    test_bios_rom();
-
     /* light up the audio and video channels within seconds, by proving
      * only the region each one needs (see quick_*_bringup above) */
     quick_video_bringup();   /* screen first: richest channel, no replay */
     quick_audio_bringup();   /* then audio, which replays the history */
+
+    /* Only now the 2 MB ROM checksum: it is the single longest test in the
+     * whole suite (4.2 M table steps) and it must never run while the
+     * operator is still staring at a black screen. */
+    test_bios_rom();
 
     /* Board identification runs only now: it probes addresses whose
      * behaviour on real hardware is less certain than plain memory, so if
