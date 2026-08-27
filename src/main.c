@@ -1052,12 +1052,15 @@ void cmain(void)
      * crt0 reports it on SCIF and halts before ever reaching this point. */
     log_result(S_L_OCRAM, CLIP_CPU_CACHE, T_OK, 0, 0);
 
-    test_bios_rom();
-
-    /* configure the bus + detect RAM size (fast) — needed by AICA/PVR,
-     * but the long CPU-RAM cell test is deferred until after audio/video
-     * are up, so the ~1 min test never looks like a freeze. */
+    /* Bus controller FIRST, exactly like the original BIOS at 0xA0000440.
+     * Until this runs, area 0 (the boot EPROM) uses the reset-default wait
+     * states -- the slowest the chip offers -- and everything that reads
+     * ROM crawls. Measured on real hardware: a plain two-instruction loop
+     * ran orders of magnitude slower before this was programmed. The 2 MB
+     * BIOS CRC below used to run at that crippled speed. */
     sdram_setup();
+
+    test_bios_rom();
 
     /* light up the audio and video channels within seconds, by proving
      * only the region each one needs (see quick_*_bringup above) */
