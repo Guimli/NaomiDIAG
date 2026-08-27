@@ -7,6 +7,14 @@
 #define ARAM_P2_BASE    0xA0800000u
 #define ARAM_SIZE       0x00800000u     /* 8 MB on Naomi */
 
+/* Block until the G2 bus is idle; mandatory around any access to sound RAM,
+ * AICA registers or the RTC (all sit behind G2). */
+void aica_g2_wait(void);
+
+/* Number of times the G2 bus failed to go idle within the bound: non-zero
+ * means the bus itself is faulty, and any sound RAM result is void. */
+u32 aica_g2_stalled(void);
+
 /* Hold the ARM7 in reset and set master volume; call before touching ARAM. */
 void aica_init(void);
 

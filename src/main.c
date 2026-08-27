@@ -427,6 +427,14 @@ static u32 test_aram(void)
         scif_puts(res.errors ? " ERR\n" : " ok\n");
     }
 
+    /* a G2 bus that never drains aborts the write loops: the cell results
+     * are meaningless then, and the bus is the actual fault to report */
+    if (aica_g2_stalled()) {
+        scif_puts("  G2 bus never went idle: sound RAM result is void\n");
+        log_result(S_L_ARAM_CELL, CLIP_SOUND_RAM, T_FAIL, 0, IC(aram_comps));
+        return 0;
+    }
+
     t_status st = res.errors ? T_FAIL : T_OK;
     log_result(S_L_ARAM_CELL, CLIP_SOUND_RAM, st,
                ram_comp_mask(&res), IC(aram_comps));

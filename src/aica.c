@@ -16,12 +16,32 @@
 #define VOICE_ARAM_OFF  0x00010000u     /* clip landing zone in sound RAM */
 #define VOICE_RATE      22050u
 
-static void g2_fifo_wait(void)
+/* Wait until the G2 bus has drained, using the mask the original Naomi BIOS
+ * itself polls at SB_FFST (see its loop: mov #49,rN / mov.l @rM,rK /
+ * tst rN,rK / bf). 0x31 = bits 0, 4 and 5; bit 4 is the SH-4 -> G2 write
+ * buffer. We previously polled 0x20 alone, i.e. we never watched that write
+ * buffer at all, so a long run of back-to-back writes overran the G2 FIFO
+ * and locked the bus on real hardware -- the sound RAM cell test froze right
+ * after the data bus test, which writes too few words to overrun anything.
+ * MAME models no FIFO, so it never showed this.
+ *
+ * Bounded, and a timeout is recorded rather than ignored: a G2 bus that
+ * never goes idle is itself a fault worth reporting, and grinding through
+ * millions of words at 0x8000 wasted reads each would just look like a
+ * freeze -- exactly the symptom we are removing. */
+static u32 g2_stalled;
+
+static int g2_fifo_wait(void)
 {
-    for (u32 i = 0; i < 0x1800; i++)
-        if (!(G2_FIFO_STAT & 0x20))
-            return;
+    for (u32 i = 0; i < 0x8000u; i++)
+        if (!(G2_FIFO_STAT & 0x31))
+            return 1;
+    g2_stalled++;
+    return 0;
 }
+
+void aica_g2_wait(void)     { g2_fifo_wait(); }
+u32  aica_g2_stalled(void)  { return g2_stalled; }
 
 void aica_init(void)
 {
@@ -80,8 +100,8 @@ void aram_test_pattern(u32 off, u32 len, u32 pattern, ram_result *r)
     volatile u32 *p = (volatile u32 *)(ARAM_P2_BASE + off);
     u32 n = len >> 2;
     for (u32 i = 0; i < n; i++) {
-        if ((i & 7) == 0)
-            g2_fifo_wait();
+        if ((i & 7) == 0 && !g2_fifo_wait())
+            return;                     /* G2 stalled: reported by caller */
         p[i] = pattern;
     }
     for (u32 i = 0; i < n; i++) {
@@ -124,8 +144,8 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
 
     for (u32 i = 0; i < n; i++) {
         x = xorshift32(x);
-        if ((i & 7) == 0)
-            g2_fifo_wait();
+        if ((i & 7) == 0 && !g2_fifo_wait())
+            return;                     /* G2 stalled: reported by caller */
         p[i] = x;
         crc_w = crc32_word(crc_w, x);
     }

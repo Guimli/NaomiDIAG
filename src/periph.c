@@ -1,5 +1,6 @@
 /* Peripheral tests: battery-backed SRAM (non-destructive) and AICA RTC. */
 #include "periph.h"
+#include "aica.h"
 #include "timer.h"
 
 /* ---- backup SRAM ---- */
@@ -159,11 +160,13 @@ u32 x76f100_rtr(void)
 
 /* ---- AICA RTC ---- */
 
+/* the RTC sits behind G2: drain the bus before touching it */
 #define RTC_HI      REG32(0xA0710000u)
 #define RTC_LO      REG32(0xA0710004u)
 
 static u32 rtc_read(void)
 {
+    aica_g2_wait();
     /* consistent 32-bit read of the split counter */
     for (int tries = 0; tries < 4; tries++) {
         u32 hi1 = RTC_HI & 0xFFFF;
