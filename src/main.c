@@ -126,7 +126,8 @@ static void screen_render(void)
         }
         y += 20;
     }
-    /* the repaint above cleared the whole screen: put the bar back */
+    /* the repaint above cleared the whole screen: put the bar back whole */
+    fb_progress_invalidate();
     fb_progress(progress_label(), progress_pct());
 }
 

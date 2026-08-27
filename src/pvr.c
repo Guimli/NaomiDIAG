@@ -278,6 +278,8 @@ void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax)
 #define BAR_W   (FB_W - 32)
 #define BAR_H   20
 
+static u32 g_bar_filled;                 /* pixels currently painted green */
+
 void fb_fill_rows(u32 y0, u32 y1, u16 color)
 {
     volatile u32 *p = (volatile u32 *)fb();
@@ -302,12 +304,25 @@ void fb_progress(const char *label, u32 pct)
     if (pct > 100)
         pct = 100;
 
-    /* label line, cleared each time so a shorter label cannot leave
-     * fragments of the previous one behind */
-    fb_fill_rows(BAR_Y - 22, BAR_Y - 4, 0);
-    fb_text(BAR_X, BAR_Y - 22, label, COL_WHITE, FB_W - 16 * 5);
+    u32 inner = BAR_W - 4;
+    u32 filled = (inner * pct) / 100;      /* pct <= 100: no overflow */
 
-    /* percentage, right aligned in its own fixed 4-character field */
+    /* A new test starts at 0%, i.e. filled goes backwards: wipe the whole
+     * interior then. Otherwise paint only the slice that just appeared --
+     * repainting the full bar on every percent would cost more VRAM writes
+     * than the memory test it is reporting on. */
+    if (filled < g_bar_filled) {
+        fb_rect(BAR_X + 2, BAR_Y + 2, inner, BAR_H - 4, 0);
+        fb_fill_rows(BAR_Y - 22, BAR_Y - 4, 0);     /* and the label line */
+        fb_text(BAR_X, BAR_Y - 22, label, COL_WHITE, FB_W - 16 * 5);
+    } else if (filled > g_bar_filled) {
+        fb_rect(BAR_X + 2 + g_bar_filled, BAR_Y + 2,
+                filled - g_bar_filled, BAR_H - 4, COL_GREEN);
+    }
+    g_bar_filled = filled;
+
+    /* percentage, in its own fixed field so it needs no full-line clear */
+    fb_rect(FB_W - 16 * 5, BAR_Y - 22, 16 * 5, 18, 0);
     char num[5];
     u32 n = pct, i = 0;
     char tmp[4];
@@ -319,12 +334,16 @@ void fb_progress(const char *label, u32 pct)
     num[j] = 0;
     fb_text(FB_W - 16 * 5, BAR_Y - 22, num, COL_TITLE, FB_W);
 
-    /* bar: frame once, then fill proportionally */
+    /* frame */
     fb_rect(BAR_X, BAR_Y, BAR_W, 1, COL_WHITE);
     fb_rect(BAR_X, BAR_Y + BAR_H - 1, BAR_W, 1, COL_WHITE);
     fb_rect(BAR_X, BAR_Y, 1, BAR_H, COL_WHITE);
     fb_rect(BAR_X + BAR_W - 1, BAR_Y, 1, BAR_H, COL_WHITE);
-    u32 inner = BAR_W - 4;
-    u32 filled = (inner * pct) / 100;      /* pct <= 100: fits in 32 bits */
-    fb_rect(BAR_X + 2, BAR_Y + 2, filled, BAR_H - 4, COL_GREEN);
+}
+
+/* after a full-screen repaint nothing of the bar is left on screen: forget
+ * how much was drawn so the next call paints it whole again */
+void fb_progress_invalidate(void)
+{
+    g_bar_filled = 0;
 }
