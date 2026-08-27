@@ -27,6 +27,7 @@
 #include "strings.h"
 #include "audio_clips.h"
 #include "cartdb.h"
+#include "progress.h"
 
 #ifndef QUICK_TEST
 #define QUICK_TEST 0
@@ -103,7 +104,7 @@ static void screen_render(void)
     fb_clear(0);
     fb_text(112, 8, "NAOMI DIAG ROM v" DIAG_VERSION, COL_TITLE, FB_W);
     u32 y = 48;
-    for (u32 i = 0; i < g_log_n && y < FB_H - 20; i++) {
+    for (u32 i = 0; i < g_log_n && y < FB_REPORT_YMAX; i++) {
         const log_entry *e = &g_log[i];
         fb_text(16, y, e->name, COL_WHITE, FB_STATUS_X);
         if (e->status == T_OK) {
@@ -125,6 +126,32 @@ static void screen_render(void)
         }
         y += 20;
     }
+    /* the repaint above cleared the whole screen: put the bar back */
+    fb_progress(progress_label(), progress_pct());
+}
+
+/* "<base> pass k/10" assembled in OC-RAM: the ROM allows no writable .data,
+ * and the progress bar needs to name which of the ten passes is running. */
+static char g_passbuf[64];
+
+static const char *pass_label(const char *base, u32 pass)
+{
+    u32 i = 0;
+    while (base[i] && i < 40) {
+        g_passbuf[i] = base[i];
+        i++;
+    }
+    const char *suf = S_P_PASS;
+    for (u32 j = 0; suf[j] && i < 52; j++)
+        g_passbuf[i++] = suf[j];
+    if (pass >= 10)
+        g_passbuf[i++] = (char)('0' + pass / 10);
+    g_passbuf[i++] = (char)('0' + pass % 10);
+    g_passbuf[i++] = '/';
+    g_passbuf[i++] = '1';
+    g_passbuf[i++] = '0';
+    g_passbuf[i] = 0;
+    return g_passbuf;
 }
 
 static void say(u32 clip, u32 gap_ms)
@@ -292,11 +319,15 @@ static void test_bios_rom(void)
     const volatile u32 *rom = (const volatile u32 *)0x80000000;
     u32 n = (0x00200000 - 4) >> 2;
     register u32 crc = 0xFFFFFFFF;
+    progress_begin(S_P_BIOS, n);
     for (u32 i = 0; i < n; i++) {
+        if ((i & 1023) == 0)
+            progress_tick(i);
         crc ^= rom[i];
         for (int k = 0; k < 8; k++)
             crc = (crc >> 4) ^ bios_crc4tab[crc & 0xF];
     }
+    progress_end();
     crc = ~crc;
     u32 expect = rom[n];
     t_status st = (crc == expect) ? T_OK : T_FAIL;
@@ -365,12 +396,16 @@ static u32 test_sdram_cells(void)
         scif_puts(S_PASS);
         scif_putdec(pass + 1);
         scif_puts("/10: 5555");
+        progress_begin(pass_label(S_P_SDRAM, pass + 1), (len >> 2) * 2);
         ram_test_pattern(SDRAM_P2_BASE, len, 0x55555555, &res);
         scif_puts(" AAAA");
+        progress_begin(pass_label(S_P_SDRAM, pass + 1), (len >> 2) * 2);
         ram_test_pattern(SDRAM_P2_BASE, len, 0xAAAAAAAA, &res);
         scif_puts(" PRNG");
         u32 seed = 0xDEADBEEF ^ (0x9E3779B9u * (pass + 1));
+        progress_begin(pass_label(S_P_SDRAM, pass + 1), (len >> 2) * 2);
         ram_test_prng(SDRAM_P2_BASE, len, seed, &res);
+        progress_end();
         scif_puts(" crc=");
         scif_puthex(res.crc_r);
         scif_puts(res.errors ? " ERR\n" : " ok\n");
@@ -416,12 +451,16 @@ static u32 test_aram(void)
         scif_puts(S_PASS);
         scif_putdec(pass + 1);
         scif_puts("/10: 5555");
+        progress_begin(pass_label(S_P_ARAM, pass + 1), (len >> 2) * 2);
         aram_test_pattern(0, len, 0x55555555, &res);
         scif_puts(" AAAA");
+        progress_begin(pass_label(S_P_ARAM, pass + 1), (len >> 2) * 2);
         aram_test_pattern(0, len, 0xAAAAAAAA, &res);
         scif_puts(" PRNG");
         u32 seed = 0xC0FFEE42 ^ (0x9E3779B9u * (pass + 1));
+        progress_begin(pass_label(S_P_ARAM, pass + 1), (len >> 2) * 2);
         aram_test_prng(0, len, seed, &res);
+        progress_end();
         scif_puts(" crc=");
         scif_puthex(res.crc_r);
         scif_puts(res.errors ? " ERR\n" : " ok\n");
@@ -473,16 +512,27 @@ static void test_vram_region(const char *name, u32 base, u32 size,
 #else
     u32 len = size;
 #endif
+    /* the framebuffer lives inside TEX0: while that region is under test,
+     * the bar must not be drawn into it -- it would overwrite the pattern
+     * being verified and report a fault that does not exist. */
+    u32 fbaddr = VRAM_TEX0_BASE + FB_VRAM_OFFSET;
+    progress_screen_enable(!(base <= fbaddr && fbaddr < base + len));
+
     for (u32 pass = 0; pass < N_PASSES; pass++) {
+        progress_begin(pass_label(S_P_VRAM, pass + 1), (len >> 2) * 2);
         vram_test_pattern(base, len, 0x55555555, &res);
+        progress_begin(pass_label(S_P_VRAM, pass + 1), (len >> 2) * 2);
         vram_test_pattern(base, len, 0xAAAAAAAA, &res);
         u32 seed = 0x7E0CBEEF ^ (0x9E3779B9u * (pass + 1)) ^ base;
+        progress_begin(pass_label(S_P_VRAM, pass + 1), (len >> 2) * 2);
         vram_test_prng(base, len, seed, &res);
+        progress_end();
         scif_putc('.');
         /* this test scribbles over the framebuffer: repaint after every
          * pass so the screen stays readable (and shows progress) */
         screen_render();
     }
+    progress_screen_enable(1);
     scif_putc('\n');
 
     t_status st = res.errors ? T_FAIL : T_OK;
@@ -1011,7 +1061,8 @@ static void quick_audio_bringup(void)
     t_status st = (bad || res.errors) ? T_FAIL : T_OK;
     log_result(S_L_AUDIO_QUICK, CLIP_NONE, st, 0, 0);
     if (st == T_OK) {
-        g_audio_ready = 1;              /* channel 3 live, in seconds */
+        g_audio_ready = 1;
+        progress_phase(PH_AUDIO_ON);    /* yellow */              /* channel 3 live, in seconds */
         audio_replay_log();
     }
 }
@@ -1034,8 +1085,11 @@ static void quick_video_bringup(void)
     if (st == T_OK) {
         pvr_display_init();
         g_screen_ready = 1;             /* channel 2 live, in seconds */
+        progress_phase(PH_VIDEO_ON);    /* green */
         screen_render();
         scif_puts(S_SCREEN_ONLINE);
+    } else {
+        progress_phase(PH_FAILED);      /* red: no usable framebuffer */
     }
 }
 
@@ -1052,6 +1106,17 @@ static void audio_replay_log(void)
 void cmain(void)
 {
     timer_init();
+
+    /* Video timings FIRST, before anything can go wrong. This touches no
+     * memory at all -- the PowerVR paints the border colour straight from a
+     * register -- so the screen turns from black to blue within a fraction
+     * of a second of power-up, and every phase from here on repaints it in
+     * its own colour. A board that stops mid-diagnostic therefore leaves
+     * the colour of the phase it died in on the screen, which is the only
+     * output a Naomi with no serial cable can give us. */
+    pvr_video_on();
+    progress_phase(PH_ROM_ALIVE);       /* blue */
+
     /* Enable the SH-4 DMA controller. The original BIOS does this early and
      * JinGasa documents why: without it the Maple bus does not work. We only
      * declared the register until now, never wrote it. */
@@ -1070,6 +1135,7 @@ void cmain(void)
      * ran orders of magnitude slower before this was programmed. The 2 MB
      * BIOS CRC below used to run at that crippled speed. */
     sdram_setup();
+    progress_phase(PH_BUS_READY);       /* cyan */
 
     /* light up the audio and video channels within seconds, by proving
      * only the region each one needs (see quick_*_bringup above) */
@@ -1086,6 +1152,9 @@ void cmain(void)
      * it ever misbehaves the operator already has screen and audio up to
      * see how far the diagnostic got. */
     test_board();
+    progress_phase(PH_BOARD_ID);        /* magenta */
+
+    progress_phase(PH_TESTING);         /* white: the long suite starts */
 
     /* now the exhaustive memory tests, reported live on those channels */
     u32 aram_ok = test_aram();
@@ -1106,6 +1175,9 @@ void cmain(void)
     test_serial_eeprom();
     test_x76();
     test_cartridge();
+
+    progress_end();
+    progress_phase(PH_DONE);            /* grey: suite finished */
 
     scif_puts(S_SUMMARY);
     for (u32 i = 0; i < g_log_n; i++) {

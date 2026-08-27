@@ -3,6 +3,7 @@
  * All register values were extracted from the original Naomi BIOS
  * (cross-checked with JinGasa HOLLY.s / libnaomi). */
 #include "pvr.h"
+#include "progress.h"
 #include "font8x8_basic.h"
 
 #define PVR_REG(off)        REG32(0xA05F8000u + (off))
@@ -91,9 +92,14 @@ void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
 {
     volatile u32 *p = (volatile u32 *)base;
     u32 n = len >> 2;
-    for (u32 i = 0; i < n; i++)
-        p[i] = pattern;
     for (u32 i = 0; i < n; i++) {
+        if ((i & 1023) == 0)
+            progress_tick(i);
+        p[i] = pattern;
+    }
+    for (u32 i = 0; i < n; i++) {
+        if ((i & 1023) == 0)
+            progress_tick(n + i);
         u32 got = p[i];
         if (got != pattern)
             note_fail(r, base + (i << 2), pattern, got);
@@ -133,12 +139,16 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
 
     for (u32 i = 0; i < n; i++) {
         x = xorshift32(x);
+        if ((i & 1023) == 0)
+            progress_tick(i);
         p[i] = x;
         crc_w = crc32_word(crc_w, x);
     }
     x = seed ? seed : 1;
     for (u32 i = 0; i < n; i++) {
         x = xorshift32(x);
+        if ((i & 1023) == 0)
+            progress_tick(n + i);
         u32 got = p[i];
         crc_r = crc32_word(crc_r, got);
         if (got != x)
@@ -151,6 +161,42 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
 }
 
 /* ---- display ---- */
+
+static u32 g_fb_live;                    /* framebuffer proven and displayed */
+u32 fb_progress_enabled(void) { return g_fb_live; }
+
+/* Program the video timings WITHOUT enabling framebuffer reads.
+ *
+ * This is the earliest possible visual sign of life: it touches no VRAM, so
+ * it can run before a single byte of memory has been proven. The screen
+ * shows the border colour over its whole surface, which progress_phase()
+ * then uses as a POST code. Called first thing on boot, so a board that
+ * dies later still tells us how far it got.
+ *
+ * DIP switch 1 selects 31 kHz (VGA) or 15 kHz on the Naomi, so a monitor
+ * that shows nothing here is a cabling or DIP question, not a board fault. */
+void pvr_video_on(void)
+{
+    PVR_FB_R_CTRL     = 0x00800000;      /* VGA clock, framebuffer reads off */
+    PVR_VO_CONTROL    = 0x00160008;      /* blank while we program timings */
+    PVR_SOFTRESET     = 0;
+    PVR_SPG_LOAD      = 0x020C0359;      /* 858 x 525 total (VGA) */
+    PVR_SPG_HBLANK    = 0x007E0345;
+    PVR_SPG_VBLANK    = 0x00280208;
+    PVR_SPG_WIDTH     = 0x03F1933F;
+    PVR_SPG_CONTROL   = 0x00000100;      /* 31 kHz, non-interlaced */
+    PVR_SPG_HBLANK_INT = 0x03450000;
+    PVR_SPG_VBLANK_INT = 0x00150208;
+    PVR_VO_STARTX     = 0x000000A8;
+    PVR_VO_STARTY     = 0x00280028;
+    PVR_VO_BORDER_COL = 0;
+    PVR_VO_CONTROL    = 0x00160000;      /* unblank: border fills the screen */
+}
+
+void pvr_border(u32 rgb)
+{
+    PVR_VO_BORDER_COL = rgb;
+}
 
 void pvr_display_init(void)
 {
@@ -176,6 +222,7 @@ void pvr_display_init(void)
     PVR_VO_BORDER_COL = 0;
     PVR_FB_R_CTRL     = 0x00800005;      /* VGA clock, RGB565, display on */
     PVR_VO_CONTROL    = 0x00160000;      /* unblank */
+    g_fb_live = 1;                       /* framebuffer proven: bar allowed */
 }
 
 static volatile u16 *fb(void)
@@ -218,4 +265,66 @@ void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax)
             return;                     /* clipped: keeps clear of the
                                            status column on the right */
     }
+}
+
+/* ---- progress display ----------------------------------------------
+ * Drawn straight into the framebuffer, below the report area. Kept cheap:
+ * only the newly filled slice of the bar is painted on each update, so
+ * calling this once per percent inside a memory test costs nothing
+ * measurable next to the test itself. */
+
+#define BAR_X   16
+#define BAR_Y   (FB_H - 40)
+#define BAR_W   (FB_W - 32)
+#define BAR_H   20
+
+void fb_fill_rows(u32 y0, u32 y1, u16 color)
+{
+    volatile u32 *p = (volatile u32 *)fb();
+    u32 v = ((u32)color << 16) | color;
+    for (u32 y = y0; y < y1 && y < FB_H; y++)
+        for (u32 i = 0; i < FB_W / 2; i++)
+            p[y * (FB_W / 2) + i] = v;
+}
+
+static void fb_rect(u32 x, u32 y, u32 w, u32 h, u16 color)
+{
+    volatile u16 *p = fb();
+    for (u32 dy = 0; dy < h && y + dy < FB_H; dy++)
+        for (u32 dx = 0; dx < w && x + dx < FB_W; dx++)
+            p[(y + dy) * FB_W + (x + dx)] = color;
+}
+
+void fb_progress(const char *label, u32 pct)
+{
+    if (!fb_progress_enabled())
+        return;
+    if (pct > 100)
+        pct = 100;
+
+    /* label line, cleared each time so a shorter label cannot leave
+     * fragments of the previous one behind */
+    fb_fill_rows(BAR_Y - 22, BAR_Y - 4, 0);
+    fb_text(BAR_X, BAR_Y - 22, label, COL_WHITE, FB_W - 16 * 5);
+
+    /* percentage, right aligned in its own fixed 4-character field */
+    char num[5];
+    u32 n = pct, i = 0;
+    char tmp[4];
+    do { tmp[i++] = (char)('0' + n % 10); n /= 10; } while (n && i < 3);
+    u32 j = 0;
+    while (i)
+        num[j++] = tmp[--i];
+    num[j++] = '%';
+    num[j] = 0;
+    fb_text(FB_W - 16 * 5, BAR_Y - 22, num, COL_TITLE, FB_W);
+
+    /* bar: frame once, then fill proportionally */
+    fb_rect(BAR_X, BAR_Y, BAR_W, 1, COL_WHITE);
+    fb_rect(BAR_X, BAR_Y + BAR_H - 1, BAR_W, 1, COL_WHITE);
+    fb_rect(BAR_X, BAR_Y, 1, BAR_H, COL_WHITE);
+    fb_rect(BAR_X + BAR_W - 1, BAR_Y, 1, BAR_H, COL_WHITE);
+    u32 inner = BAR_W - 4;
+    u32 filled = (inner * pct) / 100;      /* pct <= 100: fits in 32 bits */
+    fb_rect(BAR_X + 2, BAR_Y + 2, filled, BAR_H - 4, COL_GREEN);
 }

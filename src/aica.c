@@ -4,6 +4,7 @@
  * References: KallistiOS spu.c/g2bus.c (G2 FIFO discipline, ARM reset at
  * reg 0x2C00 bit0), MAME aica.cpp (slot register layout). */
 #include "aica.h"
+#include "progress.h"
 #include "timer.h"
 
 #define AICA_REG(off)   REG32(0xA0700000u + (off))
@@ -102,9 +103,13 @@ void aram_test_pattern(u32 off, u32 len, u32 pattern, ram_result *r)
     for (u32 i = 0; i < n; i++) {
         if ((i & 7) == 0 && !g2_fifo_wait())
             return;                     /* G2 stalled: reported by caller */
+        if ((i & 1023) == 0)
+            progress_tick(i);
         p[i] = pattern;
     }
     for (u32 i = 0; i < n; i++) {
+        if ((i & 1023) == 0)
+            progress_tick(n + i);
         u32 got = p[i];
         if (got != pattern)
             note_fail(r, ARAM_P2_BASE + off + (i << 2), pattern, got);
@@ -146,12 +151,16 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
         x = xorshift32(x);
         if ((i & 7) == 0 && !g2_fifo_wait())
             return;                     /* G2 stalled: reported by caller */
+        if ((i & 1023) == 0)
+            progress_tick(i);
         p[i] = x;
         crc_w = crc32_word(crc_w, x);
     }
     x = seed ? seed : 1;
     for (u32 i = 0; i < n; i++) {
         x = xorshift32(x);
+        if ((i & 1023) == 0)
+            progress_tick(n + i);
         u32 got = p[i];
         crc_r = crc32_word(crc_r, got);
         if (got != x)

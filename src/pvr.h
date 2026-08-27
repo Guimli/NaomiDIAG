@@ -35,7 +35,20 @@ void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r);
 void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r);
 
 /* Display: VGA 640x480@31kHz, RGB565, timings from the original BIOS. */
-void pvr_display_init(void);
+
+/* Timings only, framebuffer reads left off: needs no VRAM at all, so it is
+ * the first thing the ROM does. The screen then shows the border colour
+ * full-surface, which the progress module drives as a POST code. */
+void pvr_video_on(void);
+void pvr_border(u32 rgb);               /* 0x00RRGGBB */
+
+void pvr_display_init(void);            /* video_on + framebuffer reads on */
+
+/* progress bar at the bottom of the report; a no-op until the framebuffer
+ * has been proven, so the test code may call it unconditionally */
+void fb_progress(const char *label, u32 pct);
+u32  fb_progress_enabled(void);
+void fb_fill_rows(u32 y0, u32 y1, u16 color);
 void fb_clear(u16 color);
 /* 8x8 font at x2 scale. Drawing stops before xmax so a long label can
  * never run into the status column on the right. */
@@ -43,6 +56,9 @@ void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax);
 
 /* column where the OK/FAIL status is drawn; labels are clipped before it */
 #define FB_STATUS_X  (FB_W - 16 * 6)
+
+/* the report stops here so it never runs into the progress bar */
+#define FB_REPORT_YMAX  (FB_H - 70)
 
 #define RGB565(r, g, b) (u16)(((r) & 0x1F) << 11 | ((g) & 0x3F) << 5 | ((b) & 0x1F))
 #define COL_WHITE   RGB565(31, 63, 31)

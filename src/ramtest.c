@@ -8,6 +8,7 @@
  *   every pass) whose CRC32 is kept in a CPU register on the write side
  *   and compared with the CRC32 recomputed on the read side. */
 #include "ramtest.h"
+#include "progress.h"
 #include "scif.h"
 
 void ram_result_clear(ram_result *r)
@@ -80,9 +81,14 @@ void ram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
 {
     volatile u32 *p = (volatile u32 *)base;
     u32 n = len >> 2;
-    for (u32 i = 0; i < n; i++)
-        p[i] = pattern;
     for (u32 i = 0; i < n; i++) {
+        if ((i & 1023) == 0)
+            progress_tick(i);
+        p[i] = pattern;
+    }
+    for (u32 i = 0; i < n; i++) {
+        if ((i & 1023) == 0)
+            progress_tick(n + i);
         u32 got = p[i];
         if (got != pattern)
             note_fail(r, base + (i << 2), pattern, got);
@@ -123,12 +129,16 @@ void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
 
     for (u32 i = 0; i < n; i++) {
         x = xorshift32(x);
+        if ((i & 1023) == 0)
+            progress_tick(i);
         p[i] = x;
         crc_w = crc32_word(crc_w, x);
     }
     x = seed ? seed : 1;
     for (u32 i = 0; i < n; i++) {
         x = xorshift32(x);
+        if ((i & 1023) == 0)
+            progress_tick(n + i);
         u32 got = p[i];
         crc_r = crc32_word(crc_r, got);
         if (got != x)

@@ -19,10 +19,14 @@ ELF     := naomi_diag_$(lang_lc).elf
 
 CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
            -Wall -Wextra -std=c11 -DQUICK_TEST=$(QUICK) -DLANG_$(LANG)
-ROM_BASE ?= 0x80000000
+# P2 (0xA0000000) is the default: it is the window the reset vector lands in
+# and the only one this ROM has been observed to run from on real hardware.
+# ROM_BASE=0x80000000 links for P1, the cached alias, which is much faster but
+# has not yet been confirmed to boot on a real board -- keep it opt-in.
+ROM_BASE ?= 0xA0000000
 LDFLAGS := -nostdlib -Wl,-T,linker.gen.ld -Wl,--build-id=none -Wl,-Map,$(ELF).map
 
-OBJS := src/crt0.o src/main.o src/scif.o src/sdram.o src/ramtest.o \
+OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.o \
         src/timer.o src/aica.o src/pvr.o src/periph.o src/dimm.o src/maple.o \
         src/board.o src/sha1.o src/cart.o
 

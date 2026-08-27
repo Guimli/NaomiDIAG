@@ -40,6 +40,14 @@
 #define S_L_VRAM_TEX1_IC    "VRAM TEX1 (IC35)"
 #define S_L_VRAM_TEX1       "VRAM TEX1"
 #define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
+/* short labels for the progress bar: they get a " NN/10" pass suffix, so
+ * they must stay well inside the screen width */
+#define S_P_BIOS            "Somme ROM BIOS"
+#define S_P_ARAM            "RAM son"
+#define S_P_VRAM            "VRAM"
+#define S_P_SDRAM           "RAM CPU"
+#define S_P_PASS            " passe "
+
 #define S_L_ELAN            "RAM Elan (Naomi 2)"
 #define S_L_BACKSRAM        "NVRAM sauvegarde (non destructif)"
 #define S_L_RTC             "RTC (AICA, doit avancer)"
@@ -151,6 +159,14 @@
 #define S_L_VRAM_TEX1_IC    "VRAM TEX1 (IC35)"
 #define S_L_VRAM_TEX1       "VRAM TEX1"
 #define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
+/* short labels for the progress bar: they get a " NN/10" pass suffix, so
+ * they must stay well inside the screen width */
+#define S_P_BIOS            "BIOS ROM checksum"
+#define S_P_ARAM            "Sound RAM"
+#define S_P_VRAM            "VRAM"
+#define S_P_SDRAM           "CPU RAM"
+#define S_P_PASS            " pass "
+
 #define S_L_ELAN            "Elan RAM (Naomi 2)"
 #define S_L_BACKSRAM        "Backup SRAM (non-destructive)"
 #define S_L_RTC             "RTC (AICA, must tick)"
