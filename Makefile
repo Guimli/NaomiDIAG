@@ -17,8 +17,15 @@ lang_lc := $(shell echo $(LANG) | tr A-Z a-z)
 BIN     := NaomiDIAG_$(LANG).bin
 ELF     := naomi_diag_$(lang_lc).elf
 
+# Number of passes for every RAM cell test. The specification says 10; it is
+# temporarily 1 while the diagnostic executes uncached from EPROM, which makes
+# a single pass already far too long on a real board. Build with PASSES=10 to
+# restore the specified depth once execution speed is fixed.
+PASSES ?= 1
+
 CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
-           -Wall -Wextra -std=c11 -DQUICK_TEST=$(QUICK) -DLANG_$(LANG)
+           -Wall -Wextra -std=c11 -DQUICK_TEST=$(QUICK) -DLANG_$(LANG) \
+           -DN_PASSES=$(PASSES)
 # P2 (0xA0000000) is the default: it is the window the reset vector lands in
 # and the only one this ROM has been observed to run from on real hardware.
 # ROM_BASE=0x80000000 links for P1, the cached alias, which is much faster but
@@ -38,7 +45,7 @@ all: $(BIN)
 
 # config stamp: objects carry no LANG/QUICK in their name, so force a
 # rebuild whenever the selected language or QUICK setting changes.
-STAMP := .build_$(LANG)_$(QUICK)
+STAMP := .build_$(LANG)_$(QUICK)_$(PASSES)
 $(STAMP):
 	rm -f .build_* && touch $@
 

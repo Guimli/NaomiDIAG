@@ -33,7 +33,9 @@
 #define QUICK_TEST 0
 #endif
 
-#define N_PASSES    10
+#ifndef N_PASSES
+#define N_PASSES    1               /* see PASSES in the Makefile */
+#endif
 #define REPORT_GAP_MS 1000          /* >= 1 s between spoken reports */
 
 #define CLIP_NONE   0xFFFFFFFFu
@@ -149,8 +151,9 @@ static const char *pass_label(const char *base, u32 pass)
         g_passbuf[i++] = (char)('0' + pass / 10);
     g_passbuf[i++] = (char)('0' + pass % 10);
     g_passbuf[i++] = '/';
-    g_passbuf[i++] = '1';
-    g_passbuf[i++] = '0';
+    if (N_PASSES >= 10)
+        g_passbuf[i++] = (char)('0' + N_PASSES / 10);
+    g_passbuf[i++] = (char)('0' + N_PASSES % 10);
     g_passbuf[i] = 0;
     return g_passbuf;
 }
@@ -396,7 +399,9 @@ static u32 test_sdram_cells(void)
     for (u32 pass = 0; pass < N_PASSES; pass++) {
         scif_puts(S_PASS);
         scif_putdec(pass + 1);
-        scif_puts("/10: 5555");
+        scif_puts("/");
+        scif_putdec(N_PASSES);
+        scif_puts(": 5555");
         progress_begin(pass_label(S_P_SDRAM, pass + 1), (len >> 2) * 2);
         ram_test_pattern(SDRAM_P2_BASE, len, 0x55555555, &res);
         scif_puts(" AAAA");
@@ -451,7 +456,9 @@ static u32 test_aram(void)
     for (u32 pass = 0; pass < N_PASSES; pass++) {
         scif_puts(S_PASS);
         scif_putdec(pass + 1);
-        scif_puts("/10: 5555");
+        scif_puts("/");
+        scif_putdec(N_PASSES);
+        scif_puts(": 5555");
         progress_begin(pass_label(S_P_ARAM, pass + 1), (len >> 2) * 2);
         aram_test_pattern(0, len, 0x55555555, &res);
         scif_puts(" AAAA");

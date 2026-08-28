@@ -55,8 +55,9 @@ In order:
 5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — then the VGA report
    screen comes up.
 6. **Main CPU RAM** (SDRAM, 16/32 MB, IC16/18/20/22) — first a data-bus
-   walking-ones test and an address-bus test, then **10 passes**, each pass
-   running three patterns in this order:
+   walking-ones test and an address-bus test, then **N passes** (build
+   parameter `PASSES`, specified as 10; shipped as 1 for now — see
+   "Pass count" below), each pass running three patterns in this order:
    - write `0x55555555` (0101…) over the whole region, then read it all back
      and compare;
    - write `0xAAAAAAAA` (1010…) over the whole region, then read back and
@@ -104,6 +105,19 @@ In order:
 
 RAM faults are reported per component: a bit mask, the affected data lanes,
 and the silkscreen IC designator (e.g. `CPU RAM 1 (IC16) DEFECTIVE`).
+
+
+### Pass count
+
+Every RAM cell test runs `PASSES` passes; the specification calls for 10.
+The images currently ship with `PASSES=1`, because the ROM executes uncached
+straight from the boot EPROM: every instruction fetch is an EPROM access, so
+a single pass over 32 MB already takes far too long on a real board to be
+usable. Once execution speed is addressed, rebuild with the specified depth:
+
+```
+make LANG=EN PASSES=10
+```
 
 ## Building
 

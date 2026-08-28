@@ -57,8 +57,10 @@ Dans l'ordre :
 5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — puis l'écran de rapport
    VGA s'active.
 6. **RAM CPU principale** (SDRAM, 16/32 Mo, IC16/18/20/22) — d'abord un test
-   bus de données (walking-ones) et un test bus d'adresses, puis **10
-   passes**, chaque passe enchaînant trois motifs dans cet ordre :
+   bus de données (walking-ones) et un test bus d'adresses, puis **N passes**
+   (paramètre de compilation `PASSES`, spécifié à 10, livré à 1 pour le
+   moment — voir « Nombre de passes »), chaque passe enchaînant trois motifs
+   dans cet ordre :
    - écriture de `0x55555555` (0101…) sur toute la zone, puis relecture
      complète et comparaison ;
    - écriture de `0xAAAAAAAA` (1010…) sur toute la zone, puis relecture et
@@ -109,6 +111,20 @@ Dans l'ordre :
 Les pannes RAM sont rapportées par composant : masque de bits, lanes de
 données concernées, et désignateur IC sérigraphié (ex.
 `RAM CPU 1 (IC16) DEFECTUEUX`).
+
+
+### Nombre de passes
+
+Chaque test cellule de RAM effectue `PASSES` passes ; la spécification en
+demande 10. Les images sont actuellement livrées en `PASSES=1` : la ROM
+s'exécute sans cache directement depuis l'EPROM de démarrage, chaque lecture
+d'instruction étant un accès EPROM, si bien qu'une seule passe sur 32 Mo est
+déjà bien trop longue sur une carte réelle pour être exploitable. Une fois la
+vitesse d'exécution réglée, reconstruire à la profondeur spécifiée :
+
+```
+make LANG=FR PASSES=10
+```
 
 ## Compilation
 
