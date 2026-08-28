@@ -97,3 +97,167 @@ _ram_verify_fast:
     bf      1b
 9:  rts
     mov     r7, r0
+
+! =============================================================================
+! Pseudo-random pass, hand-written.
+!
+! The compiler needed 85 instructions per word for the read loop, which made
+! it the single most expensive thing the diagnostic does. Two thirds of that
+! was the two CRC accumulations, and most of the waste is one specific thing:
+! the indexed addressing mode mov.l @(r0,Rm) forces the index into r0, and GCC
+! keeps an extra live copy around it, spending 7 instructions per byte step
+! where 5 suffice.
+!
+! Shared context block (offsets MUST match prng_ctx in ramtest.h):
+!     0  x       PRNG state, in and out
+!     4  crc_w   CRC of the stream we meant to write
+!     8  crc_r   CRC of the stream actually read back
+!    12  diff    OR of every (read XOR expected); 0 = region good
+!
+! Register map inside both loops:
+!   r4 data pointer      r5 word count       r6 context block
+!   r7 word read         r8 PRNG state       r9 crc_w
+!   r10 crc_r            r11 diff            r12 CRC table
+!   r13 = 13, r14 = -17  (shld shift amounts; a negative count shifts right)
+! =============================================================================
+
+! -----------------------------------------------------------------------------
+! void ram_prng_fill_fast(u32 *base, u32 nwords, prng_ctx *c)
+! 14 instructions per word (compiler: 19).
+! -----------------------------------------------------------------------------
+    .global _ram_prng_fill_fast
+_ram_prng_fill_fast:
+    tst     r5, r5
+    bt      9f
+    mov.l   r8, @-r15
+    mov.l   r13, @-r15
+    mov.l   r14, @-r15
+    mov.l   @r6, r8             ! x
+    mov     #13, r13
+    mov     #-17, r14
+1:  mov     r8, r1              ! ---- xorshift32
+    shld    r13, r1
+    xor     r1, r8              ! x ^= x << 13
+    mov     r8, r1
+    shld    r14, r1
+    xor     r1, r8              ! x ^= x >> 17
+    mov     r8, r1
+    shll2   r1
+    shll2   r1
+    shll    r1
+    xor     r1, r8              ! x ^= x << 5
+    mov.l   r8, @r4             ! store it
+    add     #4, r4
+    dt      r5
+    bf      1b
+    mov.l   r8, @r6             ! hand the PRNG state back
+    mov.l   @r15+, r14
+    mov.l   @r15+, r13
+    mov.l   @r15+, r8
+9:  rts
+    nop
+
+! -----------------------------------------------------------------------------
+! void ram_prng_verify_fast(const u32 *base, u32 nwords, prng_ctx *c)
+! 59 instructions per word (compiler: 85). Branchless: it reports only whether
+! the region is good, and the C caller re-scans to locate the bad words.
+! -----------------------------------------------------------------------------
+    .global _ram_prng_verify_fast
+_ram_prng_verify_fast:
+    tst     r5, r5
+    bt      9f
+    mov.l   r8, @-r15
+    mov.l   r9, @-r15
+    mov.l   r10, @-r15
+    mov.l   r11, @-r15
+    mov.l   r12, @-r15
+    mov.l   r13, @-r15
+    mov.l   r14, @-r15
+    mov.l   @r6, r8             ! x
+    mov.l   @(4, r6), r9        ! crc_w
+    mov.l   @(8, r6), r10       ! crc_r
+    mov.l   @(12, r6), r11      ! diff
+    mov.l   Lcrctab, r12
+    mov     #13, r13
+    mov     #-17, r14
+
+1:  mov     r8, r1              ! ---- xorshift32: the expected word
+    shld    r13, r1
+    xor     r1, r8
+    mov     r8, r1
+    shld    r14, r1
+    xor     r1, r8
+    mov     r8, r1
+    shll2   r1
+    shll2   r1
+    shll    r1
+    xor     r1, r8
+
+    mov.l   @r4+, r7            ! ---- read back, accumulate any difference
+    mov     r7, r1
+    xor     r8, r1
+    or      r1, r11
+
+    xor     r8, r9              ! ---- crc_w over the expected word
+    extu.b  r9, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r9
+    xor     r1, r9
+    extu.b  r9, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r9
+    xor     r1, r9
+    extu.b  r9, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r9
+    xor     r1, r9
+    extu.b  r9, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r9
+    xor     r1, r9
+
+    xor     r7, r10             ! ---- crc_r over the word actually read
+    extu.b  r10, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r10
+    xor     r1, r10
+    extu.b  r10, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r10
+    xor     r1, r10
+    extu.b  r10, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r10
+    xor     r1, r10
+    extu.b  r10, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r10
+    xor     r1, r10
+
+    dt      r5
+    bf      1b
+
+    mov.l   r8, @r6             ! hand state and results back
+    mov.l   r9, @(4, r6)
+    mov.l   r10, @(8, r6)
+    mov.l   r11, @(12, r6)
+    mov.l   @r15+, r14
+    mov.l   @r15+, r13
+    mov.l   @r15+, r12
+    mov.l   @r15+, r11
+    mov.l   @r15+, r10
+    mov.l   @r15+, r9
+    mov.l   @r15+, r8
+9:  rts
+    nop
+
+    .align 4
+Lcrctab:    .long _crc32_tab8

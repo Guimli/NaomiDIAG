@@ -222,47 +222,60 @@ static inline u32 xorshift32(u32 x)
     return x;
 }
 
-void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
+/* Slow, fully diagnostic pseudo-random pass: regenerates the stream and
+ * records every mismatching word with its address. Only reached once the
+ * fast loop has already proved the region faulty. */
+static void prng_locate(u32 base, u32 n, u32 seed, ram_result *r)
 {
     volatile u32 *p = (volatile u32 *)base;
-    u32 n = len >> 2;
-    register u32 crc_w = 0xFFFFFFFF;    /* write-side CRC, lives in a register */
-    register u32 crc_r = 0xFFFFFFFF;    /* read-side CRC */
     u32 x = seed ? seed : 1;
-
-    /* Write pass: generate and store only. The write-side CRC used to be
-     * accumulated here, which made this the most expensive loop in the whole
-     * diagnostic. It does not need to be: the stream is a pure function of
-     * the seed, so the identical value can be built from the regenerated
-     * stream during the read pass below. The comparison stays exactly what
-     * the specification asks for -- a CRC of what we meant to write against a
-     * CRC of what came back, both held in registers -- while this loop drops
-     * from about 93 instructions per word to roughly 16. As a side effect the
-     * data now sits in the array longer before being read back, which makes
-     * the pass marginally better at catching retention faults. */
     for (u32 i = 0; i < n; i++) {
         x = xorshift32(x);
-        if ((i & 1023) == 0)
-            progress_tick(i);
-        p[i] = x;
-    }
-
-    x = seed ? seed : 1;
-    for (u32 i = 0; i < n; i++) {
-        x = xorshift32(x);
-        if ((i & 1023) == 0)
-            progress_tick(n + i);
         u32 got = p[i];
-        crc_w = crc32_word(crc_w, x);       /* what we wrote */
-        crc_r = crc32_word(crc_r, got);     /* what came back */
         if (got != x)
             note_fail(r, base + (i << 2), x, got);
     }
-    r->crc_w = ~crc_w;
-    r->crc_r = ~crc_r;
-    if (crc_w != crc_r && r->errors == 0) {
-        /* CRC caught something the compare loop did not (should not happen,
-         * but the register-held CRC is the belt-and-braces the spec asks for) */
-        note_fail(r, base, crc_w, crc_r);
+}
+
+void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
+{
+    u32 n = len >> 2;
+    prng_ctx c;
+    c.x = seed ? seed : 1;
+    c.crc_w = 0xFFFFFFFF;
+    c.crc_r = 0xFFFFFFFF;
+    c.diff = 0;
+
+    /* Both loops are hand-written (ramtest_fast.S): 19 -> 15 instructions
+     * per word to generate and store, 85 -> 59 to read back. They are called
+     * in 1024-word chunks purely so the progress bar keeps moving; the
+     * chunking costs nothing measurable next to the loop bodies. */
+    for (u32 done = 0; done < n; ) {
+        u32 chunk = n - done;
+        if (chunk > 1024)
+            chunk = 1024;
+        progress_tick(done);
+        ram_prng_fill_fast((u32 *)(base + (done << 2)), chunk, &c);
+        done += chunk;
+    }
+
+    c.x = seed ? seed : 1;              /* replay the same stream */
+    for (u32 done = 0; done < n; ) {
+        u32 chunk = n - done;
+        if (chunk > 1024)
+            chunk = 1024;
+        progress_tick(n + done);
+        ram_prng_verify_fast((const u32 *)(base + (done << 2)), chunk, &c);
+        done += chunk;
+    }
+
+    r->crc_w = ~c.crc_w;
+    r->crc_r = ~c.crc_r;
+    if (c.diff)
+        prng_locate(base, n, seed, r);
+    if (c.crc_w != c.crc_r && r->errors == 0) {
+        /* CRC caught something the compare did not (should not happen, but
+         * the register-held CRC is the belt-and-braces the spec asks for) */
+        note_fail(r, base, c.crc_w, c.crc_r);
     }
 }
