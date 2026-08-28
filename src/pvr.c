@@ -3,6 +3,7 @@
  * All register values were extracted from the original Naomi BIOS
  * (cross-checked with JinGasa HOLLY.s / libnaomi). */
 #include "pvr.h"
+#include "ramtest.h"
 #include "progress.h"
 #include "font8x8_basic.h"
 
@@ -106,20 +107,7 @@ void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
     }
 }
 
-static const u32 crc4tab[16] = {
-    0x00000000, 0x1DB71064, 0x3B6E20C8, 0x26D930AC,
-    0x76DC4190, 0x6B6B51F4, 0x4DB26158, 0x5005713C,
-    0xEDB88320, 0xF00F9344, 0xD6D6A3E8, 0xCB61B38C,
-    0x9B64C2B0, 0x86D3D2D4, 0xA00AE278, 0xBDBDF21C
-};
 
-static inline u32 crc32_word(u32 crc, u32 w)
-{
-    crc ^= w;
-    for (int k = 0; k < 8; k++)
-        crc = (crc >> 4) ^ crc4tab[crc & 0xF];
-    return crc;
-}
 
 static inline u32 xorshift32(u32 x)
 {

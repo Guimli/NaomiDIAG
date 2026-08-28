@@ -1,6 +1,26 @@
 #ifndef RAMTEST_H
 #define RAMTEST_H
+
 #include "hw.h"
+
+/* CRC-32 accumulator shared by every memory test, one table step per byte.
+ * Inline rather than a call: at one invocation per tested word the call
+ * overhead alone would be a measurable share of the loop. */
+extern const u32 crc32_tab8[256];
+
+static inline u32 crc32_word(u32 crc, u32 w)
+{
+    crc ^= w;
+    crc = (crc >> 8) ^ crc32_tab8[(u8)crc];
+    crc = (crc >> 8) ^ crc32_tab8[(u8)crc];
+    crc = (crc >> 8) ^ crc32_tab8[(u8)crc];
+    crc = (crc >> 8) ^ crc32_tab8[(u8)crc];
+    return crc;
+}
+
+/* hand-written inner loops, see ramtest_fast.S */
+void ram_fill_fast(u32 *base, u32 nblocks16, u32 pattern);
+u32  ram_verify_fast(u32 *base, u32 nblocks8, u32 pattern);
 
 #define RAM_MAX_FAILS 8
 
