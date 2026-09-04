@@ -125,8 +125,17 @@ ROM.
 L'exécution cachée depuis la SDRAM est tout autre chose : c'est là que tourne
 chaque jeu Naomi. Les quatre boucles de test mémoire — 356 octets, où passe
 la quasi-totalité du temps — sont donc recopiées au démarrage dans les 8 Ko
-de sommet de la RAM CPU et exécutées depuis là, en cache, le reste du
-programme demeurant en ROM.
+de RAM CPU et exécutées depuis là, en cache, le reste du programme demeurant
+en ROM.
+
+Les quatre puces de RAM CPU sont entrelacées par voie de données et non par
+plage d'adresses — IC16/IC18 portent les mots pairs, IC20/IC22 les impairs —
+si bien que tout bloc les traverse toutes. Les blocs sont balayés du sommet
+vers le bas et le premier sain est retenu : cela immunise contre un défaut
+localisé (ligne ou colonne défaillante dans une puce) mais pas contre une
+puce morte sur toute sa plage, auquel cas aucun bloc ne passe et les copies
+en ROM restent utilisées. Un bloc en échec est signalé comme la mémoire
+défectueuse qu'il est, non passé sous silence.
 
 Cette fenêtre est testée par la suite complète motifs + pseudo-aléatoire
 avant qu'on y copie quoi que ce soit, et la mémoire sous test reste adressée

@@ -117,8 +117,16 @@ which matches the original BIOS, that never executes cached from ROM either.
 
 Cached execution from SDRAM is a different matter: it is where every Naomi
 game runs. So the four memory-test loops -- 356 bytes, where essentially all
-the time goes -- are copied into the top 8 KB of CPU RAM at boot and run from
-there, cached, while everything else stays in ROM.
+the time goes -- are copied into an 8 KB block of CPU RAM at boot and run
+from there, cached, while everything else stays in ROM.
+
+The four CPU RAM chips are interleaved by data lane rather than by address
+range -- IC16/IC18 carry the even words, IC20/IC22 the odd ones -- so every
+block spans all four. Blocks are scanned downward from the top and the first
+sound one is taken, which gives immunity to a localized fault (a bad row or
+column inside one chip) but not to a chip dead across its range: in that case
+no block passes and the ROM copies keep being used. A block that fails the
+scan is reported as the broken memory it is, not quietly skipped.
 
 The window is tested with the full pattern and pseudo-random suite before
 anything is copied into it, and the memory under test is still addressed
