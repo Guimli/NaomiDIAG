@@ -44,6 +44,9 @@
  * they must stay well inside the screen width */
 #define S_L_RELOC           "Boucles de test relogees en RAM"
 #define S_L_RELOC_SCAN      "Blocs RAM CPU haute defectueux"
+#define S_RELOC_ROM         "  RAM CPU inutilisable: boucles gardees en ROM (mode lent)\n"
+#define S_RELOC_IN_RAM      " (RAM CPU, cache: mode rapide)\n"
+#define S_RELOC_IN_ROM      " (EPROM, non cache: mode lent)\n"
 #define S_P_BIOS            "Somme ROM BIOS"
 #define S_P_ARAM            "RAM son"
 #define S_P_VRAM            "VRAM"
@@ -165,6 +168,9 @@
  * they must stay well inside the screen width */
 #define S_L_RELOC           "Test loops relocated to CPU RAM"
 #define S_L_RELOC_SCAN      "Bad blocks at top of CPU RAM"
+#define S_RELOC_ROM         "  CPU RAM unusable: loops kept in ROM (slow mode)\n"
+#define S_RELOC_IN_RAM      " (CPU RAM, cached: fast mode)\n"
+#define S_RELOC_IN_ROM      " (EPROM, uncached: slow mode)\n"
 #define S_P_BIOS            "BIOS ROM checksum"
 #define S_P_ARAM            "Sound RAM"
 #define S_P_VRAM            "VRAM"

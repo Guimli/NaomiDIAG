@@ -128,6 +128,14 @@ column inside one chip) but not to a chip dead across its range: in that case
 no block passes and the ROM copies keep being used. A block that fails the
 scan is reported as the broken memory it is, not quietly skipped.
 
+A chip dead across its whole range is decided in thirty-two accesses by the
+data bus test, before any block is scanned: all 128 would fail for the same
+reason, and a megabyte of futile testing from the EPROM would delay the one
+thing the operator needs to know. Whatever happens, the report names the
+window the loops really execute from -- `8Cxxxxxx`/`8Dxxxxxx` for cached CPU
+RAM, `A0xxxxxx` for the boot EPROM -- read back from the pointer that will
+actually be called rather than from a flag.
+
 The window is tested with the full pattern and pseudo-random suite before
 anything is copied into it, and the memory under test is still addressed
 through P2, so the data path stays uncached and the test keeps its coverage.

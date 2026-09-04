@@ -393,11 +393,25 @@ static void sdram_setup(void)
  * exactly the board that needs one. */
 static u32 g_reloc_win;             /* P2 address of the block in use, 0 = none */
 
-static void relocate_fast_loops(void)
+static void relocate_try(void)
 {
 #if RELOC
-    if (g_ram_size < 0x00100000u)
+    if (g_ram_size < 0x00100000u) {
+        log_result(S_L_RELOC, CLIP_NONE, T_FAIL, 0, 0);
+        scif_puts(S_RELOC_ROM);
         return;
+    }
+
+    /* A chip dead across its whole range shows on the data bus test in
+     * thirty-two accesses. Without this check we would scan 128 blocks --
+     * a megabyte of futile testing from the EPROM -- before the operator
+     * learned anything, and every one of them would fail for the same
+     * reason. Decide it here and go straight to the ROM copies. */
+    if (ram_test_databus(SDRAM_P2_BASE)) {
+        log_result(S_L_RELOC, CLIP_NONE, T_FAIL, 0, 0);
+        scif_puts(S_RELOC_ROM);
+        return;
+    }
 
     ram_result scan;                /* accumulates every bad block found */
     ram_result_clear(&scan);
@@ -433,6 +447,7 @@ static void relocate_fast_loops(void)
 
     if (!g_reloc_win) {
         log_result(S_L_RELOC, CLIP_NONE, T_FAIL, 0, 0);
+        scif_puts(S_RELOC_ROM);
         return;
     }
 
@@ -443,16 +458,23 @@ static void relocate_fast_loops(void)
     progress_phase(PH_RELOC);
     u32 ok = reloc_install(g_reloc_win);
     log_result(S_L_RELOC, CLIP_NONE, ok ? T_OK : T_FAIL, 0, 0);
-    if (ok) {
-        /* print where they actually run from: 0x8C/0x8D is cached CPU RAM,
-         * anything else means we are still executing out of the EPROM */
-        scif_puts("  loops now execute at ");
-        scif_puthex((u32)p_ram_prng_verify_fast);
-        scif_puts("\n");
-    } else {
+    if (!ok) {
         g_reloc_win = 0;            /* stayed in ROM: nothing is reserved */
+        scif_puts(S_RELOC_ROM);
     }
 #endif
+}
+
+/* One report, whatever happened: the address is read back from the pointer
+ * that will really be called, not from a flag saying what should have been
+ * arranged. 0x8C/0x8D is cached CPU RAM, 0xA0 is the boot EPROM. */
+static void relocate_fast_loops(void)
+{
+    relocate_try();
+    scif_puts("  loops execute at ");
+    scif_puthex((u32)p_ram_prng_verify_fast);
+    scif_puts((u32)p_ram_prng_verify_fast < 0xA0000000u
+              ? S_RELOC_IN_RAM : S_RELOC_IN_ROM);
 }
 
 

@@ -137,6 +137,15 @@ puce morte sur toute sa plage, auquel cas aucun bloc ne passe et les copies
 en ROM restent utilisées. Un bloc en échec est signalé comme la mémoire
 défectueuse qu'il est, non passé sous silence.
 
+Une puce morte sur toute sa plage est décidée en trente-deux accès par le
+test du bus de données, avant tout balayage : les 128 blocs échoueraient pour
+la même raison, et un mégaoctet de test futile depuis l'EPROM retarderait la
+seule chose que l'opérateur a besoin de savoir. Dans tous les cas le rapport
+nomme la fenêtre depuis laquelle les boucles s'exécutent réellement —
+`8Cxxxxxx`/`8Dxxxxxx` pour la RAM CPU en cache, `A0xxxxxx` pour l'EPROM de
+démarrage — relue depuis le pointeur qui sera effectivement appelé et non
+depuis un indicateur.
+
 Cette fenêtre est testée par la suite complète motifs + pseudo-aléatoire
 avant qu'on y copie quoi que ce soit, et la mémoire sous test reste adressée
 par P2 : le chemin de données demeure non caché et la couverture est
