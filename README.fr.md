@@ -201,7 +201,11 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
 
 - Gravez `NaomiDIAG_xx.bin` sur une 27C160 (IC27). La sortie série est sur
   les broches SCIF en logique 3,3 V — utilisez un adaptateur USB-série
-  3,3 V, jamais des niveaux RS-232.
+  3,3 V, jamais des niveaux RS-232. Pour savoir où le brancher sur la carte,
+  référez-vous au projet [JinGasa](https://github.com/Tchan0/JinGasa) : il
+  n'existe que pour dialoguer avec une Naomi par le port série et en
+  documente le câblage, ce qu'on ne peut pas dire des brochages qui circulent
+  par ailleurs.
 - Un échec du test cache signifie que le SH-4 lui-même est mort : c'est
   rapporté sur SCIF puis la ROM s'arrête.
 - Une exception CPU redémarre la ROM (la bannière se réaffiche) — une

@@ -188,6 +188,10 @@ under the DRC, so fault injection into it needs `-nodrc`.
 
 - Burn `NaomiDIAG_xx.bin` on a 27C160 (IC27). Serial output is on the SCIF
   pins at 3.3 V logic — use a 3.3 V USB-serial adapter, never RS-232 levels.
+  For where to connect it on the board, refer to the
+  [JinGasa](https://github.com/Tchan0/JinGasa) project: it exists solely to
+  talk to a Naomi over the serial port and documents the wiring, which is
+  more than can be said for the pinouts circulating elsewhere.
 - A failed cache test means the SH-4 itself is dead: it is reported on SCIF
   and the ROM halts.
 - A CPU exception restarts the ROM (the banner reprints) — a repeating
