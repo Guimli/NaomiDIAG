@@ -1,6 +1,7 @@
 #include "progress.h"
 #include "pvr.h"
 #include "scif.h"
+#include "timer.h"
 
 /* border colour per phase, 0x00RRGGBB as VO_BORDER_COL wants it */
 static const u32 phase_col[] = {
@@ -16,10 +17,37 @@ static const u32 phase_col[] = {
 };
 
 static boot_phase_t g_phase;
+static u32 g_hb_last;               /* timer reading at the last toggle */
+static u32 g_hb_dim;                /* currently showing the dim half */
+
+#define HB_TICKS   ((TIMER_HZ / 10u) * 7u)      /* 0.7 s */
+
+void progress_heartbeat(void)
+{
+    u32 now = timer_ticks();
+    if ((u32)(now - g_hb_last) < HB_TICKS)
+        return;
+    g_hb_last = now;
+    g_hb_dim ^= 1u;
+    u32 c = phase_col[g_phase];
+    pvr_border(g_hb_dim ? ((c >> 2) & 0x003F3F3Fu) : c);
+}
+
+void progress_wait_ms(u32 ms)
+{
+    while (ms) {
+        u32 slice = ms > 50u ? 50u : ms;
+        delay_ms(slice);
+        ms -= slice;
+        progress_heartbeat();
+    }
+}
 
 void progress_phase(boot_phase_t ph)
 {
     g_phase = ph;
+    g_hb_dim = 0;
+    g_hb_last = timer_ticks();      /* a new phase shows full brightness first */
     pvr_border(phase_col[ph]);
 }
 
@@ -66,6 +94,7 @@ void progress_begin(const char *label, u32 total)
 
 void progress_tick(u32 done)
 {
+    progress_heartbeat();
     if (!g_active || done < g_next)
         return;
     /* a tick can jump several percent if the caller samples coarsely */

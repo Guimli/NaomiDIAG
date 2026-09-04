@@ -35,6 +35,23 @@ typedef enum {
 } boot_phase_t;
 
 void progress_phase(boot_phase_t ph);
+
+/* Pulse the border so a long phase cannot be mistaken for a crash.
+ *
+ * The first phases can run for a while -- the SDRAM controller comes up and
+ * the framebuffer is proven while the code is still fetching every
+ * instruction from the EPROM -- and a screen holding one flat colour reads
+ * as a hung machine. This alternates the phase colour between full and
+ * quarter brightness roughly every 0.7 s.
+ *
+ * Same hue, two brightnesses, deliberately: the colour is a POST code that
+ * names the phase, so blinking between two different hues would destroy the
+ * one thing it is there to say. Cheap enough to call inside a test loop --
+ * it reads a timer and returns unless the interval has elapsed. */
+void progress_heartbeat(void);
+
+/* delay_ms, but pulsing: for the seconds spent waiting on audio. */
+void progress_wait_ms(u32 ms);
 boot_phase_t progress_current_phase(void);
 
 /* Long test progress. begin() takes the total unit count; tick() is cheap

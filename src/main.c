@@ -177,13 +177,13 @@ static void say_entry(const log_entry *e)
     if (e->status == T_OK) {
         say(e->clip, 250);
         say(CLIP_OK, 250);
-        delay_ms(REPORT_GAP_MS);
+        progress_wait_ms(REPORT_GAP_MS);
         return;
     }
     if (e->detail == 0) {                   /* fault w/o component info */
         say(e->clip, 250);
         say(CLIP_FAIL, 250);
-        delay_ms(REPORT_GAP_MS);
+        progress_wait_ms(REPORT_GAP_MS);
         return;
     }
     u32 spoken = CLIP_NONE;
@@ -197,7 +197,7 @@ static void say_entry(const log_entry *e)
         say(e->clip, 250);
         say(c, 250);
         say(CLIP_DEFECT, 250);
-        delay_ms(REPORT_GAP_MS);
+        progress_wait_ms(REPORT_GAP_MS);
     }
 }
 

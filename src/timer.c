@@ -5,6 +5,9 @@
 #define TCOR0   REG32(0xFFD80008)
 #define TCNT0   REG32(0xFFD8000C)
 #define TCR0    REG16(0xFFD80010)
+#define TCOR1   REG32(0xFFD80014)
+#define TCNT1   REG32(0xFFD80018)
+#define TCR1    REG16(0xFFD8001C)
 
 #define TCR_UNF     0x0100
 #define TMU_HZ      12500000u       /* 50 MHz / 4 */
@@ -13,6 +16,22 @@ void timer_init(void)
 {
     TSTR &= (u8)~1;                 /* stop channel 0 */
     TCR0 = 0;                       /* Pck/4, no interrupt */
+
+    /* Channel 1 free-runs for the whole session as a clock nobody stops.
+     * Channel 0 cannot serve: delay_ms starts and stops it on every call.
+     * TCNT counts down and reloads from TCOR, so with TCOR at maximum it
+     * simply wraps, and unsigned subtraction of two readings gives the
+     * elapsed count correctly across the wrap. */
+    TSTR &= (u8)~2;
+    TCR1  = 0;                      /* Pck/4 */
+    TCOR1 = 0xFFFFFFFF;
+    TCNT1 = 0xFFFFFFFF;
+    TSTR |= 2;
+}
+
+u32 timer_ticks(void)
+{
+    return ~TCNT1;                  /* down-counter read as an up-counter */
 }
 
 void delay_ms(u32 ms)

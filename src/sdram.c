@@ -6,6 +6,7 @@
  * Runs entirely from ROM with an OC-RAM stack; SDRAM is untouched by
  * anything else until ramtest.c has validated it. */
 #include "sdram.h"
+#include "progress.h"
 
 /* Wait for a few refresh cycles to elapse. BOUNDED: if the refresh
  * counter never advances (misconfigured controller, dead SDRAM clock),
@@ -14,9 +15,15 @@
 static void refresh_wait(void)
 {
     RFCR = RFCR_VAL;                 /* reset refresh counter (0xA4xx key) */
-    for (u32 guard = 0; guard < 1000000u; guard++)
+    /* This runs inside the first, blue phase: pulse the border so a slow or
+     * unresponsive refresh counter reads as a machine waiting rather than a
+     * machine that has crashed. */
+    for (u32 guard = 0; guard < 1000000u; guard++) {
         if ((RFCR & 0x03FF) > 8)
             return;
+        if ((guard & 0x3FFFu) == 0)
+            progress_heartbeat();
+    }
 }
 
 static void mode_set(u32 mcr_val)

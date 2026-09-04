@@ -211,7 +211,7 @@ void aica_tone(u32 ms)
     SLOT(0, 0x00) = (u32)(0x8000 | 0x4000 | 0x0200 | ((sa >> 16) & 0x7F));
     g2_fifo_wait();
 
-    delay_ms(ms);
+    progress_wait_ms(ms);
 
     g2_fifo_wait();
     SLOT(0, 0x00) = (u32)(0x8000 | 0x0200 | ((sa >> 16) & 0x7F));  /* key off */
@@ -261,10 +261,10 @@ void aica_say(const signed char *pcm, u32 len, u32 gap_ms)
     /* blocking wait: clip duration + user-mandated inter-report gap.
      * ms = samples * (1000/22050); 2972/65536 = 0.045349 (no libgcc div) */
     u32 dur_ms = (samples * 2972u) >> 16;
-    delay_ms(dur_ms + 60);
+    progress_wait_ms(dur_ms + 60);
 
     g2_fifo_wait();
     SLOT(0, 0x00) = (u32)(0x8000 | ((sa >> 16) & 0x7F)); /* key off */
     g2_fifo_wait();
-    delay_ms(gap_ms);
+    progress_wait_ms(gap_ms);
 }
