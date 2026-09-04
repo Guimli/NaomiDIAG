@@ -28,6 +28,7 @@
 #include "audio_clips.h"
 #include "cartdb.h"
 #include "progress.h"
+#include "reloc.h"
 
 #ifndef QUICK_TEST
 #define QUICK_TEST 0
@@ -365,6 +366,58 @@ static void sdram_setup(void)
 
 /* Slow (~1 min on 32MB): the actual CPU-RAM cell test. Runs after the
  * screen and audio are live so the machine never looks frozen. */
+/* Move the memory-test loops into CPU RAM and run them cached.
+ *
+ * Uncached from the boot EPROM each of those loops pays a bus cycle per
+ * instruction; from RAM the loop body sits in the instruction cache and runs
+ * at core speed. Nothing else moves, and the memory under test is still
+ * addressed through P2, so the data path stays uncached and the test keeps
+ * the coverage it has.
+ *
+ * The window is the top 8 KB of CPU RAM, and it is tested with the full
+ * pattern and pseudo-random suite before anything is copied into it -- the
+ * rule that no untested RAM is ever used holds here too. It is small enough
+ * that testing it from ROM costs nothing. The main CPU RAM test below then
+ * covers everything under it, so the region is not skipped, merely tested
+ * earlier and by a different route.
+ *
+ * On any doubt the pointers keep addressing the ROM copies: a board whose
+ * CPU RAM is dead still gets a full, slow diagnostic, which is exactly the
+ * board that needs one. */
+static void relocate_fast_loops(void)
+{
+#if RELOC
+    if (g_ram_size < 0x00100000u)
+        return;
+    u32 win = SDRAM_P2_BASE + g_ram_size - RELOC_WINDOW;
+
+    ram_result res;
+    ram_result_clear(&res);
+    ram_test_pattern(win, RELOC_WINDOW, 0x55555555, &res);
+    ram_test_pattern(win, RELOC_WINDOW, 0xAAAAAAAA, &res);
+    ram_test_prng(win, RELOC_WINDOW, 0x5EED1234, &res);
+    if (res.errors) {
+        log_result(S_L_RELOC, CLIP_NONE, T_FAIL, 0, 0);
+        return;
+    }
+
+    /* the first execution of relocated code happens inside reloc_install.
+     * Flag it on the border first: if this board refuses cached execution
+     * from RAM the way it refused it from ROM, the screen stops on this
+     * colour and says so without a serial cable. */
+    progress_phase(PH_RELOC);
+    u32 ok = reloc_install(win);
+    log_result(S_L_RELOC, CLIP_NONE, ok ? T_OK : T_FAIL, 0, 0);
+    if (ok) {
+        /* print where they actually run from: 0x8C/0x8D is cached CPU RAM,
+         * anything else means we are still executing out of the EPROM */
+        scif_puts("  loops now execute at ");
+        scif_puthex((u32)p_ram_prng_verify_fast);
+        scif_puts("\n");
+    }
+#endif
+}
+
 static u32 test_sdram_cells(void)
 {
     u32 size = g_ram_size;
@@ -391,7 +444,10 @@ static u32 test_sdram_cells(void)
     u32 len = 0x00100000;
     scif_puts(S_QUICK);
 #else
-    u32 len = size;
+    /* the top window holds the relocated test loops and was already tested
+     * in full before they were copied there; testing it again would mean
+     * overwriting the code we are executing */
+    u32 len = reloc_active() ? size - RELOC_WINDOW : size;
 #endif
 
     ram_result res;
@@ -1114,6 +1170,7 @@ static void audio_replay_log(void)
 void cmain(void)
 {
     timer_init();
+    reloc_init();
 
     /* Video timings FIRST, before anything can go wrong. This touches no
      * memory at all -- the PowerVR paints the border colour straight from a
@@ -1161,6 +1218,8 @@ void cmain(void)
      * see how far the diagnostic got. */
     test_board();
     progress_phase(PH_BOARD_ID);        /* magenta */
+
+    relocate_fast_loops();
 
     progress_phase(PH_TESTING);         /* white: the long suite starts */
 

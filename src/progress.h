@@ -18,6 +18,7 @@
  *   GREEN    framebuffer VRAM proven, picture on
  *   YELLOW   sound RAM clip zone proven, audio on
  *   MAGENTA  board model identified
+ *   ORANGE   first execution of the loops relocated into CPU RAM
  *   WHITE    running the exhaustive test suite
  *   RED      the phase in progress failed
  * ------------------------------------------------------------------- */
@@ -27,6 +28,7 @@ typedef enum {
     PH_VIDEO_ON,
     PH_AUDIO_ON,
     PH_BOARD_ID,
+    PH_RELOC,
     PH_TESTING,
     PH_DONE,
     PH_FAILED

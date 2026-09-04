@@ -5,6 +5,7 @@
 #include "pvr.h"
 #include "ramtest.h"
 #include "progress.h"
+#include "reloc.h"
 #include "font8x8_basic.h"
 
 #define PVR_REG(off)        REG32(0xA05F8000u + (off))
@@ -113,7 +114,7 @@ void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
             chunk = 1024;
         chunk &= ~15u;
         progress_tick(done);
-        ram_fill_fast((u32 *)(base + (done << 2)), chunk >> 4, pattern);
+        p_ram_fill_fast((u32 *)(base + (done << 2)), chunk >> 4, pattern);
         done += chunk;
     }
     for (u32 i = done; i < n; i++)
@@ -126,7 +127,7 @@ void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
             chunk = 1024;
         chunk &= ~7u;
         progress_tick(n + done);
-        diff |= ram_verify_fast((u32 *)(base + (done << 2)), chunk >> 3,
+        diff |= p_ram_verify_fast((u32 *)(base + (done << 2)), chunk >> 3,
                                 pattern);
         done += chunk;
     }
@@ -173,7 +174,7 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         if (chunk > 1024)
             chunk = 1024;
         progress_tick(done);
-        ram_prng_fill_fast((u32 *)(base + (done << 2)), chunk, &c);
+        p_ram_prng_fill_fast((u32 *)(base + (done << 2)), chunk, &c);
         done += chunk;
     }
     c.x = seed ? seed : 1;
@@ -182,7 +183,7 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         if (chunk > 1024)
             chunk = 1024;
         progress_tick(n + done);
-        ram_prng_verify_fast((const u32 *)(base + (done << 2)), chunk, &c);
+        p_ram_prng_verify_fast((const u32 *)(base + (done << 2)), chunk, &c);
         done += chunk;
     }
 

@@ -107,6 +107,26 @@ RAM faults are reported per component: a bit mask, the affected data lanes,
 and the silkscreen IC designator (e.g. `CPU RAM 1 (IC16) DEFECTIVE`).
 
 
+### Where the test loops execute
+
+The SH-4 boots in P2, an address window the hardware never caches, so every
+instruction is a bus cycle to the boot EPROM. Linking the whole ROM for P1
+(the cached alias of the boot area) was tried on real hardware and the board
+refuses it outright -- black screen before the first visible instruction --
+which matches the original BIOS, that never executes cached from ROM either.
+
+Cached execution from SDRAM is a different matter: it is where every Naomi
+game runs. So the four memory-test loops -- 356 bytes, where essentially all
+the time goes -- are copied into the top 8 KB of CPU RAM at boot and run from
+there, cached, while everything else stays in ROM.
+
+The window is tested with the full pattern and pseudo-random suite before
+anything is copied into it, and the memory under test is still addressed
+through P2, so the data path stays uncached and the test keeps its coverage.
+If no usable RAM is found the pointers keep addressing the ROM copies and the
+diagnostic runs slowly rather than not at all -- which is exactly the board
+that needs diagnosing. Build with `RELOC=0` to disable it entirely.
+
 ### Pass count
 
 Every RAM cell test runs `PASSES` passes; the specification calls for 10.

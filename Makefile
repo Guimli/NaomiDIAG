@@ -23,9 +23,14 @@ ELF     := naomi_diag_$(lang_lc).elf
 # restore the specified depth once execution speed is fixed.
 PASSES ?= 1
 
+# Relocate the memory-test loops into CPU RAM and run them cached. RELOC=0
+# keeps everything executing from the boot EPROM, which is much slower but
+# depends on nothing beyond the ROM itself.
+RELOC ?= 1
+
 CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
            -Wall -Wextra -std=c11 -DQUICK_TEST=$(QUICK) -DLANG_$(LANG) \
-           -DN_PASSES=$(PASSES)
+           -DN_PASSES=$(PASSES) -DRELOC=$(RELOC)
 # P2 (0xA0000000) is the default: it is the window the reset vector lands in
 # and the only one this ROM has been observed to run from on real hardware.
 # ROM_BASE=0x80000000 links for P1, the cached alias, which is much faster but
@@ -33,7 +38,7 @@ CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
 ROM_BASE ?= 0xA0000000
 LDFLAGS := -nostdlib -Wl,-T,linker.gen.ld -Wl,--build-id=none -Wl,-Map,$(ELF).map
 
-OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.o src/ramtest_fast.o \
+OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.o src/ramtest_fast.o src/reloc.o \
         src/timer.o src/aica.o src/pvr.o src/periph.o src/dimm.o src/maple.o \
         src/board.o src/sha1.o src/cart.o
 
@@ -45,7 +50,7 @@ all: $(BIN)
 
 # config stamp: objects carry no LANG/QUICK in their name, so force a
 # rebuild whenever the selected language or QUICK setting changes.
-STAMP := .build_$(LANG)_$(QUICK)_$(PASSES)
+STAMP := .build_$(LANG)_$(QUICK)_$(PASSES)_$(RELOC)
 $(STAMP):
 	rm -f .build_* && touch $@
 

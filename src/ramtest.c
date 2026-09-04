@@ -10,6 +10,7 @@
  *   and compared with the CRC32 recomputed on the read side. */
 #include "ramtest.h"
 #include "progress.h"
+#include "reloc.h"
 #include "scif.h"
 
 void ram_result_clear(ram_result *r)
@@ -110,7 +111,7 @@ void ram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
         if (!chunk)
             break;
         progress_tick(done);
-        ram_fill_fast((u32 *)(base + (done << 2)), chunk >> 4, pattern);
+        p_ram_fill_fast((u32 *)(base + (done << 2)), chunk >> 4, pattern);
         done += chunk;
     }
     for (u32 i = done; i < n; i++)      /* tail below one block */
@@ -126,7 +127,7 @@ void ram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
         if (!chunk)
             break;
         progress_tick(n + done);
-        diff |= ram_verify_fast((u32 *)(base + (done << 2)), chunk >> 3,
+        diff |= p_ram_verify_fast((u32 *)(base + (done << 2)), chunk >> 3,
                                 pattern);
         done += chunk;
     }
@@ -255,7 +256,7 @@ void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         if (chunk > 1024)
             chunk = 1024;
         progress_tick(done);
-        ram_prng_fill_fast((u32 *)(base + (done << 2)), chunk, &c);
+        p_ram_prng_fill_fast((u32 *)(base + (done << 2)), chunk, &c);
         done += chunk;
     }
 
@@ -265,7 +266,7 @@ void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         if (chunk > 1024)
             chunk = 1024;
         progress_tick(n + done);
-        ram_prng_verify_fast((const u32 *)(base + (done << 2)), chunk, &c);
+        p_ram_prng_verify_fast((const u32 *)(base + (done << 2)), chunk, &c);
         done += chunk;
     }
 

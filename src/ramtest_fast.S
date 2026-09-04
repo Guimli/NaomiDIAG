@@ -24,8 +24,17 @@
 !          only paid for on boards that actually have a fault.
 ! =============================================================================
 
-    .section .text, "ax"
+! ---------------------------------------------------------------------------
+! Everything below lives in its own section so the boot code can copy the
+! whole block into CPU RAM and run it from there, cached, once that RAM has
+! been proven. It is relocatable as written: every branch is PC-relative and
+! the one literal (the CRC table address) travels with the code and points
+! back at the table in ROM, which never moves.
+! ---------------------------------------------------------------------------
+    .section .text.reloc, "ax"
     .align 2
+    .global _reloc_blk_start
+_reloc_blk_start:
 
 ! -----------------------------------------------------------------------------
 ! void ram_fill_fast(u32 *base, u32 nblocks16, u32 pattern)
@@ -261,3 +270,6 @@ _ram_prng_verify_fast:
 
     .align 4
 Lcrctab:    .long _crc32_tab8
+
+    .global _reloc_blk_end
+_reloc_blk_end:

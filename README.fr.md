@@ -113,6 +113,29 @@ données concernées, et désignateur IC sérigraphié (ex.
 `RAM CPU 1 (IC16) DEFECTUEUX`).
 
 
+### Où s'exécutent les boucles de test
+
+Le SH-4 démarre en P2, fenêtre que le matériel ne cache jamais : chaque
+instruction est un cycle de bus vers l'EPROM de démarrage. Lier toute la ROM
+en P1 (l'alias caché de la zone de démarrage) a été essayé sur matériel réel
+et la carte le refuse — écran noir avant la première instruction visible —
+ce qui rejoint le BIOS d'origine, qui ne s'exécute jamais en cache depuis la
+ROM.
+
+L'exécution cachée depuis la SDRAM est tout autre chose : c'est là que tourne
+chaque jeu Naomi. Les quatre boucles de test mémoire — 356 octets, où passe
+la quasi-totalité du temps — sont donc recopiées au démarrage dans les 8 Ko
+de sommet de la RAM CPU et exécutées depuis là, en cache, le reste du
+programme demeurant en ROM.
+
+Cette fenêtre est testée par la suite complète motifs + pseudo-aléatoire
+avant qu'on y copie quoi que ce soit, et la mémoire sous test reste adressée
+par P2 : le chemin de données demeure non caché et la couverture est
+conservée. Si aucune RAM utilisable n'est trouvée, les pointeurs continuent
+de viser les copies en ROM et le diagnostic est lent plutôt qu'absent — ce
+qui est précisément le cas d'une carte à diagnostiquer. `RELOC=0` désactive
+complètement le mécanisme.
+
 ### Nombre de passes
 
 Chaque test cellule de RAM effectue `PASSES` passes ; la spécification en

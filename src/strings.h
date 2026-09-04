@@ -42,6 +42,7 @@
 #define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
 /* short labels for the progress bar: they get a " NN/10" pass suffix, so
  * they must stay well inside the screen width */
+#define S_L_RELOC           "Boucles de test relogees en RAM"
 #define S_P_BIOS            "Somme ROM BIOS"
 #define S_P_ARAM            "RAM son"
 #define S_P_VRAM            "VRAM"
@@ -161,6 +162,7 @@
 #define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
 /* short labels for the progress bar: they get a " NN/10" pass suffix, so
  * they must stay well inside the screen width */
+#define S_L_RELOC           "Test loops relocated to CPU RAM"
 #define S_P_BIOS            "BIOS ROM checksum"
 #define S_P_ARAM            "Sound RAM"
 #define S_P_VRAM            "VRAM"

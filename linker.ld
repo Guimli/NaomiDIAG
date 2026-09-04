@@ -22,6 +22,7 @@ SECTIONS
 {
     .text : {
         KEEP(*(.text.start))
+        *(.text.reloc)
         *(.text*)
     } > ROM
 

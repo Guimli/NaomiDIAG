@@ -9,6 +9,7 @@ static const u32 phase_col[] = {
     0x0000FF00,     /* PH_VIDEO_ON   green   */
     0x00FFFF00,     /* PH_AUDIO_ON   yellow  */
     0x00FF00FF,     /* PH_BOARD_ID   magenta */
+    0x00FF8000,     /* PH_RELOC      orange  */
     0x00FFFFFF,     /* PH_TESTING    white   */
     0x00808080,     /* PH_DONE       grey    */
     0x00FF0000      /* PH_FAILED     red     */
