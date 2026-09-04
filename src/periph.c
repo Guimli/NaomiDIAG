@@ -30,13 +30,20 @@ static inline u32 xorshift32(u32 x)
     return x;
 }
 
-u32 sram_test(ram_result *r, u32 passes)
+/* The other memory tests run three region-wide phases -- 0101, 1010, then a
+ * pseudo-random stream -- and report them as 1/3, 2/3, 3/3. This one applies
+ * the same three patterns but BYTE BY BYTE, restoring each byte before moving
+ * to the next, because it must not destroy the operator's saved settings.
+ * Sweeping the whole region three times would mean holding 32 KB of original
+ * content somewhere, and the only memory available to hold it is the memory
+ * under test. The phase numbering would be a lie here, so it is not used. */
+u32 sram_test(ram_result *r)
 {
     volatile u8 *p = (volatile u8 *)SRAM_P2_BASE;
     ram_result_clear(r);
 
-    for (u32 pass = 0; pass < passes; pass++) {
-        u32 x = 0x5EED5EED ^ (0x9E3779B9u * (pass + 1));
+    {
+        u32 x = 0x5EED5EED ^ 0x9E3779B9u;
         for (u32 i = 0; i < SRAM_SIZE; i++) {
             u8 orig = p[i];
             x = xorshift32(x);

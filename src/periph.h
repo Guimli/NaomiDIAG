@@ -10,7 +10,7 @@
 
 /* Returns component mask: bit0 = even byte lane (chip A),
  * bit1 = odd byte lane (chip B); 0 = all good. Fills *r with details. */
-u32 sram_test(ram_result *r, u32 passes);
+u32 sram_test(ram_result *r);
 
 /* AICA RTC (32.768kHz crystal + battery), seconds since 1950.
  * Non-destructive: reads the counter twice around a TMU delay and checks

@@ -63,17 +63,15 @@ In order:
 5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — then the VGA report
    screen comes up.
 6. **Main CPU RAM** (SDRAM, 16/32 MB, IC16/18/20/22) — first a data-bus
-   walking-ones test and an address-bus test, then **N passes** (build
-   parameter `PASSES`, specified as 10; shipped as 1 for now — see
-   "Pass count" below), each pass running three patterns in this order:
-   - write `0x55555555` (0101…) over the whole region, then read it all back
-     and compare;
-   - write `0xAAAAAAAA` (1010…) over the whole region, then read back and
-     compare;
-   - write a pseudo-random stream (a different seed each pass) while
-     accumulating a **CRC32 kept in a CPU register**, then read the region
-     back recomputing the CRC and compare it against the write-side CRC as
-     well as word by word.
+   walking-ones test and an address-bus test, then **three phases**, each
+   reported as `pass n/3` and each driving the progress bar from 0 to 100%:
+   - **1/3** — write `0x55555555` (0101…) over the whole region, then read it
+     all back and compare;
+   - **2/3** — write `0xAAAAAAAA` (1010…) over the whole region, then read
+     back and compare;
+   - **3/3** — write a pseudo-random stream while accumulating a **CRC32 kept
+     in a CPU register**, then read the region back recomputing the CRC and
+     compare it against the write-side CRC as well as word by word.
 
    Any single bad cell marks the whole chip (and thus the entire interleaved
    RAM) defective; that RAM is never used for the rest of the program. If
@@ -150,18 +148,6 @@ through P2, so the data path stays uncached and the test keeps its coverage.
 If no usable RAM is found the pointers keep addressing the ROM copies and the
 diagnostic runs slowly rather than not at all -- which is exactly the board
 that needs diagnosing. Build with `RELOC=0` to disable it entirely.
-
-### Pass count
-
-Every RAM cell test runs `PASSES` passes; the specification calls for 10.
-The images currently ship with `PASSES=1`, because the ROM executes uncached
-straight from the boot EPROM: every instruction fetch is an EPROM access, so
-a single pass over 32 MB already takes far too long on a real board to be
-usable. Once execution speed is addressed, rebuild with the specified depth:
-
-```
-make LANG=EN PASSES=10
-```
 
 ## Building
 

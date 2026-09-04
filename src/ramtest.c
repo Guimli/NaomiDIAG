@@ -3,8 +3,7 @@
  * OC-RAM stack / in registers only — the RAM under test is never used
  * to hold test code or data.
  *
- * Per user spec, each full test = N_PASSES passes of three patterns
- * (the specified figure is 10; see PASSES in the Makefile):
+ * Per user spec, a full test is three phases, reported as 1/3, 2/3 and 3/3:
  *   0x55555555, 0xAAAAAAAA, then a pseudo-random stream (different seed
  *   every pass) whose CRC32 is kept in a CPU register on the write side
  *   and compared with the CRC32 recomputed on the read side. */

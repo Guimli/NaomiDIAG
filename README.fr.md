@@ -66,18 +66,17 @@ Dans l'ordre :
 5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — puis l'écran de rapport
    VGA s'active.
 6. **RAM CPU principale** (SDRAM, 16/32 Mo, IC16/18/20/22) — d'abord un test
-   bus de données (walking-ones) et un test bus d'adresses, puis **N passes**
-   (paramètre de compilation `PASSES`, spécifié à 10, livré à 1 pour le
-   moment — voir « Nombre de passes »), chaque passe enchaînant trois motifs
-   dans cet ordre :
-   - écriture de `0x55555555` (0101…) sur toute la zone, puis relecture
-     complète et comparaison ;
-   - écriture de `0xAAAAAAAA` (1010…) sur toute la zone, puis relecture et
-     comparaison ;
-   - écriture d'un flux pseudo-aléatoire (graine différente à chaque passe)
-     en accumulant un **CRC32 conservé dans un registre CPU**, puis relecture
-     de la zone en recalculant le CRC et comparaison avec le CRC d'écriture
-     ainsi que mot à mot.
+   bus de données (walking-ones) et un test bus d'adresses, puis **trois
+   phases**, annoncées `passe n/3` et menant chacune la barre de progression
+   de 0 à 100 % :
+   - **1/3** — écriture de `0x55555555` (0101…) sur toute la zone, puis
+     relecture complète et comparaison ;
+   - **2/3** — écriture de `0xAAAAAAAA` (1010…) sur toute la zone, puis
+     relecture et comparaison ;
+   - **3/3** — écriture d'un flux pseudo-aléatoire en accumulant un **CRC32
+     conservé dans un registre CPU**, puis relecture de la zone en
+     recalculant le CRC et comparaison avec le CRC d'écriture ainsi que mot
+     à mot.
 
    Toute cellule défectueuse condamne la puce entière (et donc toute la RAM
    entrelacée), qui n'est plus utilisée pour la suite du programme. Si
@@ -162,19 +161,6 @@ conservée. Si aucune RAM utilisable n'est trouvée, les pointeurs continuent
 de viser les copies en ROM et le diagnostic est lent plutôt qu'absent — ce
 qui est précisément le cas d'une carte à diagnostiquer. `RELOC=0` désactive
 complètement le mécanisme.
-
-### Nombre de passes
-
-Chaque test cellule de RAM effectue `PASSES` passes ; la spécification en
-demande 10. Les images sont actuellement livrées en `PASSES=1` : la ROM
-s'exécute sans cache directement depuis l'EPROM de démarrage, chaque lecture
-d'instruction étant un accès EPROM, si bien qu'une seule passe sur 32 Mo est
-déjà bien trop longue sur une carte réelle pour être exploitable. Une fois la
-vitesse d'exécution réglée, reconstruire à la profondeur spécifiée :
-
-```
-make LANG=FR PASSES=10
-```
 
 ## Compilation
 

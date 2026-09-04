@@ -34,9 +34,12 @@
 #define QUICK_TEST 0
 #endif
 
-#ifndef N_PASSES
-#define N_PASSES    1               /* see PASSES in the Makefile */
-#endif
+/* A memory test is three phases, always: 0101 over the region, then 1010,
+ * then a pseudo-random stream checked against a CRC held in a register.
+ * They are numbered 1/3, 2/3, 3/3 in the report and each drives the progress
+ * bar from 0 to 100%, so the operator can see which of the three is running
+ * and how far it has got. */
+#define N_PHASES    3
 #define REPORT_GAP_MS 1000          /* >= 1 s between spoken reports */
 
 #define CLIP_NONE   0xFFFFFFFFu
@@ -138,7 +141,7 @@ static void screen_render(void)
  * and the progress bar needs to name which of the ten passes is running. */
 static char g_passbuf[64];
 
-static const char *pass_label(const char *base, u32 pass)
+static const char *pass_label(const char *base, u32 phase)
 {
     u32 i = 0;
     while (base[i] && i < 40) {
@@ -148,13 +151,9 @@ static const char *pass_label(const char *base, u32 pass)
     const char *suf = S_P_PASS;
     for (u32 j = 0; suf[j] && i < 52; j++)
         g_passbuf[i++] = suf[j];
-    if (pass >= 10)
-        g_passbuf[i++] = (char)('0' + pass / 10);
-    g_passbuf[i++] = (char)('0' + pass % 10);
+    g_passbuf[i++] = (char)('0' + phase);
     g_passbuf[i++] = '/';
-    if (N_PASSES >= 10)
-        g_passbuf[i++] = (char)('0' + N_PASSES / 10);
-    g_passbuf[i++] = (char)('0' + N_PASSES % 10);
+    g_passbuf[i++] = (char)('0' + N_PHASES);
     g_passbuf[i] = 0;
     return g_passbuf;
 }
@@ -393,6 +392,17 @@ static void sdram_setup(void)
  * exactly the board that needs one. */
 static u32 g_reloc_win;             /* P2 address of the block in use, 0 = none */
 
+/* "pass n/3 <what>" on serial, and the same on the progress bar. */
+static void phase_begin(const char *label, u32 phase, const char *what,
+                        u32 words)
+{
+    scif_puts(S_PASS);
+    scif_putdec(phase);
+    scif_puts("/3 ");
+    scif_puts(what);
+    progress_begin(pass_label(label, phase), words * 2);
+}
+
 static void relocate_try(void)
 {
 #if RELOC
@@ -512,26 +522,23 @@ static u32 test_sdram_cells(void)
 
     ram_result res;
     ram_result_clear(&res);
-    for (u32 pass = 0; pass < N_PASSES; pass++) {
-        scif_puts(S_PASS);
-        scif_putdec(pass + 1);
-        scif_puts("/");
-        scif_putdec(N_PASSES);
-        scif_puts(": 5555");
-        progress_begin(pass_label(S_P_SDRAM, pass + 1), (len >> 2) * 2);
-        ram_test_pattern(SDRAM_P2_BASE, len, 0x55555555, &res);
-        scif_puts(" AAAA");
-        progress_begin(pass_label(S_P_SDRAM, pass + 1), (len >> 2) * 2);
-        ram_test_pattern(SDRAM_P2_BASE, len, 0xAAAAAAAA, &res);
-        scif_puts(" PRNG");
-        u32 seed = 0xDEADBEEF ^ (0x9E3779B9u * (pass + 1));
-        progress_begin(pass_label(S_P_SDRAM, pass + 1), (len >> 2) * 2);
-        ram_test_prng(SDRAM_P2_BASE, len, seed, &res);
-        progress_end();
-        scif_puts(" crc=");
-        scif_puthex(res.crc_r);
-        scif_puts(res.errors ? " ERR\n" : " ok\n");
-    }
+    u32 words = len >> 2;
+    phase_begin(S_P_SDRAM, 1, S_PH_0101, words);
+    ram_test_pattern(SDRAM_P2_BASE, len, 0x55555555, &res);
+    progress_end();
+    scif_puts(res.errors ? " ERR\n" : " ok\n");
+
+    phase_begin(S_P_SDRAM, 2, S_PH_1010, words);
+    ram_test_pattern(SDRAM_P2_BASE, len, 0xAAAAAAAA, &res);
+    progress_end();
+    scif_puts(res.errors ? " ERR\n" : " ok\n");
+
+    phase_begin(S_P_SDRAM, 3, S_PH_PRNG, words);
+    ram_test_prng(SDRAM_P2_BASE, len, 0xDEADBEEF ^ 0x9E3779B9u, &res);
+    progress_end();
+    scif_puts(" crc=");
+    scif_puthex(res.crc_r);
+    scif_puts(res.errors ? " ERR\n" : " ok\n");
 
     t_status st = res.errors ? T_FAIL : T_OK;
     log_result(S_L_SDRAM_CELL, CLIP_CPU_RAM, st,
@@ -569,26 +576,23 @@ static u32 test_aram(void)
 
     ram_result res;
     ram_result_clear(&res);
-    for (u32 pass = 0; pass < N_PASSES; pass++) {
-        scif_puts(S_PASS);
-        scif_putdec(pass + 1);
-        scif_puts("/");
-        scif_putdec(N_PASSES);
-        scif_puts(": 5555");
-        progress_begin(pass_label(S_P_ARAM, pass + 1), (len >> 2) * 2);
-        aram_test_pattern(0, len, 0x55555555, &res);
-        scif_puts(" AAAA");
-        progress_begin(pass_label(S_P_ARAM, pass + 1), (len >> 2) * 2);
-        aram_test_pattern(0, len, 0xAAAAAAAA, &res);
-        scif_puts(" PRNG");
-        u32 seed = 0xC0FFEE42 ^ (0x9E3779B9u * (pass + 1));
-        progress_begin(pass_label(S_P_ARAM, pass + 1), (len >> 2) * 2);
-        aram_test_prng(0, len, seed, &res);
-        progress_end();
-        scif_puts(" crc=");
-        scif_puthex(res.crc_r);
-        scif_puts(res.errors ? " ERR\n" : " ok\n");
-    }
+    u32 words = len >> 2;
+    phase_begin(S_P_ARAM, 1, S_PH_0101, words);
+    aram_test_pattern(0, len, 0x55555555, &res);
+    progress_end();
+    scif_puts(res.errors ? " ERR\n" : " ok\n");
+
+    phase_begin(S_P_ARAM, 2, S_PH_1010, words);
+    aram_test_pattern(0, len, 0xAAAAAAAA, &res);
+    progress_end();
+    scif_puts(res.errors ? " ERR\n" : " ok\n");
+
+    phase_begin(S_P_ARAM, 3, S_PH_PRNG, words);
+    aram_test_prng(0, len, 0xC0FFEE42 ^ 0x9E3779B9u, &res);
+    progress_end();
+    scif_puts(" crc=");
+    scif_puthex(res.crc_r);
+    scif_puts(res.errors ? " ERR\n" : " ok\n");
 
     /* a G2 bus that never drains aborts the write loops: the cell results
      * are meaningless then, and the bus is the actual fault to report */
@@ -642,20 +646,27 @@ static void test_vram_region(const char *name, u32 base, u32 size,
     u32 fbaddr = VRAM_TEX0_BASE + FB_VRAM_OFFSET;
     progress_screen_enable(!(base <= fbaddr && fbaddr < base + len));
 
-    for (u32 pass = 0; pass < N_PASSES; pass++) {
-        progress_begin(pass_label(S_P_VRAM, pass + 1), (len >> 2) * 2);
-        vram_test_pattern(base, len, 0x55555555, &res);
-        progress_begin(pass_label(S_P_VRAM, pass + 1), (len >> 2) * 2);
-        vram_test_pattern(base, len, 0xAAAAAAAA, &res);
-        u32 seed = 0x7E0CBEEF ^ (0x9E3779B9u * (pass + 1)) ^ base;
-        progress_begin(pass_label(S_P_VRAM, pass + 1), (len >> 2) * 2);
-        vram_test_prng(base, len, seed, &res);
-        progress_end();
-        scif_putc('.');
-        /* this test scribbles over the framebuffer: repaint after every
-         * pass so the screen stays readable (and shows progress) */
-        screen_render();
-    }
+    u32 words = len >> 2;
+    phase_begin(S_P_VRAM, 1, S_PH_0101, words);
+    vram_test_pattern(base, len, 0x55555555, &res);
+    progress_end();
+    scif_puts("\n");
+
+    phase_begin(S_P_VRAM, 2, S_PH_1010, words);
+    vram_test_pattern(base, len, 0xAAAAAAAA, &res);
+    progress_end();
+    scif_puts("\n");
+
+    phase_begin(S_P_VRAM, 3, S_PH_PRNG, words);
+    vram_test_prng(base, len, 0x7E0CBEEF ^ 0x9E3779B9u ^ base, &res);
+    progress_end();
+    scif_puts(" crc=");
+    scif_puthex(res.crc_r);
+    scif_puts(res.errors ? " ERR\n" : " ok\n");
+
+    /* this test scribbles over the framebuffer: repaint once it is done so
+     * the screen is readable again */
+    screen_render();
     progress_screen_enable(1);
     scif_putc('\n');
 
@@ -704,7 +715,7 @@ static void test_sram_rtc(void)
     scif_puts(S_PERIPH_HDR);
 
     ram_result res;
-    u32 mask = sram_test(&res, N_PASSES);
+    u32 mask = sram_test(&res);
     /* positions 1/2 = even/odd byte lane; IC designators pending the
      * user's silkscreen readout -> spoken as numbered positions */
     log_result(S_L_BACKSRAM, CLIP_SRAM,
