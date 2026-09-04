@@ -37,22 +37,28 @@ x76f100_eeprom.bin
 *.map
 *.dis
 .build_*
-src/audio_clips.h          # generated per-language copy (see audio_clips_*.h)
+# generated per-language copy (see audio_clips_*.h)
+src/audio_clips.h
 
 # =============================================================================
 # Test / debug outputs
 # =============================================================================
-*.wav                      # rendered audio samples and MAME captures
+# rendered audio samples and MAME captures
+*.wav
 mame_*.txt
 tm_dbg.txt
-snap/                      # MAME screenshots
-mamelist.xml               # huge `mame -listxml` dump (regenerate for `make cartdb`)
+# MAME screenshots
+snap/
+# huge `mame -listxml` dump (regenerate for `make cartdb`)
+mamelist.xml
 
 # =============================================================================
 # Local dev tooling (large / machine-specific, regenerated on demand)
 # =============================================================================
-tools/.venv/               # Piper Python venv
-tools/voices/              # Piper voice models (~60 MB each, downloadable)
+# Piper Python venv
+tools/.venv/
+# Piper voice models (~60 MB each, downloadable)
+tools/voices/
 
 # ad-hoc probe/fault Lua scripts (kept local, not part of the shipped set)
 id_probe.lua
@@ -73,4 +79,5 @@ Thumbs.db
 *~
 .vscode/
 .idea/
-linker.gen.ld            # generated from linker.ld by the Makefile
+# generated from linker.ld by the Makefile
+linker.gen.ld
