@@ -374,29 +374,64 @@ static void sdram_setup(void)
  * addressed through P2, so the data path stays uncached and the test keeps
  * the coverage it has.
  *
- * The window is the top 8 KB of CPU RAM, and it is tested with the full
- * pattern and pseudo-random suite before anything is copied into it -- the
- * rule that no untested RAM is ever used holds here too. It is small enough
- * that testing it from ROM costs nothing. The main CPU RAM test below then
- * covers everything under it, so the region is not skipped, merely tested
- * earlier and by a different route.
+ * Which 8 KB block: the four CPU RAM chips are interleaved by data lane, not
+ * by address range -- IC16/IC18 carry the even words, IC20/IC22 the odd ones,
+ * sixteen bits of the sixty-four each. Every block therefore spans all four,
+ * and no choice of address can dodge a chip that is dead across its range.
+ * What moving the window does buy is immunity to a LOCALIZED fault, a bad row
+ * or column inside one chip, which is the common case. So the blocks are
+ * scanned downward from the top and the first sound one is taken.
  *
- * On any doubt the pointers keep addressing the ROM copies: a board whose
- * CPU RAM is dead still gets a full, slow diagnostic, which is exactly the
- * board that needs one. */
+ * Every candidate gets the full pattern and pseudo-random suite before
+ * anything is copied into it, and a candidate that fails is reported rather
+ * than quietly skipped -- it is real broken memory. Everything scanned sits
+ * above the block finally chosen, and the main CPU RAM test then covers
+ * everything below it, so no region goes unexamined.
+ *
+ * If no block passes, the pointers keep addressing the ROM copies: a board
+ * whose CPU RAM is unusable still gets a full, slow diagnostic, which is
+ * exactly the board that needs one. */
+static u32 g_reloc_win;             /* P2 address of the block in use, 0 = none */
+
 static void relocate_fast_loops(void)
 {
 #if RELOC
     if (g_ram_size < 0x00100000u)
         return;
-    u32 win = SDRAM_P2_BASE + g_ram_size - RELOC_WINDOW;
 
-    ram_result res;
-    ram_result_clear(&res);
-    ram_test_pattern(win, RELOC_WINDOW, 0x55555555, &res);
-    ram_test_pattern(win, RELOC_WINDOW, 0xAAAAAAAA, &res);
-    ram_test_prng(win, RELOC_WINDOW, 0x5EED1234, &res);
-    if (res.errors) {
+    ram_result scan;                /* accumulates every bad block found */
+    ram_result_clear(&scan);
+    u32 nbad = 0;
+
+    for (u32 k = 0; k < RELOC_TRIES; k++) {
+        u32 cand = SDRAM_P2_BASE + g_ram_size - (k + 1) * RELOC_WINDOW;
+        ram_result res;
+        ram_result_clear(&res);
+        ram_test_pattern(cand, RELOC_WINDOW, 0x55555555, &res);
+        ram_test_pattern(cand, RELOC_WINDOW, 0xAAAAAAAA, &res);
+        ram_test_prng(cand, RELOC_WINDOW, 0x5EED1234, &res);
+        if (!res.errors) {
+            g_reloc_win = cand;
+            break;
+        }
+        nbad++;
+        scan.errors += res.errors;
+        scan.badbits |= res.badbits;
+        scan.badbits_e |= res.badbits_e;
+        scan.badbits_o |= res.badbits_o;
+    }
+
+    if (nbad) {                     /* bad memory is a finding, not a detour */
+        scif_puts("  ");
+        scif_putdec(nbad);
+        scif_puts(" bad 8KB block(s) at the top of CPU RAM\n");
+        log_result(S_L_RELOC_SCAN, CLIP_SOUND_RAM, T_FAIL,
+                   ram_comp_mask(&scan), IC(work_comps));
+        report_badbits(scan.badbits);
+        report_comps(S_CG_CPU, ram_comp_mask(&scan), IC(work_comps));
+    }
+
+    if (!g_reloc_win) {
         log_result(S_L_RELOC, CLIP_NONE, T_FAIL, 0, 0);
         return;
     }
@@ -406,7 +441,7 @@ static void relocate_fast_loops(void)
      * from RAM the way it refused it from ROM, the screen stops on this
      * colour and says so without a serial cable. */
     progress_phase(PH_RELOC);
-    u32 ok = reloc_install(win);
+    u32 ok = reloc_install(g_reloc_win);
     log_result(S_L_RELOC, CLIP_NONE, ok ? T_OK : T_FAIL, 0, 0);
     if (ok) {
         /* print where they actually run from: 0x8C/0x8D is cached CPU RAM,
@@ -414,9 +449,12 @@ static void relocate_fast_loops(void)
         scif_puts("  loops now execute at ");
         scif_puthex((u32)p_ram_prng_verify_fast);
         scif_puts("\n");
+    } else {
+        g_reloc_win = 0;            /* stayed in ROM: nothing is reserved */
     }
 #endif
 }
+
 
 static u32 test_sdram_cells(void)
 {
@@ -447,7 +485,7 @@ static u32 test_sdram_cells(void)
     /* the top window holds the relocated test loops and was already tested
      * in full before they were copied there; testing it again would mean
      * overwriting the code we are executing */
-    u32 len = reloc_active() ? size - RELOC_WINDOW : size;
+    u32 len = g_reloc_win ? g_reloc_win - SDRAM_P2_BASE : size;
 #endif
 
     ram_result res;

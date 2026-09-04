@@ -26,7 +26,8 @@
  * to be diagnosed.
  * ---------------------------------------------------------------------- */
 
-#define RELOC_WINDOW    0x2000u     /* 8 KB reserved at the top of CPU RAM */
+#define RELOC_WINDOW    0x2000u     /* 8 KB block the loops are copied into */
+#define RELOC_TRIES     128u        /* blocks scanned downward from the top */
 #define RELOC_SCRATCH   0x1000u     /* offset of the self-test area in it  */
 
 /* Called through, never directly, so a failed or disabled relocation simply
