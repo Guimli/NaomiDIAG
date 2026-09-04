@@ -189,12 +189,13 @@ make cartdb    # reconstruit la base SHA-1 cartouche depuis `mame -listxml`
 
 ```sh
 make LANG=FR QUICK=1 mame-rom
-mame naomi -rompath ../roms_diag -autoboot_script scif_tap.lua
+mame naomi -rompath ../roms_diag -autoboot_script mame/scif_tap.lua
 ```
 
-`scif_tap.lua` capture la FIFO d'émission SCIF du SH-4 et affiche la console
-série (MAME ne câble pas le SCIF). Les scripts `*_fault*.lua` injectent des
-pannes RAM pour les tests négatifs. Note : la RAM principale est en fastram
+Les scripts MAME sont tous dans [`mame/`](mame). `scif_tap.lua` capture la
+FIFO d'émission SCIF du SH-4 et affiche la console série (MAME ne câble pas
+le SCIF). Les scripts `*_fault*.lua` injectent des pannes RAM pour les tests
+négatifs. Note : la RAM principale est en fastram
 sous le DRC, l'injection de panne y nécessite `-nodrc`.
 
 ## Notes pour le vrai matériel

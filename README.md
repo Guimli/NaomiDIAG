@@ -176,12 +176,13 @@ make cartdb    # rebuild the cartridge SHA-1 DB from `mame -listxml`
 
 ```sh
 make LANG=EN QUICK=1 mame-rom
-mame naomi -rompath ../roms_diag -autoboot_script scif_tap.lua
+mame naomi -rompath ../roms_diag -autoboot_script mame/scif_tap.lua
 ```
 
-`scif_tap.lua` captures the SH-4 SCIF transmit FIFO and prints the serial
-console (MAME does not wire the SCIF to anything). The `*_fault*.lua`
-scripts inject RAM faults for negative testing. Note: main RAM is fastram
+The MAME scripts all live in [`mame/`](mame). `scif_tap.lua` captures the
+SH-4 SCIF transmit FIFO and prints the serial console (MAME does not wire the
+SCIF to anything). The `*_fault*.lua` scripts inject RAM faults for negative
+testing. Note: main RAM is fastram
 under the DRC, so fault injection into it needs `-nodrc`.
 
 ## Real hardware notes

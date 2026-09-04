@@ -61,13 +61,13 @@ tools/.venv/
 tools/voices/
 
 # ad-hoc probe/fault Lua scripts (kept local, not part of the shipped set)
-id_probe.lua
-n2_probe.lua
-n2_dev.lua
-testmode*.lua
-diag_snap*.lua
-elan_fault.lua
-sram_fault.lua
+mame/id_probe.lua
+mame/n2_probe.lua
+mame/n2_dev.lua
+mame/testmode*.lua
+mame/diag_snap*.lua
+mame/elan_fault.lua
+mame/sram_fault.lua
 fault_dbg.lua
 
 # =============================================================================
