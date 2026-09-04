@@ -1186,7 +1186,18 @@ static void quick_audio_bringup(void)
     log_result(S_L_AUDIO_QUICK, CLIP_NONE, st, 0, 0);
     if (st == T_OK) {
         g_audio_ready = 1;
-        progress_phase(PH_AUDIO_ON);    /* yellow */              /* channel 3 live, in seconds */
+        progress_phase(PH_AUDIO_ON);    /* yellow */
+
+        /* Before any speech, two seconds of plain square wave. It depends on
+         * nothing but the AICA and the board's analog output, so it splits a
+         * silent machine into two very different faults: no tone means the
+         * output stage or the wiring, tone but no speech means the clips or
+         * their playback. Announced first on the two channels that do not
+         * need a speaker, so the operator knows what to listen for. */
+        scif_puts(S_TONE);
+        log_result(S_L_TONE, CLIP_NONE, T_OK, 0, 0);
+        aica_tone(2000);
+
         audio_replay_log();
     }
 }

@@ -15,6 +15,10 @@ void aica_g2_wait(void);
  * means the bus itself is faulty, and any sound RAM result is void. */
 u32 aica_g2_stalled(void);
 
+/* Continuous square wave for `ms` milliseconds: tests the analog output
+ * chain without depending on any recorded clip. */
+void aica_tone(u32 ms);
+
 /* Hold the ARM7 in reset and set master volume; call before touching ARAM. */
 void aica_init(void);
 

@@ -44,6 +44,8 @@
  * they must stay well inside the screen width */
 #define S_L_RELOC           "Boucles de test relogees en RAM"
 #define S_L_RELOC_SCAN      "Blocs RAM CPU haute defectueux"
+#define S_L_TONE            "Tonalite de test (2 s)"
+#define S_TONE              "Tonalite carree 440 Hz pendant 2 s: si vous ne l'entendez pas,\nle defaut est en amont de la voix (sortie AICA, ampli ou cablage).\n"
 #define S_RELOC_ROM         "  RAM CPU inutilisable: boucles gardees en ROM (mode lent)\n"
 #define S_RELOC_IN_RAM      " (RAM CPU, cache: mode rapide)\n"
 #define S_RELOC_IN_ROM      " (EPROM, non cache: mode lent)\n"
@@ -168,6 +170,8 @@
  * they must stay well inside the screen width */
 #define S_L_RELOC           "Test loops relocated to CPU RAM"
 #define S_L_RELOC_SCAN      "Bad blocks at top of CPU RAM"
+#define S_L_TONE            "Test tone (2 s)"
+#define S_TONE              "440 Hz square wave for 2 s: if you cannot hear it, the fault is\nupstream of speech (AICA output, amplifier or wiring).\n"
 #define S_RELOC_ROM         "  CPU RAM unusable: loops kept in ROM (slow mode)\n"
 #define S_RELOC_IN_RAM      " (CPU RAM, cached: fast mode)\n"
 #define S_RELOC_IN_ROM      " (EPROM, uncached: slow mode)\n"

@@ -48,9 +48,20 @@ u32  aica_g2_stalled(void)  { return g2_stalled; }
 void aica_init(void)
 {
     g2_fifo_wait();
-    AICA_ARMRST |= 1;                   /* ARM7 stopped: ARAM is all ours */
+    /* Write 1, do not read-modify-write. The original BIOS writes this
+     * register outright (mov #1,rN / mov.l rN,@rM) and so should we: a
+     * read of an AICA register goes out over G2 and back, and building the
+     * value we write out of whatever comes back gains nothing. */
+    AICA_ARMRST = 1;                    /* ARM7 stopped: ARAM is all ours */
     g2_fifo_wait();
-    AICA_MVOL = 0x000F;                 /* master volume max, stereo */
+
+    /* MEM8MB matters on Naomi and cannot matter on a Dreamcast: this board
+     * carries 8 MB of sound RAM where the Dreamcast has 2, and bit 9 is what
+     * tells the AICA to address the larger part. Every reference for driving
+     * the AICA from the SH-4 is Dreamcast code, where the bit is meaningless
+     * and therefore absent -- which is exactly the kind of difference an
+     * emulator does not reproduce. */
+    AICA_MVOL = 0x0200 | 0x000F;        /* MEM8MB | master volume max */
     g2_fifo_wait();
     /* silence all 64 slots (KYONB=0 + KYONEX flush) */
     for (int ch = 0; ch < 64; ch++) {
@@ -160,7 +171,55 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
         note_fail(r, ARAM_P2_BASE + off, crc_w, crc_r);
 }
 
+/* A plain square wave, generated here rather than played from a recorded
+ * clip. It isolates the analog chain: if this is audible, the AICA, the
+ * board's output stage and the cabinet wiring all work and any remaining
+ * silence belongs to the clips or their timing. If it is not, the fault is
+ * upstream of anything the diagnostic can say with a voice.
+ *
+ * It loops out of a 500-sample buffer -- ten whole periods at 22050 Hz, so
+ * the loop point falls on a zero crossing and does not click. */
+#define TONE_ARAM_OFF   0x00008000u
+#define TONE_SAMPLES    500u
+#define TONE_PERIOD     50u
+
+void aica_tone(u32 ms)
+{
+    volatile u16 *dst = (volatile u16 *)(ARAM_P2_BASE + TONE_ARAM_OFF);
+    for (u32 i = 0; i < TONE_SAMPLES; i++) {
+        if ((i & 7) == 0 && !g2_fifo_wait())
+            return;
+        u32 phase = i % TONE_PERIOD;
+        dst[i] = (u16)(phase < TONE_PERIOD / 2 ? 8000 : (u16)-8000);
+    }
+
+    g2_fifo_wait();
+    u32 sa = TONE_ARAM_OFF;
+    SLOT(0, 0x00) = (u32)(0x0200 | ((sa >> 16) & 0x7F));  /* LPCTL: loop */
+    SLOT(0, 0x04) = sa & 0xFFFF;
+    SLOT(0, 0x08) = 0;                       /* LSA */
+    SLOT(0, 0x0C) = TONE_SAMPLES - 1;        /* LEA */
+    SLOT(0, 0x10) = 0x001F;                  /* AR max */
+    SLOT(0, 0x14) = 0x001F;                  /* RR max, DL=0 */
+    g2_fifo_wait();
+    SLOT(0, 0x18) = (u32)(0xF << 11);        /* OCT=-1: 22050 Hz */
+    SLOT(0, 0x1C) = 0;
+    SLOT(0, 0x20) = 0;
+    SLOT(0, 0x24) = 0x0F00;                  /* DISDL max, pan centre */
+    SLOT(0, 0x28) = 0;                       /* TL 0: no attenuation */
+    g2_fifo_wait();
+    SLOT(0, 0x00) = (u32)(0x8000 | 0x4000 | 0x0200 | ((sa >> 16) & 0x7F));
+    g2_fifo_wait();
+
+    delay_ms(ms);
+
+    g2_fifo_wait();
+    SLOT(0, 0x00) = (u32)(0x8000 | 0x0200 | ((sa >> 16) & 0x7F));  /* key off */
+    g2_fifo_wait();
+}
+
 /* ---- speech ---- */
+
 
 void aica_say(const signed char *pcm, u32 len, u32 gap_ms)
 {
