@@ -1314,6 +1314,28 @@ void cmain(void)
     test_x76();
     test_cartridge();
 
+    /* The loops have been executing out of CPU RAM on a board whose CPU RAM
+     * is what we just spent the whole suite testing. A cell that passed the
+     * 8 KB qualification and then decayed would have corrupted the code
+     * producing every result since, so the block is re-read and compared
+     * against the master copy in ROM before anything is summarised. */
+    if (reloc_active()) {
+        u32 off, expect, got;
+        if (reloc_verify(&off, &expect, &got)) {
+            log_result(S_L_RELOC_CHK, CLIP_NONE, T_OK, 0, 0);
+        } else {
+            log_result(S_L_RELOC_CHK, CLIP_NONE, T_FAIL, 0, 0);
+            scif_puts("  relocated code changed at offset ");
+            scif_puthex(off);
+            scif_puts(": wrote ");
+            scif_puthex(expect);
+            scif_puts(", read ");
+            scif_puthex(got);
+            scif_puts("\n");
+            scif_puts(S_RELOC_SUSPECT);
+        }
+    }
+
     progress_end();
     progress_phase(PH_DONE);            /* grey: suite finished */
 

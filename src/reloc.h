@@ -47,4 +47,14 @@ u32  reloc_install(u32 p2_dest);
 
 u32  reloc_active(void);
 
+/* Re-read the relocated block and compare it byte for byte against the master
+ * copy in ROM. A cell that passes an 8 KB test and then decays under load
+ * would otherwise corrupt the very code producing the results, and the
+ * diagnostic would report confidently on nothing.
+ *
+ * Returns 1 if intact. On a mismatch it fills the three out-parameters with
+ * the offset and the two bytes, puts the function pointers back on the ROM
+ * copies so nothing else runs from damaged memory, and returns 0. */
+u32  reloc_verify(u32 *off, u32 *expect, u32 *got);
+
 #endif

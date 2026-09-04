@@ -9,8 +9,35 @@ void (*p_ram_prng_fill_fast)(u32 *, u32, prng_ctx *);
 void (*p_ram_prng_verify_fast)(const u32 *, u32, prng_ctx *);
 
 static u32 g_active;
+static u32 g_p2_dest;        /* uncached address of the relocated block */
 
 u32 reloc_active(void) { return g_active; }
+
+u32 reloc_verify(u32 *off, u32 *expect, u32 *got)
+{
+    if (!g_active)
+        return 1;                       /* nothing was relocated */
+
+    /* Read the copy through P2, its uncached address. Reading it through the
+     * window it executes from would be answered out of the cache, which is
+     * exactly the clean copy we are trying to look past -- the check would
+     * then be incapable of ever failing. */
+    const volatile u8 *src = (const volatile u8 *)reloc_blk_start;
+    const volatile u8 *dst = (const volatile u8 *)g_p2_dest;
+    u32 len = (u32)(reloc_blk_end - reloc_blk_start);
+
+    for (u32 i = 0; i < len; i++) {
+        u8 a = src[i], b = dst[i];
+        if (a != b) {
+            *off = i;
+            *expect = a;
+            *got = b;
+            reloc_init();               /* back to ROM: nothing runs from it */
+            return 0;
+        }
+    }
+    return 1;
+}
 
 void reloc_init(void)
 {
@@ -71,6 +98,7 @@ u32 reloc_install(u32 p2_dest)
                              (cached + off_pfill);
     p_ram_prng_verify_fast = (void (*)(const u32 *, u32, prng_ctx *))
                              (cached + off_pverify);
+    g_p2_dest = p2_dest;
     g_active = 1;
     return 1;
 }
