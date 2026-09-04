@@ -16,6 +16,14 @@ direct downloads:
 
 > Français : voir [README.fr.md](README.fr.md).
 
+![NaomiDiag running on a real Naomi](NaomiDIAG_001.jpg)
+
+The on-screen report, photographed on a real Naomi 1. This board is not a
+healthy one, and the ROM says so: the sound RAM cell test fails and names
+**IC29**, the CPU RAM cell test fails and names **IC16** and **IC18** — the
+two chips carrying the even 32-bit word. The bus tests pass, so the chips
+answer; it is their cells that do not hold. Everything else reads OK.
+
 ## Three simultaneous output channels
 
 Every test result is reported **at the same time on every channel that is

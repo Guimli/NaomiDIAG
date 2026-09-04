@@ -16,6 +16,15 @@ téléchargement direct :
 
 > English: see [README.md](README.md).
 
+![NaomiDiag sur une Naomi réelle](NaomiDIAG_001.jpg)
+
+Le rapport à l'écran, photographié sur une Naomi 1 réelle. Cette carte n'est
+pas saine, et la ROM le dit : le test cellule de la RAM son échoue et nomme
+**IC29**, celui de la RAM CPU échoue et nomme **IC16** et **IC18** — les deux
+puces portant le mot pair de 32 bits. Les tests de bus passent, donc les
+puces répondent ; ce sont leurs cellules qui ne tiennent pas. Tout le reste
+est au vert.
+
 ## Trois canaux de sortie simultanés
 
 Chaque résultat de test est rapporté **en même temps sur tous les canaux
