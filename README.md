@@ -64,8 +64,9 @@ In order:
    aliasing).
 3. **BIOS EPROM (IC27)** — CRC32 self-check.
 4. **Sound RAM** (AICA, 8 MB, G2 bus) — then audio becomes a channel.
-5. **VRAM** (PowerVR TEX0 = IC9-12; TEX1's designator is not yet
-   confirmed) — then the VGA report
+5. **VRAM** — 16 MB in eight 16 Mbit chips around the graphics chip, tested
+   as two 64-bit banks, TEX0 and TEX1 of four chips each. Their designators
+   are not confirmed — then the VGA report
    screen comes up.
 6. **Main CPU RAM** (SDRAM, 16/32 MB, IC16/18/20/22) — first a data-bus
    walking-ones test and an address-bus test, then **three phases**, each

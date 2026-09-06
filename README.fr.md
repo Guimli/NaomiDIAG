@@ -66,8 +66,9 @@ Dans l'ordre :
    aliasing VRAM).
 3. **EPROM BIOS (IC27)** — auto-contrôle CRC32.
 4. **RAM son** (AICA, 8 Mo, bus G2) — puis l'audio devient un canal.
-5. **VRAM** (PowerVR TEX0 = IC9-12 ; la désignation de TEX1 n'est pas
-   encore confirmée) — puis l'écran de rapport
+5. **VRAM** — 16 Mo en huit puces de 16 Mbit autour du circuit graphique,
+   testées en deux bancs de 64 bits, TEX0 et TEX1 de quatre puces chacun.
+   Leurs désignations ne sont pas confirmées — puis l'écran de rapport
    VGA s'active.
 6. **RAM CPU principale** (SDRAM, 16/32 Mo, IC16/18/20/22) — d'abord un test
    bus de données (walking-ones) et un test bus d'adresses, puis **trois

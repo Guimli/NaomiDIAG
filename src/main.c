@@ -92,10 +92,20 @@ static const comp_map tex0_comps[4] = {   /* lane order = hypothesis */
     { CLIP_IC_11, "IC11" },         /* D0-D15,  odd word  */
     { CLIP_IC_12, "IC12" },         /* D16-D31, odd word  */
 };
-/* TEX1 is a single 64 Mbit chip whose designator we no longer know: IC35 was
- * this table's answer and IC35 is the sound RAM. Rather than name a chip on a
- * guess, the test reports the region without a designator until the real one
- * is read off a board. */
+/* TEX1 is FOUR chips, not one, and their designators are unknown.
+ *
+ * The board carries eight 16 Mbit VRAM chips (1M x 16, uPD4516161) around the
+ * graphics chip -- the one under the heatsink WITH the fan -- and four 64 Mbit
+ * chips (1M x 16 x 4 banks, HM5264165) around the SH-4, which has a heatsink
+ * and no fan. The arithmetic is what identifies them, and it rests on sizes
+ * this ROM measures for itself: 4 x 8 MB is the 32 MB of main RAM we detect,
+ * and 8 x 2 MB is the 16 MB of VRAM we test as TEX0 plus TEX1. Eight chips of
+ * 16 bits is two 64-bit banks, so each of TEX0 and TEX1 is four of them.
+ *
+ * So this table used to be wrong twice over: it named one chip where there
+ * are four, and the name it used belongs to the sound RAM. Reporting the
+ * region with position numbers and no designators is the honest state until
+ * the four are read off a board. */
 #define tex1_comps  0
 
 typedef struct {
