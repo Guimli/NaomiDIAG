@@ -176,6 +176,32 @@ static const char *pass_label(const char *base, u32 phase)
     return g_passbuf;
 }
 
+/* The detected main RAM size, as a log line so it reaches the screen and not
+ * only the serial console. It answers a question no datasheet settles
+ * reliably: how much memory the four chips around the SH-4 actually add up
+ * to, measured on the board itself. Its own buffer, because log_result keeps
+ * the pointer it is given and g_passbuf is rewritten on every phase. */
+static char g_sizebuf[48];
+
+static const char *size_label(const char *base, u32 mb)
+{
+    u32 i = 0;
+    while (base[i] && i < 32) {
+        g_sizebuf[i] = base[i];
+        i++;
+    }
+    if (mb >= 100)
+        g_sizebuf[i++] = (char)('0' + mb / 100);
+    if (mb >= 10)
+        g_sizebuf[i++] = (char)('0' + (mb / 10) % 10);
+    g_sizebuf[i++] = (char)('0' + mb % 10);
+    g_sizebuf[i++] = ' ';
+    g_sizebuf[i++] = 'M';
+    g_sizebuf[i++] = 'B';
+    g_sizebuf[i] = 0;
+    return g_sizebuf;
+}
+
 static void say(u32 clip, u32 gap_ms)
 {
     if (g_audio_ready && clip != CLIP_NONE)
@@ -379,6 +405,7 @@ static void sdram_setup(void)
     scif_puts(S_SDRAM_SIZE);
     scif_putdec(g_ram_size >> 20);
     scif_puts(S_MB);
+    log_result(size_label(S_L_RAMSIZE, g_ram_size >> 20), CLIP_NONE, T_OK, 0, 0);
 }
 
 /* Slow (~1 min on 32MB): the actual CPU-RAM cell test. Runs after the

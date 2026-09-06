@@ -26,6 +26,7 @@
 
 /* result labels (SCIF + screen + drive the spoken clip) */
 #define S_L_OCRAM           "OC-RAM CPU (cache en RAM)"
+#define S_L_RAMSIZE         "RAM CPU detectee : "
 #define S_L_BOARD_N1        "Carte : Naomi 1 (837-13544)"
 #define S_L_BOARD_N2        "Carte : Naomi 2 (837-14009)"
 #define S_L_BOARD_UNK       "Carte : INCONNUE (noms IC off)"
@@ -156,6 +157,7 @@
 #define S_BOOT_OCRAM_KO     "CPU OC-RAM (cache as RAM) ........ FAIL -- CPU unusable, halting\r\n"
 
 #define S_L_OCRAM           "CPU OC-RAM (cache as RAM)"
+#define S_L_RAMSIZE         "CPU RAM detected: "
 #define S_L_BOARD_N1        "Board: Naomi 1 (837-13544)"
 #define S_L_BOARD_N2        "Board: Naomi 2 (837-14009)"
 #define S_L_BOARD_UNK       "Board: UNKNOWN - IC names off"
