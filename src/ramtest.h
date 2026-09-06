@@ -23,16 +23,19 @@ static inline u32 crc32_word(u32 crc, u32 w)
 /* Shared with the assembly: the field ORDER IS PART OF THE ABI --
  * ramtest_fast.S addresses these by offset 0/4/8/12. */
 typedef struct {
-    u32 x;              /* PRNG state, in and out                       */
-    u32 crc_w;          /* CRC of the stream we meant to write          */
-    u32 crc_r;          /* CRC of the stream actually read back         */
-    u32 diff;           /* OR of every (read XOR expected); 0 = good    */
+    u32 x;              /* PRNG state, in and out                        */
+    u32 crc_w;          /* CRC of the stream we meant to write           */
+    u32 crc_r;          /* CRC of the stream actually read back          */
+    u32 diff_e;         /* differences on even-address words: chips 1,2  */
+    u32 diff_o;         /* differences on odd-address words:  chips 3,4  */
 } prng_ctx;
 
 void ram_prng_fill_fast(u32 *base, u32 nwords, prng_ctx *c);
-void ram_prng_verify_fast(const u32 *base, u32 nwords, prng_ctx *c);
+/* npairs counts PAIRS of words: the loop is unrolled two ways so that each
+ * word's address parity, and therefore its chip, is known at assembly time. */
+void ram_prng_verify_fast(const u32 *base, u32 npairs, prng_ctx *c);
 void ram_fill_fast(u32 *base, u32 nblocks16, u32 pattern);
-u32  ram_verify_fast(u32 *base, u32 nblocks8, u32 pattern);
+u32  ram_verify_fast(u32 *base, u32 nblocks8, u32 pattern, u32 *diff_odd);
 
 #define RAM_MAX_FAILS 8
 
@@ -45,7 +48,9 @@ typedef struct {
     u32 fail_addr[RAM_MAX_FAILS];
     u32 fail_exp [RAM_MAX_FAILS];
     u32 fail_got [RAM_MAX_FAILS];
-    u32 crc_w, crc_r;            /* PRNG pass: write-side / read-side CRC32 */
+    u32 crc_w, crc_r;
+                                 /* PRNG pass: write-side / read-side CRC32 */
+    u32 unpinned;                /* seen while verifying, gone on re-scan    */
 } ram_result;
 
 void ram_result_clear(ram_result *r);

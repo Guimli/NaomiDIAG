@@ -202,6 +202,15 @@ static const char *size_label(const char *base, u32 mb)
     return g_sizebuf;
 }
 
+/* The parity of the failing word is always known now -- the verify loops keep
+ * one difference mask per address parity -- so a fault names exactly one chip,
+ * whether the re-scan could reproduce it or not. */
+static void report_intermittent(const ram_result *r)
+{
+    if (r->unpinned)
+        scif_puts(S_INTERMITTENT);
+}
+
 static void say(u32 clip, u32 gap_ms)
 {
     if (g_audio_ready && clip != CLIP_NONE)
@@ -589,6 +598,7 @@ static u32 test_sdram_cells(void)
     log_result(S_L_SDRAM_CELL, CLIP_CPU_RAM, st,
                ram_comp_mask(&res), IC(work_comps));
     if (res.errors) {
+        report_intermittent(&res);
         report_badbits(res.badbits);
         report_comps(S_CG_CPU, ram_comp_mask(&res), IC(work_comps));
         report_fails(&res);
@@ -651,6 +661,7 @@ static u32 test_aram(void)
     log_result(S_L_ARAM_CELL, CLIP_SOUND_RAM, st,
                ram_comp_mask(&res), IC(aram_comps));
     if (res.errors) {
+        report_intermittent(&res);
         report_badbits(res.badbits);
         report_comps(S_CG_SOUND, ram_comp_mask(&res), IC(aram_comps));
         report_fails(&res);
@@ -718,6 +729,7 @@ static void test_vram_region(const char *name, u32 base, u32 size,
     t_status st = res.errors ? T_FAIL : T_OK;
     log_result(name, name_clip, st, ram_comp_mask(&res), comps);
     if (res.errors) {
+        report_intermittent(&res);
         report_badbits(res.badbits);
         report_comps(name, ram_comp_mask(&res), comps);
         report_fails(&res);
@@ -766,6 +778,7 @@ static void test_sram_rtc(void)
     log_result(S_L_BACKSRAM, CLIP_SRAM,
                mask ? T_FAIL : T_OK, mask, 0);
     if (mask) {
+        report_intermittent(&res);
         report_badbits(res.badbits);
         report_comps(S_CG_SRAM, mask, 0);
         report_fails(&res);

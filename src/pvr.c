@@ -106,7 +106,7 @@ static void vram_pattern_locate(u32 base, u32 n, u32 pattern, ram_result *r)
 
 void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
 {
-    u32 n = len >> 2, done = 0, diff = 0;
+    u32 n = len >> 2, done = 0;
 
     while (done + 16 <= n) {
         u32 chunk = n - done;
@@ -121,21 +121,42 @@ void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
         ((volatile u32 *)base)[i] = pattern;
 
     done = 0;
+    u32 diff_e = 0, diff_o = 0;
     while (done + 8 <= n) {
         u32 chunk = n - done;
         if (chunk > 1024)
             chunk = 1024;
         chunk &= ~7u;
         progress_tick(n + done);
-        diff |= p_ram_verify_fast((u32 *)(base + (done << 2)), chunk >> 3,
-                                pattern);
+        u32 dodd = 0;
+        diff_e |= p_ram_verify_fast((u32 *)(base + (done << 2)), chunk >> 3,
+                                    pattern, &dodd);
+        diff_o |= dodd;
         done += chunk;
     }
-    for (u32 i = done; i < n; i++)
-        diff |= ((volatile u32 *)base)[i] ^ pattern;
+    for (u32 i = done; i < n; i++) {
+        u32 d = ((volatile u32 *)base)[i] ^ pattern;
+        if (i & 1)
+            diff_o |= d;
+        else
+            diff_e |= d;
+    }
 
-    if (diff)
+    if (diff_e | diff_o)
         vram_pattern_locate(base, n, pattern, r);
+
+    /* A difference the re-scan could not reproduce is an intermittent cell,
+     * and it used to be discarded here: locate() found nothing, errors stayed
+     * zero and the region was reported good. The masks are kept per address
+     * parity precisely so this case still names one chip -- the data half
+     * gives the pair, the parity gives which of the two. */
+    if ((diff_e | diff_o) && r->errors == 0) {
+        r->errors++;
+        r->unpinned = 1;
+        r->badbits |= diff_e | diff_o;
+        r->badbits_e |= diff_e;
+        r->badbits_o |= diff_o;
+    }
 }
 
 
@@ -167,7 +188,8 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
     c.x = seed ? seed : 1;
     c.crc_w = 0xFFFFFFFF;
     c.crc_r = 0xFFFFFFFF;
-    c.diff = 0;
+    c.diff_e = 0;
+    c.diff_o = 0;
 
     for (u32 done = 0; done < n; ) {
         u32 chunk = n - done;
@@ -182,17 +204,28 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         u32 chunk = n - done;
         if (chunk > 1024)
             chunk = 1024;
+        chunk &= ~1u;               /* the loop consumes words in pairs */
+        if (!chunk)
+            break;
         progress_tick(n + done);
-        p_ram_prng_verify_fast((const u32 *)(base + (done << 2)), chunk, &c);
+        p_ram_prng_verify_fast((const u32 *)(base + (done << 2)),
+                               chunk >> 1, &c);
         done += chunk;
     }
 
     r->crc_w = ~c.crc_w;
     r->crc_r = ~c.crc_r;
-    if (c.diff)
+    if (c.diff_e | c.diff_o)
         vram_prng_locate(base, n, seed, r);
-    if (c.crc_w != c.crc_r && r->errors == 0)
-        note_fail(r, base, c.crc_w, c.crc_r);
+    if (c.crc_w != c.crc_r && r->errors == 0) {
+        /* intermittent: see the note in ramtest.c -- a CRC XOR is not a
+         * data-line mask and must never be read as one */
+        r->errors++;
+        r->unpinned = 1;
+        r->badbits |= c.diff_e | c.diff_o;
+        r->badbits_e |= c.diff_e;
+        r->badbits_o |= c.diff_o;
+    }
 }
 
 /* ---- display ---- */

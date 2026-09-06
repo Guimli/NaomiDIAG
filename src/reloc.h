@@ -33,9 +33,10 @@
 /* Called through, never directly, so a failed or disabled relocation simply
  * keeps executing the ROM copies. */
 extern void (*p_ram_fill_fast)(u32 *base, u32 nblocks16, u32 pattern);
-extern u32  (*p_ram_verify_fast)(u32 *base, u32 nblocks8, u32 pattern);
+extern u32  (*p_ram_verify_fast)(u32 *base, u32 nblocks8, u32 pattern,
+                                 u32 *diff_odd);
 extern void (*p_ram_prng_fill_fast)(u32 *base, u32 nwords, prng_ctx *c);
-extern void (*p_ram_prng_verify_fast)(const u32 *base, u32 nwords,
+extern void (*p_ram_prng_verify_fast)(const u32 *base, u32 npairs,
                                       prng_ctx *c);
 
 void reloc_init(void);              /* point everything at the ROM copies */

@@ -167,8 +167,13 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
     }
     r->crc_w = ~crc_w;
     r->crc_r = ~crc_r;
-    if (crc_w != crc_r && r->errors == 0)
-        note_fail(r, ARAM_P2_BASE + off, crc_w, crc_r);
+    if (crc_w != crc_r && r->errors == 0) {
+        /* intermittent: see the note in ramtest.c. Sound RAM is one chip so
+         * the parity would not help anyway, but the mask must still not be
+         * fabricated out of two CRC values. */
+        r->errors++;
+        r->unpinned = 1;
+    }
 }
 
 /* A plain square wave, generated here rather than played from a recorded

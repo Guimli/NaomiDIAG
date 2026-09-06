@@ -27,6 +27,7 @@
 /* result labels (SCIF + screen + drive the spoken clip) */
 #define S_L_OCRAM           "OC-RAM CPU (cache en RAM)"
 #define S_L_RAMSIZE         "RAM CPU detectee : "
+#define S_INTERMITTENT      "  Defaut intermittent : vu a la verification, absent a la relecture.\n  La puce est nommee malgre tout : la parite du mot est conservee.\n"
 #define S_L_BOARD_N1        "Carte : Naomi 1 (837-13544)"
 #define S_L_BOARD_N2        "Carte : Naomi 2 (837-14009)"
 #define S_L_BOARD_UNK       "Carte : INCONNUE (noms IC off)"
@@ -158,6 +159,7 @@
 
 #define S_L_OCRAM           "CPU OC-RAM (cache as RAM)"
 #define S_L_RAMSIZE         "CPU RAM detected: "
+#define S_INTERMITTENT      "  Intermittent fault: seen while verifying, gone on re-scan.\n  The chip is still named: the word parity was kept.\n"
 #define S_L_BOARD_N1        "Board: Naomi 1 (837-13544)"
 #define S_L_BOARD_N2        "Board: Naomi 2 (837-14009)"
 #define S_L_BOARD_UNK       "Board: UNKNOWN - IC names off"

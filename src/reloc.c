@@ -4,7 +4,7 @@
 extern char reloc_blk_start[], reloc_blk_end[];
 
 void (*p_ram_fill_fast)(u32 *, u32, u32);
-u32  (*p_ram_verify_fast)(u32 *, u32, u32);
+u32  (*p_ram_verify_fast)(u32 *, u32, u32, u32 *);
 void (*p_ram_prng_fill_fast)(u32 *, u32, prng_ctx *);
 void (*p_ram_prng_verify_fast)(const u32 *, u32, prng_ctx *);
 
@@ -77,20 +77,26 @@ u32 reloc_install(u32 p2_dest)
 
     void (*f_fill)(u32 *, u32, u32)   = (void (*)(u32 *, u32, u32))
                                         (cached + off_fill);
-    u32  (*f_verify)(u32 *, u32, u32) = (u32 (*)(u32 *, u32, u32))
-                                        (cached + off_verify);
+    u32  (*f_verify)(u32 *, u32, u32, u32 *) =
+        (u32 (*)(u32 *, u32, u32, u32 *))(cached + off_verify);
 
     /* First execution from RAM, and it has to prove two things: that the
      * board will run cached code from SDRAM at all, and that the copy
      * computes the same answers. The scratch area is inside the window we
      * have already tested, well clear of the code itself. */
     volatile u32 *scratch = (volatile u32 *)(p2_dest + RELOC_SCRATCH);
+    u32 dodd = 0;
     f_fill((u32 *)scratch, 8, 0xA5A5F00Du);         /* 128 words */
-    if (f_verify((u32 *)scratch, 16, 0xA5A5F00Du) != 0)
+    if (f_verify((u32 *)scratch, 16, 0xA5A5F00Du, &dodd) != 0 || dodd != 0)
         return 0;                                   /* must see them equal */
-    scratch[70] ^= 0x00000040u;                     /* plant one bad bit */
-    if (f_verify((u32 *)scratch, 16, 0xA5A5F00Du) != 0x00000040u)
+    /* index 70 is an EVEN-address word, so the difference must land in the
+     * even mask and nowhere else -- which also proves the parity split works */
+    scratch[70] ^= 0x00000040u;
+    dodd = 0;
+    if (f_verify((u32 *)scratch, 16, 0xA5A5F00Du, &dodd) != 0x00000040u)
         return 0;                                   /* must see it, exactly */
+    if (dodd != 0)
+        return 0;                                   /* and on the right half */
 
     p_ram_fill_fast        = f_fill;
     p_ram_verify_fast      = f_verify;

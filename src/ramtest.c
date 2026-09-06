@@ -21,6 +21,7 @@ void ram_result_clear(ram_result *r)
     r->nfails = 0;
     r->crc_w = 0;
     r->crc_r = 0;
+    r->unpinned = 0;
 }
 
 static void note_fail(ram_result *r, u32 addr, u32 exp, u32 got)
@@ -117,7 +118,7 @@ void ram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
         ((volatile u32 *)base)[i] = pattern;
 
     done = 0;
-    u32 diff = 0;
+    u32 diff_e = 0, diff_o = 0;
     while (done < n) {
         u32 chunk = n - done;
         if (chunk > 1024)
@@ -126,15 +127,35 @@ void ram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
         if (!chunk)
             break;
         progress_tick(n + done);
-        diff |= p_ram_verify_fast((u32 *)(base + (done << 2)), chunk >> 3,
-                                pattern);
+        u32 dodd = 0;
+        diff_e |= p_ram_verify_fast((u32 *)(base + (done << 2)), chunk >> 3,
+                                    pattern, &dodd);
+        diff_o |= dodd;
         done += chunk;
     }
-    for (u32 i = done; i < n; i++)
-        diff |= ((volatile u32 *)base)[i] ^ pattern;
+    for (u32 i = done; i < n; i++) {
+        u32 d = ((volatile u32 *)base)[i] ^ pattern;
+        if (i & 1)
+            diff_o |= d;
+        else
+            diff_e |= d;
+    }
 
-    if (diff)
+    if (diff_e | diff_o)
         pattern_locate(base, n, pattern, r);
+
+    /* A difference the re-scan could not reproduce is an intermittent cell,
+     * and it used to be discarded here: locate() found nothing, errors stayed
+     * zero and the region was reported good. The masks are kept per address
+     * parity precisely so this case still names one chip -- the data half
+     * gives the pair, the parity gives which of the two. */
+    if ((diff_e | diff_o) && r->errors == 0) {
+        r->errors++;
+        r->unpinned = 1;
+        r->badbits |= diff_e | diff_o;
+        r->badbits_e |= diff_e;
+        r->badbits_o |= diff_o;
+    }
 }
 
 /* CRC32 (IEEE 0xEDB88320), 4 bits at a time; table lives in ROM. */
@@ -244,7 +265,8 @@ void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
     c.x = seed ? seed : 1;
     c.crc_w = 0xFFFFFFFF;
     c.crc_r = 0xFFFFFFFF;
-    c.diff = 0;
+    c.diff_e = 0;
+    c.diff_o = 0;
 
     /* Both loops are hand-written (ramtest_fast.S): 19 -> 15 instructions
      * per word to generate and store, 85 -> 59 to read back. They are called
@@ -264,18 +286,30 @@ void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         u32 chunk = n - done;
         if (chunk > 1024)
             chunk = 1024;
+        chunk &= ~1u;               /* the loop consumes words in pairs */
+        if (!chunk)
+            break;
         progress_tick(n + done);
-        p_ram_prng_verify_fast((const u32 *)(base + (done << 2)), chunk, &c);
+        p_ram_prng_verify_fast((const u32 *)(base + (done << 2)),
+                               chunk >> 1, &c);
         done += chunk;
     }
 
     r->crc_w = ~c.crc_w;
     r->crc_r = ~c.crc_r;
-    if (c.diff)
+    if (c.diff_e | c.diff_o)
         prng_locate(base, n, seed, r);
     if (c.crc_w != c.crc_r && r->errors == 0) {
-        /* CRC caught something the compare did not (should not happen, but
-         * the register-held CRC is the belt-and-braces the spec asks for) */
-        note_fail(r, base, c.crc_w, c.crc_r);
+        /* The verify pass saw a difference the re-scan could not reproduce:
+         * an intermittent cell. Record it as a failure, but NOT through
+         * note_fail -- that would take (crc_w ^ crc_r) for a data-line mask,
+         * and a CRC XOR is a random number. The accumulated diff is the real
+         * mask; what it lacks is the word parity, so the caller names the two
+         * candidate chips per data half rather than inventing one. */
+        r->errors++;
+        r->unpinned = 1;
+        r->badbits |= c.diff_e | c.diff_o;
+        r->badbits_e |= c.diff_e;
+        r->badbits_o |= c.diff_o;
     }
 }

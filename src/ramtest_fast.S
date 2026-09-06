@@ -68,44 +68,54 @@ _ram_fill_fast:
     nop
 
 ! -----------------------------------------------------------------------------
-! u32 ram_verify_fast(u32 *base, u32 nblocks8, u32 pattern)
-!   r4 = source, r5 = number of 8-word blocks (>=1), r6 = expected pattern
-!   returns in r0 the OR of every (read XOR expected): 0 = whole region good
-! 26 instructions per 8 words = 3.25 per word.
+! u32 ram_verify_fast(u32 *base, u32 nblocks8, u32 pattern, u32 *diff_odd)
+!   r4 = source, r5 = number of 8-word blocks (>=1), r6 = expected pattern,
+!   r7 = where to store the odd-word mask. Returns the even-word mask in r0.
+!
+! The two masks are what pins the failing chip. The SDRAM bus is 64 bits of
+! four 16-bit chips: a 32-bit word at an even offset is carried by chips 1 and
+! 2, one at an odd offset by chips 3 and 4. Accumulating a single mask throws
+! that parity away and leaves two candidates for every fault; keeping one mask
+! per parity names exactly one chip. The loop is unrolled eight ways, so the
+! parity of each word is known at assembly time and the split costs nothing --
+! it is the same instruction, on a different register.
+! 26 instructions per 8 words = 3.25 per word, unchanged.
 ! -----------------------------------------------------------------------------
     .global _ram_verify_fast
 _ram_verify_fast:
-    mov     #0, r7          ! r7 = accumulated difference
+    mov     #0, r1              ! differences on even-address words
+    mov     #0, r2              ! differences on odd-address words
     tst     r5, r5
     bt      9f
-1:  mov.l   @r4+, r0        ! post-increment: the pointer advance is free
+1:  mov.l   @r4+, r0            ! word 0, even
     xor     r6, r0
-    or      r0, r7
-    mov.l   @r4+, r0
+    or      r0, r1
+    mov.l   @r4+, r0            ! word 1, odd
     xor     r6, r0
-    or      r0, r7
-    mov.l   @r4+, r0
+    or      r0, r2
+    mov.l   @r4+, r0            ! word 2, even
     xor     r6, r0
-    or      r0, r7
-    mov.l   @r4+, r0
+    or      r0, r1
+    mov.l   @r4+, r0            ! word 3, odd
     xor     r6, r0
-    or      r0, r7
-    mov.l   @r4+, r0
+    or      r0, r2
+    mov.l   @r4+, r0            ! word 4, even
     xor     r6, r0
-    or      r0, r7
-    mov.l   @r4+, r0
+    or      r0, r1
+    mov.l   @r4+, r0            ! word 5, odd
     xor     r6, r0
-    or      r0, r7
-    mov.l   @r4+, r0
+    or      r0, r2
+    mov.l   @r4+, r0            ! word 6, even
     xor     r6, r0
-    or      r0, r7
-    mov.l   @r4+, r0
+    or      r0, r1
+    mov.l   @r4+, r0            ! word 7, odd
     xor     r6, r0
-    or      r0, r7
+    or      r0, r2
     dt      r5
     bf      1b
-9:  rts
-    mov     r7, r0
+9:  mov.l   r2, @r7             ! hand back the odd-word mask
+    rts
+    mov     r1, r0              ! and return the even-word one
 
 ! =============================================================================
 ! Pseudo-random pass, hand-written.
@@ -167,14 +177,24 @@ _ram_prng_fill_fast:
     nop
 
 ! -----------------------------------------------------------------------------
-! void ram_prng_verify_fast(const u32 *base, u32 nwords, prng_ctx *c)
-! 59 instructions per word (compiler: 85). Branchless: it reports only whether
-! the region is good, and the C caller re-scans to locate the bad words.
+! void ram_prng_verify_fast(const u32 *base, u32 npairs, prng_ctx *c)
+!   r5 counts PAIRS of words, not words.
+!
+! Unrolled two ways so the parity of each word is known at assembly time: the
+! first of every pair sits at an even 32-bit offset and is carried by chips 1
+! and 2, the second at an odd offset, by chips 3 and 4. Their differences go
+! to separate accumulators, which is what lets a fault name one chip instead
+! of two candidates. The unrolling pays for itself -- one loop control for two
+! words instead of one each -- so this is 58 instructions per word against the
+! 59 of the version that could not tell the halves apart.
 ! -----------------------------------------------------------------------------
     .global _ram_prng_verify_fast
 _ram_prng_verify_fast:
-    tst     r5, r5
-    bt      9f
+    tst     r5, r5              ! nothing to do: return before saving anything
+    bf      1f                  ! (branch on the near side; the body below is
+    rts                         !  far past bt's reach)
+    nop
+1:
     mov.l   r8, @-r15
     mov.l   r9, @-r15
     mov.l   r10, @-r15
@@ -185,12 +205,14 @@ _ram_prng_verify_fast:
     mov.l   @r6, r8             ! x
     mov.l   @(4, r6), r9        ! crc_w
     mov.l   @(8, r6), r10       ! crc_r
-    mov.l   @(12, r6), r11      ! diff
+    mov.l   @(12, r6), r11      ! diff on even-address words
+    mov.l   @(16, r6), r3       ! diff on odd-address words
     mov.l   Lcrctab, r12
     mov     #13, r13
     mov     #-17, r14
 
-1:  mov     r8, r1              ! ---- xorshift32: the expected word
+1:
+    mov     r8, r1
     shld    r13, r1
     xor     r1, r8
     mov     r8, r1
@@ -202,12 +224,12 @@ _ram_prng_verify_fast:
     shll    r1
     xor     r1, r8
 
-    mov.l   @r4+, r7            ! ---- read back, accumulate any difference
+    mov.l   @r4+, r7
     mov     r7, r1
     xor     r8, r1
     or      r1, r11
 
-    xor     r8, r9              ! ---- crc_w over the expected word
+    xor     r8, r9
     extu.b  r9, r0
     shll2   r0
     mov.l   @(r0, r12), r1
@@ -229,7 +251,68 @@ _ram_prng_verify_fast:
     shlr8   r9
     xor     r1, r9
 
-    xor     r7, r10             ! ---- crc_r over the word actually read
+    xor     r7, r10
+    extu.b  r10, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r10
+    xor     r1, r10
+    extu.b  r10, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r10
+    xor     r1, r10
+    extu.b  r10, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r10
+    xor     r1, r10
+    extu.b  r10, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r10
+    xor     r1, r10
+
+    mov     r8, r1
+    shld    r13, r1
+    xor     r1, r8
+    mov     r8, r1
+    shld    r14, r1
+    xor     r1, r8
+    mov     r8, r1
+    shll2   r1
+    shll2   r1
+    shll    r1
+    xor     r1, r8
+
+    mov.l   @r4+, r7
+    mov     r7, r1
+    xor     r8, r1
+    or      r1, r3
+
+    xor     r8, r9
+    extu.b  r9, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r9
+    xor     r1, r9
+    extu.b  r9, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r9
+    xor     r1, r9
+    extu.b  r9, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r9
+    xor     r1, r9
+    extu.b  r9, r0
+    shll2   r0
+    mov.l   @(r0, r12), r1
+    shlr8   r9
+    xor     r1, r9
+
+    xor     r7, r10
     extu.b  r10, r0
     shll2   r0
     mov.l   @(r0, r12), r1
@@ -252,12 +335,15 @@ _ram_prng_verify_fast:
     xor     r1, r10
 
     dt      r5
-    bf      1b
-
-    mov.l   r8, @r6             ! hand state and results back
+    bt      2f                  ! the unrolled body is past bf's reach, so
+    bra     1b                  ! the loop is written out rather than left
+    nop                         ! to the assembler's relaxation
+2:
+    mov.l   r8, @r6
     mov.l   r9, @(4, r6)
     mov.l   r10, @(8, r6)
     mov.l   r11, @(12, r6)
+    mov.l   r3, @(16, r6)
     mov.l   @r15+, r14
     mov.l   @r15+, r13
     mov.l   @r15+, r12
@@ -265,7 +351,7 @@ _ram_prng_verify_fast:
     mov.l   @r15+, r10
     mov.l   @r15+, r9
     mov.l   @r15+, r8
-9:  rts
+    rts
     nop
 
     .align 4
