@@ -19,11 +19,14 @@ téléchargement direct :
 ![NaomiDiag sur une Naomi réelle](NaomiDIAG_001.jpg)
 
 Le rapport à l'écran, photographié sur une Naomi 1 réelle. Cette carte n'est
-pas saine, et la ROM le dit : le test cellule de la RAM son échoue et nomme
-**IC29**, celui de la RAM CPU échoue et nomme **IC16** et **IC18** — les deux
-puces portant le mot pair de 32 bits. Les tests de bus passent, donc les
-puces répondent ; ce sont leurs cellules qui ne tiennent pas. Tout le reste
-est au vert.
+pas saine, et la ROM le dit : le test cellule de la RAM son échoue, celui de
+la RAM CPU aussi et nomme **IC16** et **IC18** — les deux puces portant le
+mot pair de 32 bits. Les tests de bus passent, donc les puces répondent ; ce
+sont leurs cellules qui ne tiennent pas. Tout le reste est au vert.
+
+La photo est en v0.9, qui étiquetait la RAM son **IC29**. Cette étiquette
+était fausse : IC29 est la NVRAM de sauvegarde et la RAM son est **IC35**.
+Les versions suivantes la nomment correctement.
 
 ## Trois canaux de sortie simultanés
 
@@ -63,7 +66,8 @@ Dans l'ordre :
    aliasing VRAM).
 3. **EPROM BIOS (IC27)** — auto-contrôle CRC32.
 4. **RAM son** (AICA, 8 Mo, bus G2) — puis l'audio devient un canal.
-5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — puis l'écran de rapport
+5. **VRAM** (PowerVR TEX0 = IC9-12 ; la désignation de TEX1 n'est pas
+   encore confirmée) — puis l'écran de rapport
    VGA s'active.
 6. **RAM CPU principale** (SDRAM, 16/32 Mo, IC16/18/20/22) — d'abord un test
    bus de données (walking-ones) et un test bus d'adresses, puis **trois

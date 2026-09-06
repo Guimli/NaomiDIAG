@@ -62,7 +62,7 @@ typedef enum { T_OK = 0, T_FAIL = 1 } t_status;
 /* numbered position -> silkscreen IC (see analysis/ADDRESS_MAP.md).
  * Mapping extracted from the original BIOS RAM TEST tables; the WORK
  * lane ORDER is a hypothesis until confirmed by a forced fault on real
- * hardware. Sound RAM is a single chip: every lane maps to IC29. */
+ * hardware. Sound RAM is a single chip: every lane maps to IC35. */
 typedef struct { u32 clip; const char *name; } comp_map;
 
 static const comp_map work_comps[4] = {
@@ -71,9 +71,16 @@ static const comp_map work_comps[4] = {
     { CLIP_IC_20, "IC20" },         /* D0-D15,  odd word  */
     { CLIP_IC_22, "IC22" },         /* D16-D31, odd word  */
 };
+/* Sound RAM is IC35 and the backup NVRAM is IC29 -- confirmed on a real
+ * board. Both were wrong here until now, and the mistake is worth recording:
+ * the IC NUMBERS are genuine, read from the original BIOS RAM TEST screens
+ * which print "IC%02d GOOD/BAD", but which number belonged to which region
+ * was inferred from the order they appear in, and that inference was wrong.
+ * Naming the wrong part on a diagnostic sends someone to desolder a good
+ * chip, so anything still resting on that inference is now marked as such. */
 static const comp_map aram_comps[4] = {
-    { CLIP_IC_29, "IC29" }, { CLIP_IC_29, "IC29" },
-    { CLIP_IC_29, "IC29" }, { CLIP_IC_29, "IC29" },
+    { CLIP_IC_35, "IC35" }, { CLIP_IC_35, "IC35" },
+    { CLIP_IC_35, "IC35" }, { CLIP_IC_35, "IC35" },
 };
 static const comp_map bios_comps[4] = {
     { CLIP_IC_27, "IC27" }, { CLIP_IC_27, "IC27" },
@@ -85,10 +92,11 @@ static const comp_map tex0_comps[4] = {   /* lane order = hypothesis */
     { CLIP_IC_11, "IC11" },         /* D0-D15,  odd word  */
     { CLIP_IC_12, "IC12" },         /* D16-D31, odd word  */
 };
-static const comp_map tex1_comps[4] = {   /* single 64Mbit chip */
-    { CLIP_IC_35, "IC35" }, { CLIP_IC_35, "IC35" },
-    { CLIP_IC_35, "IC35" }, { CLIP_IC_35, "IC35" },
-};
+/* TEX1 is a single 64 Mbit chip whose designator we no longer know: IC35 was
+ * this table's answer and IC35 is the sound RAM. Rather than name a chip on a
+ * guess, the test reports the region without a designator until the real one
+ * is read off a board. */
+#define tex1_comps  0
 
 typedef struct {
     const char *name;               /* points into ROM */
@@ -687,8 +695,8 @@ static u32 test_vram(void)
     u32 tex0_ok = 1, tex1_ok = 1;
     test_vram_region(g_ic_valid ? S_L_VRAM_TEX0_IC : S_L_VRAM_TEX0, VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
                      IC(tex0_comps), CLIP_VRAM, &tex0_ok);
-    test_vram_region(g_ic_valid ? S_L_VRAM_TEX1_IC : S_L_VRAM_TEX1, VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
-                     IC(tex1_comps), CLIP_VRAM, &tex1_ok);
+    test_vram_region(S_L_VRAM_TEX1, VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
+                     tex1_comps, CLIP_VRAM, &tex1_ok);
     return tex0_ok;                     /* the framebuffer lives in TEX0 */
 }
 

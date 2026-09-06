@@ -37,7 +37,6 @@
 #define S_L_ARAM_CELL       "RAM son test cellules"
 #define S_L_VRAM_TEX0_IC    "VRAM TEX0 (IC9-12)"
 #define S_L_VRAM_TEX0       "VRAM TEX0"
-#define S_L_VRAM_TEX1_IC    "VRAM TEX1 (IC35)"
 #define S_L_VRAM_TEX1       "VRAM TEX1"
 #define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
 /* short labels for the progress bar: they get a " NN/10" pass suffix, so
@@ -168,7 +167,6 @@
 #define S_L_ARAM_CELL       "Sound RAM cell test"
 #define S_L_VRAM_TEX0_IC    "VRAM TEX0 (IC9-12)"
 #define S_L_VRAM_TEX0       "VRAM TEX0"
-#define S_L_VRAM_TEX1_IC    "VRAM TEX1 (IC35)"
 #define S_L_VRAM_TEX1       "VRAM TEX1"
 #define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
 /* short labels for the progress bar: they get a " NN/10" pass suffix, so

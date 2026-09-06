@@ -19,10 +19,14 @@ direct downloads:
 ![NaomiDiag running on a real Naomi](NaomiDIAG_001.jpg)
 
 The on-screen report, photographed on a real Naomi 1. This board is not a
-healthy one, and the ROM says so: the sound RAM cell test fails and names
-**IC29**, the CPU RAM cell test fails and names **IC16** and **IC18** — the
-two chips carrying the even 32-bit word. The bus tests pass, so the chips
-answer; it is their cells that do not hold. Everything else reads OK.
+healthy one, and the ROM says so: the sound RAM cell test fails, and so does
+the CPU RAM cell test, naming **IC16** and **IC18** — the two chips carrying
+the even 32-bit word. The bus tests pass, so the chips answer; it is their
+cells that do not hold. Everything else reads OK.
+
+The photograph is v0.9, which labelled the sound RAM **IC29**. That label was
+wrong: IC29 is the backup NVRAM and the sound RAM is **IC35**. Later versions
+name it correctly.
 
 ## Three simultaneous output channels
 
@@ -60,7 +64,8 @@ In order:
    aliasing).
 3. **BIOS EPROM (IC27)** — CRC32 self-check.
 4. **Sound RAM** (AICA, 8 MB, G2 bus) — then audio becomes a channel.
-5. **VRAM** (PowerVR TEX0 = IC9-12, TEX1 = IC35) — then the VGA report
+5. **VRAM** (PowerVR TEX0 = IC9-12; TEX1's designator is not yet
+   confirmed) — then the VGA report
    screen comes up.
 6. **Main CPU RAM** (SDRAM, 16/32 MB, IC16/18/20/22) — first a data-bus
    walking-ones test and an address-bus test, then **three phases**, each
