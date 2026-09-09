@@ -27,7 +27,7 @@ The photograph is v0.9, whose IC designators were wrong. They came from the
 original BIOS RAM TEST screens, which are genuine, but which number belonged
 to which region was inferred from the order they appear in — and that
 inference had the two RAM groups the wrong way round. The correct map, read
-off a board, is in `analysis/ADDRESS_MAP.md`: CPU RAM is IC9, IC10, IC11S and
+off a board, is in [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md): CPU RAM is IC9, IC10, IC11S and
 IC12S; the eight GPU RAM chips are IC16/18/20/22 on top and IC17S/19S/21S/23S
 underneath. Designators ending in **S** are on the underside of the PCB.
 

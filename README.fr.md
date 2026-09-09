@@ -27,7 +27,7 @@ La photo est en v0.9, dont les désignations d'IC étaient fausses. Elles
 venaient des écrans RAM TEST du BIOS d'origine, authentiques, mais
 l'association d'un numéro à une région était déduite de leur ordre
 d'affichage — et cette déduction intervertissait les deux groupes de RAM. La
-carte correcte, relevée sur PCB, est dans `analysis/ADDRESS_MAP.md` : la RAM
+carte correcte, relevée sur PCB, est dans [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md) : la RAM
 CPU est IC9, IC10, IC11S et IC12S ; les huit RAM du GPU sont IC16/18/20/22 au
 recto et IC17S/19S/21S/23S au verso. Les désignations terminées par **S**
 sont sous la carte.
