@@ -19,14 +19,17 @@ direct downloads:
 ![NaomiDiag running on a real Naomi](NaomiDIAG_001.jpg)
 
 The on-screen report, photographed on a real Naomi 1. This board is not a
-healthy one, and the ROM says so: the sound RAM cell test fails, and so does
-the CPU RAM cell test, naming **IC16** and **IC18** — the two chips carrying
-the even 32-bit word. The bus tests pass, so the chips answer; it is their
-cells that do not hold. Everything else reads OK.
+healthy one, and the ROM says so: both the sound RAM and the CPU RAM cell
+tests fail. The bus tests pass, so the chips answer; it is their cells that do
+not hold. Everything else reads OK.
 
-The photograph is v0.9, which labelled the sound RAM **IC29**. That label was
-wrong: IC29 is the backup NVRAM and the sound RAM is **IC35**. Later versions
-name it correctly.
+The photograph is v0.9, whose IC designators were wrong. They came from the
+original BIOS RAM TEST screens, which are genuine, but which number belonged
+to which region was inferred from the order they appear in — and that
+inference had the two RAM groups the wrong way round. The correct map, read
+off a board, is in `analysis/ADDRESS_MAP.md`: CPU RAM is IC9, IC10, IC11S and
+IC12S; the eight GPU RAM chips are IC16/18/20/22 on top and IC17S/19S/21S/23S
+underneath. Designators ending in **S** are on the underside of the PCB.
 
 ## Three simultaneous output channels
 
@@ -68,7 +71,7 @@ In order:
    as two 64-bit banks, TEX0 and TEX1 of four chips each. Their designators
    are not confirmed — then the VGA report
    screen comes up.
-6. **Main CPU RAM** (SDRAM, 16/32 MB, IC16/18/20/22) — first a data-bus
+6. **Main CPU RAM** (SDRAM, 16/32 MB, IC9/IC10/IC11S/IC12S) — first a data-bus
    walking-ones test and an address-bus test, then **three phases**, each
    reported as `pass n/3` and each driving the progress bar from 0 to 100%:
    - **1/3** — write `0x55555555` (0101…) over the whole region, then read it

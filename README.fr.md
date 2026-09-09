@@ -19,14 +19,18 @@ téléchargement direct :
 ![NaomiDiag sur une Naomi réelle](NaomiDIAG_001.jpg)
 
 Le rapport à l'écran, photographié sur une Naomi 1 réelle. Cette carte n'est
-pas saine, et la ROM le dit : le test cellule de la RAM son échoue, celui de
-la RAM CPU aussi et nomme **IC16** et **IC18** — les deux puces portant le
-mot pair de 32 bits. Les tests de bus passent, donc les puces répondent ; ce
+pas saine, et la ROM le dit : les tests cellule de la RAM son et de la RAM CPU
+échouent tous deux. Les tests de bus passent, donc les puces répondent ; ce
 sont leurs cellules qui ne tiennent pas. Tout le reste est au vert.
 
-La photo est en v0.9, qui étiquetait la RAM son **IC29**. Cette étiquette
-était fausse : IC29 est la NVRAM de sauvegarde et la RAM son est **IC35**.
-Les versions suivantes la nomment correctement.
+La photo est en v0.9, dont les désignations d'IC étaient fausses. Elles
+venaient des écrans RAM TEST du BIOS d'origine, authentiques, mais
+l'association d'un numéro à une région était déduite de leur ordre
+d'affichage — et cette déduction intervertissait les deux groupes de RAM. La
+carte correcte, relevée sur PCB, est dans `analysis/ADDRESS_MAP.md` : la RAM
+CPU est IC9, IC10, IC11S et IC12S ; les huit RAM du GPU sont IC16/18/20/22 au
+recto et IC17S/19S/21S/23S au verso. Les désignations terminées par **S**
+sont sous la carte.
 
 ## Trois canaux de sortie simultanés
 
@@ -70,7 +74,7 @@ Dans l'ordre :
    testées en deux bancs de 64 bits, TEX0 et TEX1 de quatre puces chacun.
    Leurs désignations ne sont pas confirmées — puis l'écran de rapport
    VGA s'active.
-6. **RAM CPU principale** (SDRAM, 16/32 Mo, IC16/18/20/22) — d'abord un test
+6. **RAM CPU principale** (SDRAM, 16/32 Mo, IC9/IC10/IC11S/IC12S) — d'abord un test
    bus de données (walking-ones) et un test bus d'adresses, puis **trois
    phases**, annoncées `passe n/3` et menant chacune la barre de progression
    de 0 à 100 % :

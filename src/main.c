@@ -66,10 +66,10 @@ typedef enum { T_OK = 0, T_FAIL = 1 } t_status;
 typedef struct { u32 clip; const char *name; } comp_map;
 
 static const comp_map work_comps[4] = {
-    { CLIP_IC_16, "IC16" },         /* D0-D15,  even word */
-    { CLIP_IC_18, "IC18" },         /* D16-D31, even word */
-    { CLIP_IC_20, "IC20" },         /* D0-D15,  odd word  */
-    { CLIP_IC_22, "IC22" },         /* D16-D31, odd word  */
+    { CLIP_IC_9,  "IC9"   },        /* D0-D15,  even word */
+    { CLIP_IC_10, "IC10"  },        /* D16-D31, even word */
+    { CLIP_IC_11, "IC11S" },        /* D0-D15,  odd word  */
+    { CLIP_IC_12, "IC12S" },        /* D16-D31, odd word  */
 };
 /* Sound RAM is IC35 and the backup NVRAM is IC29 -- confirmed on a real
  * board. Both were wrong here until now, and the mistake is worth recording:
@@ -86,12 +86,13 @@ static const comp_map bios_comps[4] = {
     { CLIP_IC_27, "IC27" }, { CLIP_IC_27, "IC27" },
     { CLIP_IC_27, "IC27" }, { CLIP_IC_27, "IC27" },
 };
-static const comp_map tex0_comps[4] = {   /* lane order = hypothesis */
-    { CLIP_IC_9,  "IC9"  },         /* D0-D15,  even word */
-    { CLIP_IC_10, "IC10" },         /* D16-D31, even word */
-    { CLIP_IC_11, "IC11" },         /* D0-D15,  odd word  */
-    { CLIP_IC_12, "IC12" },         /* D16-D31, odd word  */
-};
+/* The GPU carries EIGHT RAM chips -- IC16, IC18, IC20, IC22 on top and
+ * IC17S, IC19S, IC21S, IC23S underneath -- forming two 64-bit banks. Which
+ * bank answers at TEX0 and which at TEX1 is not known, so neither test names
+ * a chip: it reports the position within the bank, which is exact, and the
+ * operator maps it once the grouping is established. Naming one of eight on a
+ * guess is how this table was wrong before. */
+#define tex0_comps  0
 /* TEX1 is FOUR chips, not one, and their designators are unknown.
  *
  * The board carries eight 16 Mbit VRAM chips (1M x 16, uPD4516161) around the
@@ -742,8 +743,8 @@ static u32 test_vram(void)
     scif_puts(S_PVR_HDR);
     pvr_vram_enable();
     u32 tex0_ok = 1, tex1_ok = 1;
-    test_vram_region(g_ic_valid ? S_L_VRAM_TEX0_IC : S_L_VRAM_TEX0, VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
-                     IC(tex0_comps), CLIP_VRAM, &tex0_ok);
+    test_vram_region(S_L_VRAM_TEX0, VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
+                     tex0_comps, CLIP_VRAM, &tex0_ok);
     test_vram_region(S_L_VRAM_TEX1, VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
                      tex1_comps, CLIP_VRAM, &tex1_ok);
     return tex0_ok;                     /* the framebuffer lives in TEX0 */
