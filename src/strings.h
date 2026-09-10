@@ -27,6 +27,23 @@
 /* result labels (SCIF + screen + drive the spoken clip) */
 #define S_L_OCRAM           "OC-RAM CPU (SH-4 IC1)"
 #define S_L_RAMSIZE         "RAM CPU detectee : "
+#define S_BEACON_HDR        "\nBalise de voies : ecritures 16 bits sur une seule puce a la fois.\n"\
+                            "RAM CPU : sondez LDQM/UDQM. VRAM : sondez une broche DQ.\n"\
+                            "La puce qui bouge est celle annoncee.\n"
+#define S_BEACON_ON         "Balise -> "
+#define S_BEACON_CPU1       "RAM CPU voie 1 : D0-D15 mot pair"
+#define S_BEACON_CPU2       "RAM CPU voie 2 : D16-D31 mot pair"
+#define S_BEACON_CPU3       "RAM CPU voie 3 : D0-D15 mot impair"
+#define S_BEACON_CPU4       "RAM CPU voie 4 : D16-D31 mot impair"
+#define S_BEACON_T0_1       "VRAM TEX0 voie 1"
+#define S_BEACON_T0_2       "VRAM TEX0 voie 2"
+#define S_BEACON_T0_3       "VRAM TEX0 voie 3"
+#define S_BEACON_T0_4       "VRAM TEX0 voie 4"
+#define S_BEACON_T1_1       "VRAM TEX1 voie 1"
+#define S_BEACON_T1_2       "VRAM TEX1 voie 2"
+#define S_BEACON_T1_3       "VRAM TEX1 voie 3"
+#define S_BEACON_T1_4       "VRAM TEX1 voie 4"
+
 #define S_INTERMITTENT      "  Defaut intermittent : vu a la verification, absent a la relecture.\n  La puce est nommee malgre tout : la parite du mot est conservee.\n"
 #define S_L_BOARD_N1        "Carte : Naomi 1 (837-13544)"
 #define S_L_BOARD_N2        "Carte : Naomi 2 (837-14009)"
@@ -158,6 +175,23 @@
 
 #define S_L_OCRAM           "CPU OC-RAM (SH-4 IC1)"
 #define S_L_RAMSIZE         "CPU RAM detected: "
+#define S_BEACON_HDR        "\nLane beacon: 16-bit writes hitting one chip at a time.\n"\
+                            "CPU RAM: probe LDQM/UDQM. VRAM: probe a DQ pin.\n"\
+                            "The chip that moves is the one named.\n"
+#define S_BEACON_ON         "Beacon -> "
+#define S_BEACON_CPU1       "CPU RAM lane 1: D0-D15 even word"
+#define S_BEACON_CPU2       "CPU RAM lane 2: D16-D31 even word"
+#define S_BEACON_CPU3       "CPU RAM lane 3: D0-D15 odd word"
+#define S_BEACON_CPU4       "CPU RAM lane 4: D16-D31 odd word"
+#define S_BEACON_T0_1       "VRAM TEX0 lane 1"
+#define S_BEACON_T0_2       "VRAM TEX0 lane 2"
+#define S_BEACON_T0_3       "VRAM TEX0 lane 3"
+#define S_BEACON_T0_4       "VRAM TEX0 lane 4"
+#define S_BEACON_T1_1       "VRAM TEX1 lane 1"
+#define S_BEACON_T1_2       "VRAM TEX1 lane 2"
+#define S_BEACON_T1_3       "VRAM TEX1 lane 3"
+#define S_BEACON_T1_4       "VRAM TEX1 lane 4"
+
 #define S_INTERMITTENT      "  Intermittent fault: seen while verifying, gone on re-scan.\n  The chip is still named: the word parity was kept.\n"
 #define S_L_BOARD_N1        "Board: Naomi 1 (837-13544)"
 #define S_L_BOARD_N2        "Board: Naomi 2 (837-14009)"

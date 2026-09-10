@@ -1308,6 +1308,99 @@ static void audio_replay_log(void)
 }
 
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------------
+ * Lane beacon: which silkscreen chip carries which 16-bit slice of the bus.
+ *
+ * The test suite knows a fault is on, say, D0-D15 of the even word. Turning
+ * that into a designator needs a link between an electrical lane and a
+ * physical package, and that link cannot be inferred -- inferring it from
+ * the order the original BIOS prints IC numbers is exactly what got the map
+ * wrong three times over.
+ *
+ * It can be measured, though, and without touching the CPU. The SH-4 can
+ * write 16 bits at a time, and on a 64-bit bus a halfword write asserts the
+ * byte mask of exactly one 16-bit slice, so exactly one chip is selected:
+ *
+ *     offset +0 -> D0-D15    +2 -> D16-D31    +4 -> D32-D47    +6 -> D48-D63
+ *
+ * Hammering one offset in a loop therefore pulses the DQM pins of one chip
+ * and leaves the other three masked. Put a scope on LDQM or UDQM of each RAM
+ * -- they are TSOP and reachable, unlike anything under a heatsink -- and the
+ * one that moves during a given phase is that group's chip. The same applies
+ * to the eight GPU RAM chips: the offset picks the chip within a bank, the
+ * base address picks TEX0 or TEX1.
+ *
+ * Runs after the report, forever, because by then there is nothing left to
+ * disturb and the operator needs time with a probe. */
+static void lane_beacon_phase(u32 base, u32 offset, const char *what,
+                              u32 halfword)
+{
+    scif_puts(S_BEACON_ON);
+    scif_puts(what);
+    scif_puts("\n");
+    log_result(what, CLIP_NONE, T_OK, 0, 0);
+
+    /* Two ways of lighting up one 16-bit slice, because the two memories
+     * hang off different buses.
+     *
+     * CPU RAM is on the SH-4's own bus, so a 16-bit write asserts the byte
+     * mask of exactly one slice: one chip sees DQM pulse and its data lines
+     * move, the other three stay masked and quiet. Both pins discriminate.
+     *
+     * VRAM is not on that bus -- it belongs to the graphics chip, which
+     * mediates every access -- so the SH-4's byte masks say nothing about
+     * which VRAM chip is selected. There the write is 32 bits wide with only
+     * the targeted half toggling and the other half held constant: the
+     * chip carrying the moving half shows activity on its data pins while
+     * its neighbour sits still, whatever the graphics chip does with byte
+     * enables. Probe DQ rather than DQM for those. */
+    for (u32 rep = 0; rep < 4000; rep++) {
+        if (halfword) {
+            volatile u16 *p = (volatile u16 *)(base + offset);
+            for (u32 i = 0; i < 64; i++) {
+                p[i * 4] = 0xAAAA;
+                p[i * 4] = 0x5555;
+            }
+        } else {
+            /* offset 0 or 4 selects the 32-bit word; 0 or 2 within it says
+             * which half moves and which is pinned to a constant */
+            volatile u32 *p = (volatile u32 *)(base + (offset & 4));
+            u32 lo = (offset & 2) == 0;
+            for (u32 i = 0; i < 64; i++) {
+                p[i * 2] = lo ? 0x0000AAAAu : 0xAAAA0000u;
+                p[i * 2] = lo ? 0x00005555u : 0x55550000u;
+            }
+        }
+        if ((rep & 0x7F) == 0)
+            progress_heartbeat();
+    }
+}
+
+static void lane_beacon(void)
+{
+    static const char *const cpu_names[4] = {
+        S_BEACON_CPU1, S_BEACON_CPU2, S_BEACON_CPU3, S_BEACON_CPU4
+    };
+    static const char *const vram0_names[4] = {
+        S_BEACON_T0_1, S_BEACON_T0_2, S_BEACON_T0_3, S_BEACON_T0_4
+    };
+    static const char *const vram1_names[4] = {
+        S_BEACON_T1_1, S_BEACON_T1_2, S_BEACON_T1_3, S_BEACON_T1_4
+    };
+
+    scif_puts(S_BEACON_HDR);
+    for (;;) {
+        g_log_n = 0;                    /* one phase on screen at a time */
+        for (u32 k = 0; k < 4; k++)
+            lane_beacon_phase(SDRAM_P2_BASE, k * 2, cpu_names[k], 1);
+        for (u32 k = 0; k < 4; k++)
+            lane_beacon_phase(VRAM_TEX0_BASE, k * 2, vram0_names[k], 0);
+        for (u32 k = 0; k < 4; k++)
+            lane_beacon_phase(VRAM_TEX1_BASE, k * 2, vram1_names[k], 0);
+    }
+}
+
 void cmain(void)
 {
     timer_init();
@@ -1426,6 +1519,6 @@ void cmain(void)
     scif_puts(S_COMPLETE);
     say(CLIP_TESTS_DONE, REPORT_GAP_MS);
     scif_flush();
-    for (;;)
-        ;
+
+    lane_beacon();                      /* never returns */
 }
