@@ -69,7 +69,8 @@ Dans l'ordre :
 2. **Identification de la carte** — Naomi 1 ou Naomi 2 (signature Elan +
    aliasing VRAM).
 3. **EPROM BIOS (IC27)** — auto-contrôle CRC32.
-4. **RAM son** (AICA, 8 Mo, bus G2) — puis l'audio devient un canal.
+4. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2) — puis
+   l'audio devient un canal.
 5. **VRAM** — 16 Mo en huit puces de 16 Mbit autour du circuit graphique,
    testées en deux bancs de 64 bits, TEX0 et TEX1 de quatre puces chacun.
    Leurs désignations ne sont pas confirmées — puis l'écran de rapport
@@ -95,7 +96,8 @@ Dans l'ordre :
    descripteurs DMA, est ignoré.
 7. **Naomi 2 uniquement** — VRAM du PVR esclave (16 Mo) et RAM Elan (32 Mo).
 8. **NVRAM de sauvegarde** — test non destructif (sauvegarde/restauration).
-9. **RTC** (AICA) — vérification non destructive de l'avance de l'horloge.
+9. **RTC** (interne à l'AICA, IC33) — vérification non destructive de
+   l'avance de l'horloge.
 10. **Carte DIMM** (mailbox G1) — présence et cohérence de la mailbox.
 11. **Bus Maple / MIE** (Z80 315-6146) — requête de version + auto-test
     d'usine.
@@ -224,11 +226,22 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
 
 ## État et limites
 
-- Les désignateurs IC des puces RAM proviennent des tables du RAM TEST du
-  BIOS d'origine ; l'**ordre exact lane→IC** est une hypothèse à confirmer
-  par panne forcée sur vrai matériel.
-- Les désignateurs du SH-4, du HOLLY, de l'AICA et des deux 62256 sont
-  encore inconnus (le BIOS ne les affiche jamais) ; à relever sur une carte.
+- Les désignateurs IC ont été **relevés sur la carte** et sont listés dans
+  [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md). Une version antérieure les
+  déduisait de l'ordre dans lequel le RAM TEST du BIOS d'origine affiche ses
+  numéros ; cette déduction s'est trompée trois fois — dont une inversion
+  complète des groupes RAM CPU et RAM GPU — et plus rien ne repose dessus.
+- Deux points restent réellement inconnus, et la ROM affiche un numéro de
+  position plutôt que de les deviner :
+  - quel groupe de quatre RAM GPU répond à **TEX0** (`0xA5000000`) et lequel
+    à **TEX1** (`0xA5800000`). Le partage recto / verso est plausible, pas
+    établi ;
+  - l'**ordre des voies** à l'intérieur de chaque groupe de quatre. Le code
+    suppose l'ordre croissant — IC9 sur D0-D15 du mot pair, IC10 sur D16-D31,
+    IC11S et IC12S sur le mot impair — et une panne forcée sur une puce
+    identifiée trancherait.
+- Les clips vocaux énoncent le numéro sans le suffixe **S** : une panne sur
+  IC11S s'entend « I C onze ». L'écran et le port série font foi.
 - La lecture de l'EEPROM des réglages et le test JVS complet de la carte
   I/O nécessitent un upload de code Z80 dans le MIE (travail futur).
 

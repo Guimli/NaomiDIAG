@@ -66,7 +66,8 @@ In order:
 2. **Board identification** — Naomi 1 vs Naomi 2 (Elan T&L signature + VRAM
    aliasing).
 3. **BIOS EPROM (IC27)** — CRC32 self-check.
-4. **Sound RAM** (AICA, 8 MB, G2 bus) — then audio becomes a channel.
+4. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus) — then
+   audio becomes a channel.
 5. **VRAM** — 16 MB in eight 16 Mbit chips around the graphics chip, tested
    as two 64-bit banks, TEX0 and TEX1 of four chips each. Their designators
    are not confirmed — then the VGA report
@@ -89,7 +90,7 @@ In order:
    Maple/MIE test, which needs RAM for its DMA descriptors, is skipped.
 7. **Naomi 2 only** — slave PVR VRAM (16 MB) and Elan RAM (32 MB).
 8. **Backup SRAM** — non-destructive save/restore test.
-9. **RTC** (AICA) — non-destructive tick check.
+9. **RTC** (inside the AICA, IC33) — non-destructive tick check.
 10. **DIMM board** (G1 mailbox) — presence and mailbox sanity.
 11. **Maple bus / MIE** (315-6146 Z80) — version request + factory
     self-test.
@@ -210,11 +211,23 @@ under the DRC, so fault injection into it needs `-nodrc`.
 
 ## Status and limitations
 
-- Silkscreen IC designators for the RAM chips come from the original BIOS
-  RAM TEST tables; the exact **lane→IC order** is a hypothesis pending
-  confirmation by a forced fault on real hardware.
-- IC designators for the SH-4, HOLLY, AICA and the two 62256 are not yet
-  known (the BIOS never prints them); to be read off a real board.
+- The IC designators were **read off a board** and are listed in
+  [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md). An earlier version derived
+  them from the order the original BIOS RAM TEST prints its numbers, which
+  was wrong three times over — including having the CPU RAM and GPU RAM
+  groups the wrong way round — so nothing rests on that inference any more.
+- Two things are still genuinely unknown, and the ROM says position numbers
+  rather than guessing at them:
+  - which group of four GPU RAM chips answers at **TEX0** (`0xA5000000`) and
+    which at **TEX1** (`0xA5800000`). The top/underside split is plausible,
+    not established;
+  - the **lane→IC order** inside each group of four. The code assumes
+    ascending numbers — IC9 on D0-D15 of the even word, IC10 on D16-D31,
+    IC11S and IC12S on the odd word — and a forced fault on a known chip
+    would settle it.
+- The spoken clips say the number without the **S** suffix, so a fault on
+  IC11S is heard as "I C eleven". The screen and the serial console are
+  authoritative.
 - The settings EEPROM read and full JVS I/O-board testing need a Z80 code
   upload into the MIE (future work).
 
