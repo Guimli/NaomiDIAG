@@ -6,6 +6,9 @@ les composants de la carte un par un, en rapportant les résultats sur trois
 canaux — **série (SCIF)**, **écran (VGA)** et **voix** — sans jamais
 dépendre d'une mémoire dont le bon fonctionnement n'a pas encore été prouvé.
 
+Elle a déjà servi à réparer une carte : la ROM a désigné **IC10**, et le
+remplacement d'IC10 seul a fait disparaître la panne.
+
 Disponible en **anglais** et en **français**, texte et voix localisés.
 Les ROMs pré-compilées prêtes à graver sont sur la page
 [**Releases**](https://github.com/Guimli/NaomiDIAG/releases/latest) —
@@ -236,10 +239,13 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   - quel groupe de quatre RAM GPU répond à **TEX0** (`0xA5000000`) et lequel
     à **TEX1** (`0xA5800000`). Le partage recto / verso est plausible, pas
     établi ;
-  - l'**ordre des voies** à l'intérieur de chaque groupe de quatre. Le code
-    suppose l'ordre croissant — IC9 sur D0-D15 du mot pair, IC10 sur D16-D31,
-    IC11S et IC12S sur le mot impair — et une panne forcée sur une puce
-    identifiée trancherait.
+  - l'**ordre des voies** à l'intérieur de chaque groupe de quatre, mais
+    plus entièrement. Une carte que cette ROM a désignée **IC10** a été
+    réparée en ne remplaçant qu'IC10, ce qui confirme IC10 sur D16-D31 du mot
+    pair et écarte les deux alternatives plausibles — ordre inversé, et
+    moitiés paire/impaire interverties. IC9, IC11S et IC12S découlent de la
+    numérotation croissante, pas d'une mesure propre. La balise de voies les
+    tranche individuellement.
 - Les clips vocaux énoncent le numéro sans le suffixe **S** : une panne sur
   IC11S s'entend « I C onze ». L'écran et le port série font foi.
 - La lecture de l'EEPROM des réglages et le test JVS complet de la carte

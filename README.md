@@ -6,6 +6,9 @@ board's components one by one, reporting results on up to three channels —
 **serial (SCIF)**, **on-screen (VGA)** and **spoken audio** — without ever
 relying on memory it has not yet proven good.
 
+It has been used to repair a board: the ROM named **IC10**, replacing IC10
+alone cleared the fault.
+
 Available in **English** and **French**, text and voice both localized.
 Pre-built ROMs ready to burn are on the
 [**Releases**](https://github.com/Guimli/NaomiDIAG/releases/latest) page —
@@ -221,10 +224,12 @@ under the DRC, so fault injection into it needs `-nodrc`.
   - which group of four GPU RAM chips answers at **TEX0** (`0xA5000000`) and
     which at **TEX1** (`0xA5800000`). The top/underside split is plausible,
     not established;
-  - the **lane→IC order** inside each group of four. The code assumes
-    ascending numbers — IC9 on D0-D15 of the even word, IC10 on D16-D31,
-    IC11S and IC12S on the odd word — and a forced fault on a known chip
-    would settle it.
+  - the **lane→IC order** inside each group of four, though no longer
+    entirely. A board this ROM reported as **IC10** was repaired by replacing
+    IC10 alone, which confirms IC10 on D16-D31 of the even word and rules out
+    both plausible alternatives — reversed order, and the even/odd halves
+    swapped. IC9, IC11S and IC12S follow from ascending numbering rather than
+    from their own measurement. The lane beacon settles them individually.
 - The spoken clips say the number without the **S** suffix, so a fault on
   IC11S is heard as "I C eleven". The screen and the serial console are
   authoritative.

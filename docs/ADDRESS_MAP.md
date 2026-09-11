@@ -82,10 +82,14 @@ reste deux points, et aucun ne se devine :
 
 1. **Quel groupe de quatre RAM GPU répond à TEX0** (0xA5000000) et lequel à
    TEX1 (0xA5800000). Le partage recto / verso est plausible, pas établi.
-2. **L'ordre des voies** à l'intérieur de chaque groupe de quatre. Le code
-   suppose l'ordre croissant des numéros — IC9 sur D0-D15 du mot pair, IC10
-   sur D16-D31, IC11S et IC12S sur le mot impair — et cette hypothèse n'est
-   pas vérifiée.
+2. **L'ordre des voies** à l'intérieur de chaque groupe de quatre — en
+   partie seulement désormais. **IC10 = position 2 (D16-D31, mot pair) est
+   validé physiquement** : une carte que NaomiDiag a désignée IC10 a été
+   réparée en ne remplaçant qu'IC10, et la panne a disparu. Cela écarte les
+   deux alternatives plausibles — ordre inversé, et moitiés paire/impaire
+   interverties — et ne laisse debout que la numérotation croissante. IC9,
+   IC11S et IC12S en découlent, sans mesure qui leur soit propre ; la balise
+   de voies en fin d'exécution est là pour les trancher une à une.
 
 Les tests concernés affichent le **numéro de position** dans le banc, qui est
 exact, plutôt qu'une désignation devinée.

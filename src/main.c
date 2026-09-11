@@ -65,11 +65,17 @@ typedef enum { T_OK = 0, T_FAIL = 1 } t_status;
  * hardware. Sound RAM is a single chip: every lane maps to IC35. */
 typedef struct { u32 clip; const char *name; } comp_map;
 
+/* Lane order. IC10 on position 2 is PROVEN: a board this ROM reported as
+ * IC10 was repaired by replacing IC10 alone and the fault went away. That
+ * rules out the reversed order and the even/odd swap, the two plausible
+ * alternatives, and leaves ascending numbering. Positions 1, 3 and 4 follow
+ * from that ordering rather than from their own measurement -- the lane
+ * beacon at the end of the run is there to settle them individually. */
 static const comp_map work_comps[4] = {
-    { CLIP_IC_9,  "IC9"   },        /* D0-D15,  even word */
-    { CLIP_IC_10, "IC10"  },        /* D16-D31, even word */
-    { CLIP_IC_11, "IC11S" },        /* D0-D15,  odd word  */
-    { CLIP_IC_12, "IC12S" },        /* D16-D31, odd word  */
+    { CLIP_IC_9,  "IC9"   },        /* D0-D15,  even word              */
+    { CLIP_IC_10, "IC10"  },        /* D16-D31, even word -- CONFIRMED */
+    { CLIP_IC_11, "IC11S" },        /* D0-D15,  odd word               */
+    { CLIP_IC_12, "IC12S" },        /* D16-D31, odd word               */
 };
 /* Sound RAM is IC35 and the backup NVRAM is IC29 -- confirmed on a real
  * board. Both were wrong here until now, and the mistake is worth recording:
