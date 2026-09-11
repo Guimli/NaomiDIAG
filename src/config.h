@@ -24,6 +24,24 @@
  * for what is still unmeasured. */
 #ifndef CFG_LANE_BEACON
 #define CFG_LANE_BEACON 0
+
+/* Let the AICA's ARM7 run (0 = hold it in reset, 1 = let it spin).
+ *
+ * We drive the sound channels from the SH-4 and have no use for the ARM, so
+ * this ROM held it in reset. A working Naomi does not: dumping the AICA under
+ * the original BIOS shows 0x2C00 = 0, the ARM released, while ours sat at 1.
+ * That is the one structural difference left between our configuration and a
+ * machine that is known to make sound, and it is invisible to an emulator --
+ * no game holds the ARM in reset, so nothing ever exercised that case.
+ *
+ * With this on, a four-byte ARM program that branches to itself is written at
+ * sound RAM offset 0, the ARM's reset vector, and the reset is released. The
+ * ARM spins in place, touching nothing, and the AICA sits in the same state
+ * as on a booting Naomi. Set to 0 to go back to holding it in reset. */
+#ifndef CFG_AICA_ARM_RUN
+#define CFG_AICA_ARM_RUN 1
+#endif
+
 #endif
 
 #endif

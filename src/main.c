@@ -609,6 +609,10 @@ static u32 test_aram(void)
     u32 len = ARAM_SIZE;
 #endif
 
+    /* The cell test overwrites sound RAM offset 0, which is the ARM's reset
+     * vector: leave it running and it would execute the test pattern. */
+    aica_arm_halt();
+
     ram_result res;
     ram_result_clear(&res);
     u32 words = len >> 2;
@@ -636,6 +640,8 @@ static u32 test_aram(void)
         log_result(S_L_ARAM_CELL, CLIP_SOUND_RAM, T_FAIL, 0, IC(aram_comps));
         return 0;
     }
+
+    aica_arm_park();                    /* back to the state a Naomi boots in */
 
     t_status st = res.errors ? T_FAIL : T_OK;
     log_result(S_L_ARAM_CELL, CLIP_SOUND_RAM, st,

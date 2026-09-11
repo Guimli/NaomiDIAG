@@ -15,6 +15,11 @@ void aica_g2_wait(void);
  * means the bus itself is faulty, and any sound RAM result is void. */
 u32 aica_g2_stalled(void);
 
+/* The AICA's ARM7: parked on a branch-to-self and running, or held in reset.
+ * It must be halted before anything overwrites sound RAM offset 0. */
+void aica_arm_park(void);
+void aica_arm_halt(void);
+
 /* Hold the ARM7 in reset and set master volume; call before touching ARAM. */
 void aica_init(void);
 

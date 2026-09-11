@@ -6,12 +6,14 @@
 #include "aica.h"
 #include "ramtest.h"
 #include "progress.h"
+#include "config.h"
 #include "timer.h"
 
 #define AICA_REG(off)   REG32(0xA0700000u + (off))
 #define AICA_ARMRST     AICA_REG(0x2C00)
 #define AICA_MVOL       AICA_REG(0x2800)
 #define G2_FIFO_STAT    REG32(0xA05F688Cu)
+#define AICA_RBP        AICA_REG(0x2804)
 
 #define SLOT(ch, off)   REG32(0xA0700000u + (u32)(ch) * 0x80 + (off))
 
@@ -63,13 +65,52 @@ void aica_init(void)
      * emulator does not reproduce. */
     AICA_MVOL = 0x0200 | 0x000F;        /* MEM8MB | master volume max */
     g2_fifo_wait();
+
+    /* DSP ring buffer, at the address the original BIOS uses. Left at zero it
+     * points at sound RAM offset 0 -- where the ARM's reset vector lives and
+     * where our own data starts -- so if the DSP ever writes, it writes over
+     * exactly the wrong place. */
+    AICA_RBP = 0x00004FE0;
+    g2_fifo_wait();
     /* silence all 64 slots (KYONB=0 + KYONEX flush) */
     for (int ch = 0; ch < 64; ch++) {
         SLOT(ch, 0x00) = 0x0000;
-        if ((ch & 7) == 7)
-            g2_fifo_wait();
+        /* filter wide open on every slot, as the original BIOS leaves it:
+         * closed is the reset state, and closed means silent */
+        SLOT(ch, 0x2C) = 0x1FF7;
+        SLOT(ch, 0x30) = 0x1FF7;
+        SLOT(ch, 0x34) = 0x1FF7;
+        SLOT(ch, 0x38) = 0x1FF7;
+        SLOT(ch, 0x3C) = 0x1FF7;
+        g2_fifo_wait();
     }
     SLOT(0, 0x00) = 0x8000;             /* KYONEX: apply */
+    g2_fifo_wait();
+
+    aica_arm_park();
+}
+
+/* Park the ARM7 on a four-byte program that branches to itself, then let it
+ * run. See CFG_AICA_ARM_RUN in config.h for why a chip we never use is
+ * nevertheless started. */
+void aica_arm_park(void)
+{
+#if CFG_AICA_ARM_RUN
+    g2_fifo_wait();
+    REG32(ARAM_P2_BASE) = 0xEAFFFFFEu;  /* ARM: b . -- the reset vector */
+    g2_fifo_wait();
+    AICA_ARMRST = 0;                    /* release: it spins, touching nothing */
+    g2_fifo_wait();
+#endif
+}
+
+/* Back into reset. Mandatory before anything overwrites sound RAM offset 0:
+ * the ARM would carry on fetching from it and execute whatever the test just
+ * wrote there. */
+void aica_arm_halt(void)
+{
+    g2_fifo_wait();
+    AICA_ARMRST = 1;
     g2_fifo_wait();
 }
 
@@ -210,7 +251,29 @@ void aica_say(const signed char *pcm, u32 len, u32 gap_ms)
     SLOT(0, 0x1C) = 0;                       /* no LFO */
     SLOT(0, 0x20) = 0;                       /* no DSP send */
     SLOT(0, 0x24) = 0x0F00;                  /* DISDL max, pan center */
-    SLOT(0, 0x28) = 0;                       /* TL 0 = full level */
+
+    /* Open the per-voice lowpass filter. THIS is what silenced the board.
+     *
+     * Every AICA channel runs through a filter whose five level registers
+     * come out of reset at zero -- fully closed. A voice with correct sample
+     * data, full DISDL and no attenuation still produces nothing, because
+     * the filter removes it. Dumping the AICA under the original BIOS shows
+     * it writing 0x1FF7 into all five on every slot, which is wide open.
+     *
+     * An emulator that does not model the filter plays the channel anyway,
+     * which is why this cost a real board its sound while MAME sounded
+     * perfect from the same image. Bit 5 of 0x28 is set because the BIOS
+     * sets it on every slot; the filter envelope rates are left at zero,
+     * again as the BIOS leaves them, so the level never moves off FLV0. */
+    SLOT(0, 0x28) = 0x0020;                  /* TL 0 = full level */
+    SLOT(0, 0x2C) = 0x1FF7;                  /* FLV0 */
+    SLOT(0, 0x30) = 0x1FF7;                  /* FLV1 */
+    g2_fifo_wait();
+    SLOT(0, 0x34) = 0x1FF7;                  /* FLV2 */
+    SLOT(0, 0x38) = 0x1FF7;                  /* FLV3 */
+    SLOT(0, 0x3C) = 0x1FF7;                  /* FLV4 */
+    SLOT(0, 0x40) = 0x0000;                  /* FAR / FD1R */
+    SLOT(0, 0x44) = 0x0000;                  /* FD2R / FRR */
     g2_fifo_wait();
     /* key on */
     SLOT(0, 0x00) = (u32)(0x8000 | 0x4000 | ((sa >> 16) & 0x7F));
