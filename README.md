@@ -172,6 +172,24 @@ make LANG=FR            # -> NaomiDIAG_FR.bin (French text + voice)
 make LANG=EN QUICK=1    # 1 MB per RAM pass, for fast emulator bring-up
 ```
 
+[`src/config.h`](src/config.h) holds the options that are a decision about
+the ROM rather than a per-build variation. The Makefile carries what changes
+from one build to the next — `LANG`, `QUICK`, `RELOC`, `ROM_BASE`; the header
+carries what is edited once and stays. Anything in it can still be overridden
+without touching the file:
+
+```sh
+make LANG=EN CFLAGS_EXTRA=-DCFG_LANE_BEACON=1
+```
+
+**`CFG_LANE_BEACON`** (off by default) enables the lane beacon: after the
+report it cycles through the twelve 16-bit slices of the CPU RAM and VRAM
+buses, naming one at a time and hammering it so a scope on the chips shows
+which package carries which lane. It is a bench instrument for establishing
+the lane-to-designator map, not part of diagnosing a board — it never ends,
+so the report stays up but the machine never settles. Turn it on when you
+have a probe in hand.
+
 A 2 MB image is produced, ready to burn on a 27C160 EPROM (IC27). The build
 refuses to produce an image larger than 2 MB (no silent truncation).
 

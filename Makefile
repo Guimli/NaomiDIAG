@@ -22,9 +22,13 @@ ELF     := naomi_diag_$(lang_lc).elf
 # depends on nothing beyond the ROM itself.
 RELOC ?= 1
 
+# Anything in src/config.h can be overridden from the command line without
+# editing the file, e.g. make CFLAGS_EXTRA=-DCFG_LANE_BEACON=1
+CFLAGS_EXTRA ?=
+
 CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
            -Wall -Wextra -std=c11 -DQUICK_TEST=$(QUICK) -DLANG_$(LANG) \
-           -DRELOC=$(RELOC)
+           -DRELOC=$(RELOC) $(CFLAGS_EXTRA)
 # P2 (0xA0000000) is the default: it is the window the reset vector lands in
 # and the only one this ROM has been observed to run from on real hardware.
 # ROM_BASE=0x80000000 links for P1, the cached alias, which is much faster but
@@ -36,15 +40,15 @@ OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.
         src/timer.o src/aica.o src/pvr.o src/periph.o src/dimm.o src/maple.o \
         src/board.o src/sha1.o src/cart.o
 
-HDRS := src/hw.h src/scif.h src/sdram.h src/ramtest.h src/timer.h src/aica.h \
+HDRS := src/config.h src/version.inc src/hw.h src/scif.h src/sdram.h src/ramtest.h src/timer.h src/aica.h \
         src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/sha1.h \
-        src/cart.h src/cartdb.h src/version.inc src/strings.h
+        src/cart.h src/cartdb.h src/strings.h
 
 all: $(BIN)
 
 # config stamp: objects carry no LANG/QUICK in their name, so force a
 # rebuild whenever the selected language or QUICK setting changes.
-STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)
+STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)$(subst -,,$(subst =,,$(CFLAGS_EXTRA)))
 $(STAMP):
 	rm -f .build_* && touch $@
 

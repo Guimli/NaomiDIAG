@@ -23,6 +23,7 @@
 #include "board.h"
 #include "cart.h"
 #include "sha1.h"
+#include "config.h"
 #include "version.inc"
 #include "strings.h"
 #include "audio_clips.h"
@@ -1314,6 +1315,7 @@ static void audio_replay_log(void)
 
 /* ------------------------------------------------------------------ */
 
+#if CFG_LANE_BEACON
 /* ------------------------------------------------------------------------
  * Lane beacon: which silkscreen chip carries which 16-bit slice of the bus.
  *
@@ -1405,6 +1407,7 @@ static void lane_beacon(void)
             lane_beacon_phase(VRAM_TEX1_BASE, k * 2, vram1_names[k], 0);
     }
 }
+#endif  /* CFG_LANE_BEACON */
 
 void cmain(void)
 {
@@ -1525,5 +1528,10 @@ void cmain(void)
     say(CLIP_TESTS_DONE, REPORT_GAP_MS);
     scif_flush();
 
+#if CFG_LANE_BEACON
     lane_beacon();                      /* never returns */
+#else
+    for (;;)                            /* report stays on screen */
+        progress_heartbeat();
+#endif
 }

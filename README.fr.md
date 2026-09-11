@@ -186,6 +186,24 @@ make LANG=FR            # -> NaomiDIAG_FR.bin (texte + voix français)
 make LANG=FR QUICK=1    # 1 Mo par passe RAM, pour l'émulateur
 ```
 
+[`src/config.h`](src/config.h) regroupe les options qui relèvent d'une
+décision sur la ROM plutôt que d'une variation d'une construction à l'autre.
+Le Makefile porte ce qui change à chaque build — `LANG`, `QUICK`, `RELOC`,
+`ROM_BASE` ; l'en-tête porte ce qu'on règle une fois. Tout y reste
+surchargeable sans éditer le fichier :
+
+```sh
+make LANG=FR CFLAGS_EXTRA=-DCFG_LANE_BEACON=1
+```
+
+**`CFG_LANE_BEACON`** (désactivée par défaut) active la balise de voies :
+après le rapport, elle parcourt les douze tranches de 16 bits des bus RAM CPU
+et VRAM, en nommant une à la fois et en la martelant pour qu'un oscilloscope
+posé sur les puces révèle laquelle porte quelle voie. C'est un instrument
+d'établi pour construire la correspondance voie → désignation, pas une étape
+du diagnostic : elle ne se termine jamais, donc le rapport reste affiché mais
+la machine ne se stabilise pas. À activer quand vous avez une sonde en main.
+
 Une image de 2 Mo est produite, prête à graver sur une EPROM 27C160 (IC27).
 Le build refuse toute image dépassant 2 Mo (pas de troncature silencieuse).
 
