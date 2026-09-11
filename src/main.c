@@ -183,34 +183,8 @@ static const char *pass_label(const char *base, u32 phase)
     return g_passbuf;
 }
 
-/* The detected main RAM size, as a log line so it reaches the screen and not
- * only the serial console. It answers a question no datasheet settles
- * reliably: how much memory the four chips around the SH-4 actually add up
- * to, measured on the board itself. Its own buffer, because log_result keeps
- * the pointer it is given and g_passbuf is rewritten on every phase. */
-static char g_sizebuf[48];
-
-static const char *size_label(const char *base, u32 mb)
-{
-    u32 i = 0;
-    while (base[i] && i < 32) {
-        g_sizebuf[i] = base[i];
-        i++;
-    }
-    if (mb >= 100)
-        g_sizebuf[i++] = (char)('0' + mb / 100);
-    if (mb >= 10)
-        g_sizebuf[i++] = (char)('0' + (mb / 10) % 10);
-    g_sizebuf[i++] = (char)('0' + mb % 10);
-    g_sizebuf[i++] = ' ';
-    g_sizebuf[i++] = 'M';
-    g_sizebuf[i++] = 'B';
-    g_sizebuf[i] = 0;
-    return g_sizebuf;
-}
-
-/* The parity of the failing word is always known now -- the verify loops keep
- * one difference mask per address parity -- so a fault names exactly one chip,
+/* The parity of the failing word is always known -- the verify loops keep one
+ * difference mask per address parity -- so a fault names exactly one chip,
  * whether the re-scan could reproduce it or not. */
 static void report_intermittent(const ram_result *r)
 {
@@ -421,7 +395,6 @@ static void sdram_setup(void)
     scif_puts(S_SDRAM_SIZE);
     scif_putdec(g_ram_size >> 20);
     scif_puts(S_MB);
-    log_result(size_label(S_L_RAMSIZE, g_ram_size >> 20), CLIP_NONE, T_OK, 0, 0);
 }
 
 /* Slow (~1 min on 32MB): the actual CPU-RAM cell test. Runs after the
@@ -1263,16 +1236,6 @@ static void quick_audio_bringup(void)
     if (st == T_OK) {
         g_audio_ready = 1;
         progress_phase(PH_AUDIO_ON);    /* yellow */
-
-        /* Before any speech, two seconds of plain square wave. It depends on
-         * nothing but the AICA and the board's analog output, so it splits a
-         * silent machine into two very different faults: no tone means the
-         * output stage or the wiring, tone but no speech means the clips or
-         * their playback. Announced first on the two channels that do not
-         * need a speaker, so the operator knows what to listen for. */
-        scif_puts(S_TONE);
-        log_result(S_L_TONE, CLIP_NONE, T_OK, 0, 0);
-        aica_tone(2000);
 
         audio_replay_log();
     }
