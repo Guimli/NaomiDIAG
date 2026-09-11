@@ -365,31 +365,10 @@ static void fb_rect(u32 x, u32 y, u32 w, u32 h, u16 color)
             p[(y + dy) * FB_W + (x + dx)] = color;
 }
 
-void fb_progress(const char *label, u32 pct)
+/* Percentage in its own fixed field, then the frame. Separate because both
+ * the full and the incremental painter need exactly this and nothing else. */
+static void fb_progress_pct_frame(u32 pct)
 {
-    if (!fb_progress_enabled())
-        return;
-    if (pct > 100)
-        pct = 100;
-
-    u32 inner = BAR_W - 4;
-    u32 filled = (inner * pct) / 100;      /* pct <= 100: no overflow */
-
-    /* A new test starts at 0%, i.e. filled goes backwards: wipe the whole
-     * interior then. Otherwise paint only the slice that just appeared --
-     * repainting the full bar on every percent would cost more VRAM writes
-     * than the memory test it is reporting on. */
-    if (filled < g_bar_filled) {
-        fb_rect(BAR_X + 2, BAR_Y + 2, inner, BAR_H - 4, 0);
-        fb_fill_rows(BAR_Y - 22, BAR_Y - 4, 0);     /* and the label line */
-        fb_text(BAR_X, BAR_Y - 22, label, COL_WHITE, FB_W - 16 * 5);
-    } else if (filled > g_bar_filled) {
-        fb_rect(BAR_X + 2 + g_bar_filled, BAR_Y + 2,
-                filled - g_bar_filled, BAR_H - 4, COL_GREEN);
-    }
-    g_bar_filled = filled;
-
-    /* percentage, in its own fixed field so it needs no full-line clear */
     fb_rect(FB_W - 16 * 5, BAR_Y - 22, 16 * 5, 18, 0);
     char num[5];
     u32 n = pct, i = 0;
@@ -402,11 +381,58 @@ void fb_progress(const char *label, u32 pct)
     num[j] = 0;
     fb_text(FB_W - 16 * 5, BAR_Y - 22, num, COL_TITLE, FB_W);
 
-    /* frame */
     fb_rect(BAR_X, BAR_Y, BAR_W, 1, COL_WHITE);
     fb_rect(BAR_X, BAR_Y + BAR_H - 1, BAR_W, 1, COL_WHITE);
     fb_rect(BAR_X, BAR_Y, 1, BAR_H, COL_WHITE);
     fb_rect(BAR_X + BAR_W - 1, BAR_Y, 1, BAR_H, COL_WHITE);
+}
+
+/* Paint the whole thing: label, percentage, frame, fill. Used when there is
+ * nothing on screen to build on -- a test starting, or a full repaint. */
+void fb_progress_full(const char *label, u32 pct)
+{
+    if (!fb_progress_enabled())
+        return;
+    if (pct > 100)
+        pct = 100;
+    u32 inner = BAR_W - 4;
+    u32 filled = (inner * pct) / 100;
+
+    fb_fill_rows(BAR_Y - 22, BAR_Y - 4, 0);
+    fb_text(BAR_X, BAR_Y - 22, label, COL_WHITE, FB_W - 16 * 5);
+    fb_rect(BAR_X + 2, BAR_Y + 2, inner, BAR_H - 4, 0);
+    if (filled)
+        fb_rect(BAR_X + 2, BAR_Y + 2, filled, BAR_H - 4, COL_GREEN);
+    g_bar_filled = filled;
+    fb_progress_pct_frame(pct);
+}
+
+/* Incremental update while a test runs: paint only the slice that just
+ * appeared. Repainting the whole bar on every percent would cost more VRAM
+ * writes than the memory test it is reporting on.
+ *
+ * A backwards step means a new test began without going through
+ * fb_progress_full, so fall back to painting everything -- the label
+ * especially, which used to be drawn ONLY on that backwards step and so was
+ * missing for every test whose bar started from an already-empty bar. */
+void fb_progress(const char *label, u32 pct)
+{
+    if (!fb_progress_enabled())
+        return;
+    if (pct > 100)
+        pct = 100;
+    u32 inner = BAR_W - 4;
+    u32 filled = (inner * pct) / 100;
+
+    if (filled < g_bar_filled) {
+        fb_progress_full(label, pct);
+        return;
+    }
+    if (filled > g_bar_filled)
+        fb_rect(BAR_X + 2 + g_bar_filled, BAR_Y + 2,
+                filled - g_bar_filled, BAR_H - 4, COL_GREEN);
+    g_bar_filled = filled;
+    fb_progress_pct_frame(pct);
 }
 
 /* after a full-screen repaint nothing of the bar is left on screen: forget

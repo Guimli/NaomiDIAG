@@ -89,7 +89,7 @@ void progress_begin(const char *label, u32 total)
         g_step = 1;
     g_next = g_step;
     if (!g_screen_off)
-        fb_progress(label, 0);
+        fb_progress_full(label, 0);   /* a new test always repaints its label */
 }
 
 void progress_tick(u32 done)

@@ -47,6 +47,7 @@ void pvr_display_init(void);            /* video_on + framebuffer reads on */
 /* progress bar at the bottom of the report; a no-op until the framebuffer
  * has been proven, so the test code may call it unconditionally */
 void fb_progress(const char *label, u32 pct);
+void fb_progress_full(const char *label, u32 pct);  /* label included */
 void fb_progress_invalidate(void);      /* call after a full-screen repaint */
 u32  fb_progress_enabled(void);
 void fb_fill_rows(u32 y0, u32 y1, u16 color);

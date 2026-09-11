@@ -158,8 +158,7 @@ static void screen_render(void)
         y += 20;
     }
     /* the repaint above cleared the whole screen: put the bar back whole */
-    fb_progress_invalidate();
-    fb_progress(progress_label(), progress_pct());
+    fb_progress_full(progress_label(), progress_pct());
 }
 
 /* "<base> pass k/10" assembled in OC-RAM: the ROM allows no writable .data,
