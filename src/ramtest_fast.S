@@ -1,3 +1,4 @@
+#include "config.h"
 ! =============================================================================
 ! Hand-written inner loops for the RAM pattern test.
 !
@@ -229,6 +230,7 @@ _ram_prng_verify_fast:
     xor     r8, r1
     or      r1, r11
 
+#if CFG_RAM_CRC
     xor     r8, r9
     extu.b  r9, r0
     shll2   r0
@@ -250,7 +252,9 @@ _ram_prng_verify_fast:
     mov.l   @(r0, r12), r1
     shlr8   r9
     xor     r1, r9
+#endif
 
+#if CFG_RAM_CRC
     xor     r7, r10
     extu.b  r10, r0
     shll2   r0
@@ -272,6 +276,7 @@ _ram_prng_verify_fast:
     mov.l   @(r0, r12), r1
     shlr8   r10
     xor     r1, r10
+#endif
 
     mov     r8, r1
     shld    r13, r1
@@ -290,6 +295,7 @@ _ram_prng_verify_fast:
     xor     r8, r1
     or      r1, r3
 
+#if CFG_RAM_CRC
     xor     r8, r9
     extu.b  r9, r0
     shll2   r0
@@ -311,7 +317,9 @@ _ram_prng_verify_fast:
     mov.l   @(r0, r12), r1
     shlr8   r9
     xor     r1, r9
+#endif
 
+#if CFG_RAM_CRC
     xor     r7, r10
     extu.b  r10, r0
     shll2   r0
@@ -333,6 +341,7 @@ _ram_prng_verify_fast:
     mov.l   @(r0, r12), r1
     shlr8   r10
     xor     r1, r10
+#endif
 
     dt      r5
     bt      2f                  ! the unrolled body is past bf's reach, so

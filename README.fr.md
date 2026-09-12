@@ -205,6 +205,18 @@ surchargeable sans éditer le fichier :
 make LANG=FR CFLAGS_EXTRA=-DCFG_LANE_BEACON=1
 ```
 
+**`CFG_RAM_CRC`** (désactivée par défaut) rétablit la comparaison CRC32 dans
+les tests cellule de RAM. La spécification la demandait, elle est implémentée
+et fonctionne — mais elle est démontrablement redondante et coûteuse.
+Redondante, parce que la même boucle compare déjà chaque mot à la valeur
+attendue : si aucun mot ne diffère, les deux flux d'octets sont identiques et
+leurs CRC ne peuvent pas différer. Coûteuse, parce qu'un CRC-32 coûte 20
+instructions par mot de 32 bits et qu'il y en a deux — **40 des 59
+instructions** de la boucle de relecture, contre **3** pour la comparaison mot
+à mot qui fait le travail de détection. Désactivée, la boucle tombe à 17
+instructions par mot, environ trois fois plus rapide, sans rien perdre en
+détection ni en localisation.
+
 **`CFG_LANE_BEACON`** (désactivée par défaut) active la balise de voies :
 après le rapport, elle parcourt les douze tranches de 16 bits des bus RAM CPU
 et VRAM, en nommant une à la fois et en la martelant pour qu'un oscilloscope

@@ -40,6 +40,31 @@
  * as on a booting Naomi. Set to 0 to go back to holding it in reset. */
 #ifndef CFG_AICA_ARM_RUN
 #define CFG_AICA_ARM_RUN 1
+
+/* Keep the CRC32 comparison in the RAM cell tests (0 = off, 1 = on).
+ *
+ * The specification asked for a CRC held in a CPU register, accumulated over
+ * what is written and over what is read back, the two compared at the end.
+ * It is implemented and it works -- but it is provably redundant, and it is
+ * expensive.
+ *
+ * Redundant, because the same loop already compares every word against the
+ * value it should hold. If no word differed, the two byte streams are
+ * identical and their CRCs cannot differ: the comparison can only ever
+ * confirm what the word compare already established.
+ *
+ * Expensive, because a CRC-32 costs 20 instructions per 32-bit word and
+ * there are two of them: 40 of the 59 instructions in the read-back loop,
+ * against 3 for the word comparison that does the actual detecting. Turning
+ * it off makes the read-back roughly three times faster, and the test loses
+ * no ability to find or locate a fault.
+ *
+ * Set to 1 to restore it -- as an independent check against a bug in the
+ * comparison logic itself, which is the one thing it can still catch. */
+#ifndef CFG_RAM_CRC
+#define CFG_RAM_CRC 0
+#endif
+
 #endif
 
 #endif

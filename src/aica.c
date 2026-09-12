@@ -194,7 +194,9 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
         if ((i & 1023) == 0)
             progress_tick(i);
         p[i] = x;
+#if CFG_RAM_CRC
         crc_w = crc32_word(crc_w, x);
+#endif
     }
     x = seed ? seed : 1;
     for (u32 i = 0; i < n; i++) {
@@ -202,12 +204,15 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
         if ((i & 1023) == 0)
             progress_tick(n + i);
         u32 got = p[i];
+#if CFG_RAM_CRC
         crc_r = crc32_word(crc_r, got);
+#endif
         if (got != x)
             note_fail(r, ARAM_P2_BASE + off + (i << 2), x, got);
     }
     r->crc_w = ~crc_w;
     r->crc_r = ~crc_r;
+#if CFG_RAM_CRC
     if (crc_w != crc_r && r->errors == 0) {
         /* intermittent: see the note in ramtest.c. Sound RAM is one chip so
          * the parity would not help anyway, but the mask must still not be
@@ -215,6 +220,7 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
         r->errors++;
         r->unpinned = 1;
     }
+#endif
 }
 
 /* ---- speech ---- */

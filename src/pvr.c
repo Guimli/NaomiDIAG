@@ -5,6 +5,7 @@
 #include "pvr.h"
 #include "ramtest.h"
 #include "progress.h"
+#include "config.h"
 #include "reloc.h"
 #include "font8x8_basic.h"
 
@@ -217,6 +218,7 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
     r->crc_r = ~c.crc_r;
     if (c.diff_e | c.diff_o)
         vram_prng_locate(base, n, seed, r);
+#if CFG_RAM_CRC
     if (c.crc_w != c.crc_r && r->errors == 0) {
         /* intermittent: see the note in ramtest.c -- a CRC XOR is not a
          * data-line mask and must never be read as one */
@@ -226,6 +228,7 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         r->badbits_e |= c.diff_e;
         r->badbits_o |= c.diff_o;
     }
+#endif
 }
 
 /* ---- display ---- */

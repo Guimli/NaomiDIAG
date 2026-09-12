@@ -586,8 +586,10 @@ static u32 test_sdram_cells(void)
     phase_begin(S_P_SDRAM, 3, S_PH_PRNG, words);
     ram_test_prng(SDRAM_P2_BASE, len, 0xDEADBEEF ^ 0x9E3779B9u, &res);
     progress_end();
+#if CFG_RAM_CRC
     scif_puts(" crc=");
     scif_puthex(res.crc_r);
+#endif
     scif_puts(res.errors ? " ERR\n" : " ok\n");
 
     t_status st = res.errors ? T_FAIL : T_OK;
@@ -645,8 +647,10 @@ static u32 test_aram(void)
     phase_begin(S_P_ARAM, 3, S_PH_PRNG, words);
     aram_test_prng(0, len, 0xC0FFEE42 ^ 0x9E3779B9u, &res);
     progress_end();
+#if CFG_RAM_CRC
     scif_puts(" crc=");
     scif_puthex(res.crc_r);
+#endif
     scif_puts(res.errors ? " ERR\n" : " ok\n");
 
     /* a G2 bus that never drains aborts the write loops: the cell results
@@ -718,8 +722,10 @@ static void test_vram_region(const char *name, u32 base, u32 size,
     phase_begin(S_P_VRAM, 3, S_PH_PRNG, words);
     vram_test_prng(base, len, 0x7E0CBEEF ^ 0x9E3779B9u ^ base, &res);
     progress_end();
+#if CFG_RAM_CRC
     scif_puts(" crc=");
     scif_puthex(res.crc_r);
+#endif
     scif_puts(res.errors ? " ERR\n" : " ok\n");
 
     /* this test scribbles over the framebuffer: repaint once it is done so

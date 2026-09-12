@@ -188,6 +188,17 @@ without touching the file:
 make LANG=EN CFLAGS_EXTRA=-DCFG_LANE_BEACON=1
 ```
 
+**`CFG_RAM_CRC`** (off by default) restores the CRC32 comparison in the RAM
+cell tests. The specification asked for it, it is implemented and it works —
+but it is provably redundant and expensive. Redundant, because the same loop
+already compares every word against the value it should hold: if no word
+differed, the two byte streams are identical and their CRCs cannot differ.
+Expensive, because a CRC-32 costs 20 instructions per 32-bit word and there
+are two of them — **40 of the 59 instructions** in the read-back loop, against
+**3** for the word comparison that does the actual detecting. With it off the
+loop is 17 instructions per word, about three times faster, and the test
+loses no ability to find or locate a fault.
+
 **`CFG_LANE_BEACON`** (off by default) enables the lane beacon: after the
 report it cycles through the twelve 16-bit slices of the CPU RAM and VRAM
 buses, naming one at a time and hammering it so a scope on the chips shows

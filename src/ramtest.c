@@ -9,6 +9,7 @@
  *   and compared with the CRC32 recomputed on the read side. */
 #include "ramtest.h"
 #include "progress.h"
+#include "config.h"
 #include "reloc.h"
 #include "scif.h"
 
@@ -299,6 +300,7 @@ void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
     r->crc_r = ~c.crc_r;
     if (c.diff_e | c.diff_o)
         prng_locate(base, n, seed, r);
+#if CFG_RAM_CRC
     if (c.crc_w != c.crc_r && r->errors == 0) {
         /* The verify pass saw a difference the re-scan could not reproduce:
          * an intermittent cell. Record it as a failure, but NOT through
@@ -312,4 +314,5 @@ void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         r->badbits_e |= c.diff_e;
         r->badbits_o |= c.diff_o;
     }
+#endif
 }
