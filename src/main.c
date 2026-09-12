@@ -1462,13 +1462,14 @@ void cmain(void)
     test_naomi2_ram();
 
     /* peripheral stage: backup SRAM (non-destructive), RTC, DIMM, MIE */
-    test_sram_rtc();
-    test_dimm();
-    /* From here on the tests answer yes or no -- Maple, the EEPROMs, the
-     * cartridge -- and have nothing for a percentage to count. The bar goes,
-     * and the report takes the rows it occupied. */
+    /* From here on nothing measures anything: the NVRAM, the RTC, the DIMM
+     * probe, Maple, the EEPROMs and the cartridge all answer yes or no. A bar
+     * left up would sit at whatever the last memory test put it, which says
+     * less than no bar at all -- so it goes, and the report takes its rows. */
     progress_retire();
 
+    test_sram_rtc();
+    test_dimm();
     test_maple_mie(usable);
     test_settings_eeprom();
     test_serial_eeprom();
