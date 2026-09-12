@@ -104,7 +104,13 @@ In order:
 15. **Cartridge content** — identifies the game against an embedded
     database of every known Naomi/Naomi 2 cartridge (192 games, 2298 ICs)
     and verifies each ROM chip by SHA-1, reporting the failing IC by its
-    silkscreen name.
+    silkscreen name. Identification streams the first chip and snapshots the
+    SHA-1 at each known first-ROM size, so a cart is named without hashing
+    all of it. Chips are hashed **raw**, decryption not applied, so the
+    digests are the ones in the MAME dumps. A cart that matches nothing is
+    reported as *unknown content* rather than as faulty — it may simply be a
+    dump this database does not carry — and the data-line test below still
+    runs, because a dead line is one reason a known cart fails to match.
 16. **Cartridge ROM set completeness** — once the game is identified, the
     **whole set of chips that game needs** is checked: every mask ROM in the
     database entry is probed and the result is stated affirmatively

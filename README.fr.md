@@ -112,6 +112,15 @@ Dans l'ordre :
 15. **Contenu cartouche** — identifie le jeu dans une base embarquée de tous
     les jeux cartouche Naomi/Naomi 2 connus (192 jeux, 2298 IC) et vérifie
     chaque puce ROM par SHA-1, en nommant l'IC fautive par sa sérigraphie.
+    L'identification lit la première puce en flux et prend un instantané du
+    SHA-1 à chaque taille de première ROM connue : la cartouche est nommée
+    sans avoir à la hacher entièrement. Les puces sont hachées **en brut**,
+    sans déchiffrement, de sorte que les empreintes sont celles des dumps
+    MAME. Une cartouche qui ne correspond à rien est signalée *contenu
+    inconnu* et non défectueuse — ce peut être simplement un dump absent de
+    cette base — et le test des lignes de données ci-dessous s'exécute quand
+    même, une ligne morte étant l'une des raisons pour lesquelles une
+    cartouche connue ne correspond plus.
 16. **Complétude du jeu de ROM cartouche** — une fois le jeu identifié,
     **l'ensemble des puces nécessaires à ce jeu** est vérifié : chaque mask
     ROM de la fiche de la base est sondée et le résultat est affirmé
