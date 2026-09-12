@@ -110,6 +110,7 @@
 
 /* component group names (report_comps) */
 #define S_CG_CPU            "RAM CPU"
+#define S_ARAM_LINES        "  lignes de donnees fautives (D0-D15) : "
 #define S_CG_SOUND          "RAM son"
 #define S_CG_SRAM           "NVRAM"
 
@@ -256,6 +257,7 @@
 #define S_DEFECTIVE         " DEFECTIVE\n"
 
 #define S_CG_CPU            "CPU RAM"
+#define S_ARAM_LINES        "  bad data lines (D0-D15): "
 #define S_CG_SOUND          "SOUND RAM"
 #define S_CG_SRAM           "SRAM"
 

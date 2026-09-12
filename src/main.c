@@ -269,6 +269,20 @@ static void log_result(const char *name, u32 clip, t_status st, u32 detail,
     log_result_q(name, clip, st, detail, comps, 0);
 }
 
+/* Sound RAM is ONE 16-bit chip behind the AICA, not four chips on a 64-bit
+ * bus like the CPU RAM. A 32-bit access from the SH-4 crosses G2 as one
+ * transfer and the AICA splits it into two 16-bit cycles on its own RAM bus,
+ * so every physical data line carries both halves of the word. A single
+ * stuck line therefore shows up twice in a 32-bit mask -- at bit n and at
+ * bit n+16 -- which reads as two faults where the board has one. Folding the
+ * halves together names the line that actually exists. */
+static void report_badbits_aram(u32 badbits)
+{
+    scif_puts(S_ARAM_LINES);
+    scif_puthex((badbits | (badbits >> 16)) & 0xFFFFu);
+    scif_puts("\n");
+}
+
 /* ------------------------------------------------------------------ */
 static void report_badbits(u32 badbits)
 {
@@ -616,7 +630,7 @@ static u32 test_aram(void)
     log_result_q(S_L_ARAM_DBUS, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
                  IC(aram_comps), 1);
     if (bad) {
-        report_badbits(bad);
+        report_badbits_aram(bad);
         report_comps(S_CG_SOUND, comps, IC(aram_comps));
     }
 
@@ -668,7 +682,7 @@ static u32 test_aram(void)
                ram_comp_mask(&res), IC(aram_comps));
     if (res.errors) {
         report_intermittent(&res);
-        report_badbits(res.badbits);
+        report_badbits_aram(res.badbits);
         report_comps(S_CG_SOUND, ram_comp_mask(&res), IC(aram_comps));
         report_fails(&res);
         return 0;
