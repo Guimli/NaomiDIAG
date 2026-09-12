@@ -967,6 +967,26 @@ static void test_x76(void)
  * checkpoints over the first IC, then verify every IC of the matched
  * game against the embedded database (per-IC SHA1s from MAME). */
 
+/* "<what> <ic>" for the bar, in its own buffer: each chip opens a new bar, so
+ * the previous label is finished with by the time this is rewritten. */
+static char g_cartbuf[48];
+
+static const char *cart_label(const char *what, const char *icname)
+{
+    u32 i = 0;
+    while (what[i] && i < 24) {
+        g_cartbuf[i] = what[i];
+        i++;
+    }
+    if (icname) {
+        g_cartbuf[i++] = ' ';
+        for (u32 j = 0; icname[j] && i < 44; j++)
+            g_cartbuf[i++] = icname[j];
+    }
+    g_cartbuf[i] = 0;
+    return g_cartbuf;
+}
+
 static u32 sha1_ic(u32 offset, u32 size, u8 out[20])
 {
     sha1_ctx c;
@@ -980,9 +1000,11 @@ static u32 sha1_ic(u32 offset, u32 size, u8 out[20])
             buf[i + 1] = (u8)(w >> 8);
         }
         sha1_update(&c, buf, sizeof buf);
+        progress_tick(done);
         if ((done & 0x3FFFFF) == 0)
             scif_putc('.');
     }
+    progress_end();
     sha1_final(&c, out);
     return 0;
 }
@@ -1028,7 +1050,9 @@ static void test_cart_pins(void)
 #else
     const u32 span = 0x00100000;        /* 1 MB sample */
 #endif
+    progress_begin(S_P_CART_PINS, span);
     cart_pin_scan(0, span, &st);
+    progress_end();
 
     scif_puts(S_PINS_HDR);
     scif_puts(S_PINS_SAMPLED);
@@ -1086,9 +1110,11 @@ static void test_cartridge(void)
     cart_seek(0);
     u32 done = 0;
     scif_puts(S_IDENTIFYING);
+    progress_begin(S_P_CART_ID, cartdb_first_sizes[CARTDB_NFIRST - 1]);
     for (u32 s = 0; s < CARTDB_NFIRST && game == 0xFFFFFFFF; s++) {
         u32 target = cartdb_first_sizes[s];
         while (done < target) {
+            progress_tick(done);
             for (u32 i = 0; i < sizeof buf; i += 2) {
                 u16 w = CART_ROM_DATA;
                 buf[i] = (u8)w;
@@ -1116,6 +1142,7 @@ static void test_cartridge(void)
             }
         }
     }
+    progress_end();
     scif_puts("\n");
 
     if (game == 0xFFFFFFFF) {
@@ -1168,6 +1195,8 @@ static void test_cartridge(void)
             continue;
         }
         scif_putc(' ');
+        progress_begin(cart_label(S_P_CART_IC, cartdb_ic_name[idx]),
+                       cartdb_ic_size[idx]);
         sha1_ic(cartdb_ic_off[idx], cartdb_ic_size[idx], digest);
         u32 ok = sha1_eq(digest, cartdb_sha1[idx]);
         scif_puts(ok ? S_GOOD : S_BAD);
@@ -1462,10 +1491,16 @@ void cmain(void)
     test_naomi2_ram();
 
     /* peripheral stage: backup SRAM (non-destructive), RTC, DIMM, MIE */
+    /* The cartridge test reads tens of megabytes over the G1 bus and needs
+     * the bar, so it runs before the bar is retired rather than at the end
+     * of the suite where it used to sit. */
+    test_x76();
+    test_cartridge();
+
     /* From here on nothing measures anything: the NVRAM, the RTC, the DIMM
-     * probe, Maple, the EEPROMs and the cartridge all answer yes or no. A bar
-     * left up would sit at whatever the last memory test put it, which says
-     * less than no bar at all -- so it goes, and the report takes its rows. */
+     * probe, Maple and the EEPROMs all answer yes or no. A bar left up would
+     * sit at whatever the last test put it, which says less than no bar at
+     * all -- so it goes, and the report takes the rows it occupied. */
     progress_retire();
 
     test_sram_rtc();
@@ -1473,8 +1508,6 @@ void cmain(void)
     test_maple_mie(usable);
     test_settings_eeprom();
     test_serial_eeprom();
-    test_x76();
-    test_cartridge();
 
     /* The loops have been executing out of CPU RAM on a board whose CPU RAM
      * is what we just spent the whole suite testing. A cell that passed the

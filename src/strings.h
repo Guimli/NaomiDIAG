@@ -70,6 +70,9 @@
 #define S_P_VRAM            "VRAM"
 #define S_P_SDRAM           "RAM CPU"
 #define S_P_PASS            " passe "
+#define S_P_CART_ID         "Identification cartouche"
+#define S_P_CART_IC         "Cartouche"
+#define S_P_CART_PINS       "Lignes cartouche"
 
 #define S_L_ELAN            "RAM Elan (Naomi 2)"
 #define S_L_BACKSRAM        "NVRAM IC29 sauvegarde (non destructif)"
@@ -215,6 +218,9 @@
 #define S_P_VRAM            "VRAM"
 #define S_P_SDRAM           "CPU RAM"
 #define S_P_PASS            " pass "
+#define S_P_CART_ID         "Cartridge ID"
+#define S_P_CART_IC         "Cartridge"
+#define S_P_CART_PINS       "Cartridge lines"
 
 #define S_L_ELAN            "Elan RAM (Naomi 2)"
 #define S_L_BACKSRAM        "Backup NVRAM IC29 (non-destructive)"

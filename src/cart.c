@@ -1,4 +1,5 @@
 #include "cart.h"
+#include "progress.h"
 
 /* G1 bus timing, with the values the original BIOS programs before it
  * touches the ROM board (0x5F7490/7494 <- 0x511, 0x5F74A0 <- 5). The exact
@@ -67,6 +68,7 @@ void cart_pin_scan(u32 offset, u32 len, cart_pin_stats *st)
 
     for (u32 done = 0; done + sizeof buf <= len; done += sizeof buf) {
         u32 addr = offset + done;
+        progress_tick(done);
 
         cart_seek(addr);                /* first read pass */
         for (u32 i = 0; i < 256; i++)
