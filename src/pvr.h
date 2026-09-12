@@ -59,8 +59,11 @@ void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax);
 /* column where the OK/FAIL status is drawn; labels are clipped before it */
 #define FB_STATUS_X  (FB_W - 16 * 6)
 
-/* the report stops here so it never runs into the progress bar */
-#define FB_REPORT_YMAX  (FB_H - 70)
+/* Bottom of the report area. Not a constant: retiring the progress bar gives
+ * its rows back to the report, which is how the last results fit on a screen
+ * that is one line short of the suite. */
+u32  fb_report_ymax(void);
+void fb_progress_retire(void);
 
 #define RGB565(r, g, b) (u16)(((r) & 0x1F) << 11 | ((g) & 0x3F) << 5 | ((b) & 0x1F))
 #define COL_WHITE   RGB565(31, 63, 31)

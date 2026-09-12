@@ -11,11 +11,11 @@ notif = emu.add_machine_frame_notifier(function()
     if manager.machine.time.seconds > 115 and not shown then
         shown = true
         local n, last = 0, -1
-        for k = 0, 18 do                    -- renderer allows y = 48+20k < 410
+        for k = 0, 22 do                    -- report may now reach the bottom
             local y = 48 + k*20
             if rowhas(y + 4) or rowhas(y + 10) then n = n + 1; last = k end
         end
-        print(string.format("[rows] occupees=%d  derniere=%d  capacite=19", n, last))
+        print(string.format("[rows] occupees=%d  derniere=%d  capacite variable", n, last))
     end
 end)
 print("[report_rows] armed")

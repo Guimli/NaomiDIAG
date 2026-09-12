@@ -137,7 +137,7 @@ static void screen_render(void)
     fb_clear(0);
     fb_text(112, 8, "NAOMI DIAG ROM v" DIAG_VERSION, COL_TITLE, FB_W);
     u32 y = 48;
-    for (u32 i = 0; i < g_log_n && y < FB_REPORT_YMAX; i++) {
+    for (u32 i = 0; i < g_log_n && y < fb_report_ymax(); i++) {
         const log_entry *e = &g_log[i];
         /* The screen holds fewer lines than the suite produces results, so
          * the bus tests give up their line while they pass. They still run,
@@ -553,7 +553,7 @@ static u32 test_sdram_cells(void)
     }
 
     bad = ram_test_addrbus(SDRAM_P2_BASE, size);
-    log_result(S_L_SDRAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0);
+    log_result_q(S_L_SDRAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1);
     if (bad) {
         scif_puts("  bad address bits mask: ");
         scif_puthex(bad);
@@ -1464,6 +1464,11 @@ void cmain(void)
     /* peripheral stage: backup SRAM (non-destructive), RTC, DIMM, MIE */
     test_sram_rtc();
     test_dimm();
+    /* From here on the tests answer yes or no -- Maple, the EEPROMs, the
+     * cartridge -- and have nothing for a percentage to count. The bar goes,
+     * and the report takes the rows it occupied. */
+    progress_retire();
+
     test_maple_mie(usable);
     test_settings_eeprom();
     test_serial_eeprom();

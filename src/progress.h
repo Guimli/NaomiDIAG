@@ -61,6 +61,11 @@ void progress_begin(const char *label, u32 total);
 void progress_tick(u32 done);
 void progress_end(void);
 
+/* No more percentages from here on: wipe the bar and give the report its
+ * rows. Irreversible, by design -- the tests that follow have nothing to
+ * measure. */
+void progress_retire(void);
+
 /* Suppress the on-screen bar while a test writes over the framebuffer's own
  * VRAM: drawing the bar there would corrupt the very data under test and
  * manufacture failures. Serial marks and the border colour keep working. */

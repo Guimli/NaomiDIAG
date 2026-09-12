@@ -346,7 +346,8 @@ void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax)
 #define BAR_W   (FB_W - 32)
 #define BAR_H   20
 
-static u32 g_bar_filled;                 /* pixels currently painted green */
+static u32 g_bar_filled;
+static u32 g_bar_retired;                /* bar gone: its rows are the report's */                 /* pixels currently painted green */
 
 void fb_fill_rows(u32 y0, u32 y1, u16 color)
 {
@@ -391,7 +392,7 @@ static void fb_progress_pct_frame(u32 pct)
  * nothing on screen to build on -- a test starting, or a full repaint. */
 void fb_progress_full(const char *label, u32 pct)
 {
-    if (!fb_progress_enabled())
+    if (!fb_progress_enabled() || g_bar_retired)
         return;
     if (pct > 100)
         pct = 100;
@@ -417,7 +418,7 @@ void fb_progress_full(const char *label, u32 pct)
  * missing for every test whose bar started from an already-empty bar. */
 void fb_progress(const char *label, u32 pct)
 {
-    if (!fb_progress_enabled())
+    if (!fb_progress_enabled() || g_bar_retired)
         return;
     if (pct > 100)
         pct = 100;
@@ -433,6 +434,28 @@ void fb_progress(const char *label, u32 pct)
                 filled - g_bar_filled, BAR_H - 4, COL_GREEN);
     g_bar_filled = filled;
     fb_progress_pct_frame(pct);
+}
+
+/* Retire the bar for good and hand its rows to the report.
+ *
+ * The tests that follow the memory suite -- the Maple bus, the EEPROMs, the
+ * cartridge -- are single questions with a yes or no answer: there is nothing
+ * for a percentage to count. Their bar would sit at whatever the last memory
+ * test left it, which is worse than no bar, and the screen is short of lines
+ * for the results themselves. So the bar is wiped and the report is allowed
+ * down into the space it occupied. */
+void fb_progress_retire(void)
+{
+    if (fb_progress_enabled())
+        fb_fill_rows(BAR_Y - 24, FB_H, 0);
+    g_bar_retired = 1;
+}
+
+/* Bottom of the report area: just above the bar, or near the bottom of the
+ * screen once the bar has been retired. */
+u32 fb_report_ymax(void)
+{
+    return g_bar_retired ? (FB_H - 8) : (BAR_Y - 30);
 }
 
 /* after a full-screen repaint nothing of the bar is left on screen: forget

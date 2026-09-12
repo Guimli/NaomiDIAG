@@ -113,6 +113,12 @@ void progress_tick(u32 done)
     }
 }
 
+void progress_retire(void)
+{
+    g_active = 0;
+    fb_progress_retire();
+}
+
 void progress_end(void)
 {
     if (!g_active)
