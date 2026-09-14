@@ -12,7 +12,8 @@ PCB 837-13544 dans l'en-tête MAME.
 | SH-4 (CPU) | — | **IC1** | dissipateur sans ventilateur |
 | GPU (HOLLY) | — | **IC15** | dissipateur + ventilateur |
 | WORK (RAM CPU) | 0xAC000000, 32 Mo | **IC9, IC10, IC11S, IC12S** | 4× HM5264165 (64 Mbit) |
-| VRAM GPU | 0xA5000000 / 0xA5800000, 2× 8 Mo | **IC16, IC18, IC20, IC22** (dessus) et **IC17S, IC19S, IC21S, IC23S** (dessous) | 8× µPD4516161 (16 Mbit) ; quel groupe = TEX0 et lequel = TEX1 : **inconnu** |
+| VRAM TEX0 | 0xA5000000, 8 Mo | **IC16, IC18, IC20, IC22** (dessus) | 4× µPD4516161 (16 Mbit) |
+| VRAM TEX1 | 0xA5800000, 8 Mo | **IC17S, IC19S, IC21S, IC23S** (dessous) | 4× µPD4516161 (16 Mbit) |
 | ROM BIOS | 0xA0000000, 2 Mo | **IC27** | 27C160 |
 | Puce son (AICA) | 0xA0700000 | **IC33** | |
 | RAM son | 0xA0800000, 8 Mo | **IC35** | |
@@ -80,8 +81,24 @@ le code BIOS (pool 0xA00251E6 : 0x33333333/0xCCCCCCCC, 0x000F/0x00F0/
 Tout ce qui figure dans le tableau ci-dessus a été relevé sur la carte. Il
 reste deux points, et aucun ne se devine :
 
-1. **Quel groupe de quatre RAM GPU répond à TEX0** (0xA5000000) et lequel à
-   TEX1 (0xA5800000). Le partage recto / verso est plausible, pas établi.
+1. ~~Quel groupe de quatre RAM GPU répond à TEX0~~ — **résolu**. Le RAM TEST
+   du BIOS d'origine porte à l'offset ROM `0x5C484` une table donnant, pour
+   chaque région, un compteur suivi des numéros d'IC qu'il affiche, dans
+   l'ordre des noms de régions situés à `0x59548` :
+
+   | Région | Puces |
+   |---|---|
+   | BACK | IC29 |
+   | AICA | IC35 |
+   | WORK | IC9, IC10, IC11, IC12 |
+   | TEX0 | IC16, IC18, IC20, IC22 |
+   | TEX1 | IC17, IC19, IC21, IC23 |
+
+   Les trois premières lignes sont confirmées indépendamment sur carte réelle,
+   ce qui est précisément ce qui rend les deux dernières fiables : lire cette
+   table seule est ce qui avait produit la carte fausse, quand la région de
+   chaque entrée était déduite de l'ordre d'affichage au lieu de la structure
+   de la table elle-même.
 2. **L'ordre des voies** à l'intérieur de chaque groupe de quatre — en
    partie seulement désormais. **IC10 = position 2 (D16-D31, mot pair) est
    validé physiquement** : une carte que NaomiDiag a désignée IC10 a été

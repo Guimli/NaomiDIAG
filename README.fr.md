@@ -273,11 +273,14 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   déduisait de l'ordre dans lequel le RAM TEST du BIOS d'origine affiche ses
   numéros ; cette déduction s'est trompée trois fois — dont une inversion
   complète des groupes RAM CPU et RAM GPU — et plus rien ne repose dessus.
-- Deux points restent réellement inconnus, et la ROM affiche un numéro de
-  position plutôt que de les deviner :
-  - quel groupe de quatre RAM GPU répond à **TEX0** (`0xA5000000`) et lequel
-    à **TEX1** (`0xA5800000`). Le partage recto / verso est plausible, pas
-    établi ;
+- Le partage de la VRAM est tranché : **TEX0 = IC16/18/20/22**, les quatre
+  puces du dessus, et **TEX1 = IC17S/19S/21S/23S**, les quatre du dessous. Il
+  provient d'une table du RAM TEST du BIOS d'origine, à l'offset ROM
+  `0x5C484`, dont les trois premières entrées — IC29 pour la NVRAM, IC35 pour
+  la RAM son, IC9-12 pour la RAM CPU — sont confirmées indépendamment sur
+  carte réelle.
+- Un point n'est toujours pas mesuré, et la ROM y affiche un numéro de
+  position plutôt que de deviner :
   - l'**ordre des voies** à l'intérieur de chaque groupe de quatre, mais
     plus entièrement. Une carte que cette ROM a désignée **IC10** a été
     réparée en ne remplaçant qu'IC10, ce qui confirme IC10 sur D16-D31 du mot

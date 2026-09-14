@@ -93,28 +93,39 @@ static const comp_map bios_comps[4] = {
     { CLIP_IC_27, "IC27" }, { CLIP_IC_27, "IC27" },
     { CLIP_IC_27, "IC27" }, { CLIP_IC_27, "IC27" },
 };
-/* The GPU carries EIGHT RAM chips -- IC16, IC18, IC20, IC22 on top and
- * IC17S, IC19S, IC21S, IC23S underneath -- forming two 64-bit banks. Which
- * bank answers at TEX0 and which at TEX1 is not known, so neither test names
- * a chip: it reports the position within the bank, which is exact, and the
- * operator maps it once the grouping is established. Naming one of eight on a
- * guess is how this table was wrong before. */
-#define tex0_comps  0
-/* TEX1 is FOUR chips, not one, and their designators are unknown.
+/* TEX0 and TEX1, read out of the original BIOS rather than guessed.
  *
- * The board carries eight 16 Mbit VRAM chips (1M x 16, uPD4516161) around the
- * graphics chip -- the one under the heatsink WITH the fan -- and four 64 Mbit
- * chips (1M x 16 x 4 banks, HM5264165) around the SH-4, which has a heatsink
- * and no fan. The arithmetic is what identifies them, and it rests on sizes
- * this ROM measures for itself: 4 x 8 MB is the 32 MB of main RAM we detect,
- * and 8 x 2 MB is the 16 MB of VRAM we test as TEX0 plus TEX1. Eight chips of
- * 16 bits is two 64-bit banks, so each of TEX0 and TEX1 is four of them.
+ * The BIOS RAM TEST carries a table at ROM offset 0x5C484: for each region,
+ * a count followed by the IC numbers it prints. In the order of its region
+ * names at 0x59548 -- BACK, AICA, WORK, TEX0, TEX1 -- it reads
  *
- * So this table used to be wrong twice over: it named one chip where there
- * are four, and the name it used belongs to the sound RAM. Reporting the
- * region with position numbers and no designators is the honest state until
- * the four are read off a board. */
-#define tex1_comps  0
+ *   BACK 1 -> IC29        AICA 1 -> IC35
+ *   WORK 4 -> IC9,10,11,12
+ *   TEX0 4 -> IC16,18,20,22        TEX1 4 -> IC17,19,21,23
+ *
+ * The first three are independently confirmed on a real board: IC29 is the
+ * NVRAM, IC35 the sound RAM, IC9-12 the CPU RAM, and IC10 was proven to be
+ * position 2 by a repair. Three matches out of three is what makes the last
+ * two trustworthy -- reading this table by itself is exactly what produced
+ * the wrong map before, when the region each entry belonged to was inferred
+ * from display order instead of from the table's own structure.
+ *
+ * TEX0 is the four chips on top of the board, TEX1 the four underneath. */
+static const comp_map tex0_comps[4] = {
+    { CLIP_IC_16, "IC16" },         /* D0-D15,  even word */
+    { CLIP_IC_18, "IC18" },         /* D16-D31, even word */
+    { CLIP_IC_20, "IC20" },         /* D0-D15,  odd word  */
+    { CLIP_IC_22, "IC22" },         /* D16-D31, odd word  */
+};
+/* No spoken clips exist for these four: the voice falls back to the position
+ * number rather than announcing a chip it cannot name. */
+static const comp_map tex1_comps[4] = {
+    { CLIP_NONE, "IC17S" },
+    { CLIP_NONE, "IC19S" },
+    { CLIP_NONE, "IC21S" },
+    { CLIP_NONE, "IC23S" },
+};
+
 
 typedef struct {
     const char *name;               /* points into ROM */
@@ -231,6 +242,8 @@ static void say_entry(const log_entry *e)
         if (!(e->detail & (1u << i)))
             continue;
         u32 c = (e->comps && i < 4) ? e->comps[i].clip : CLIP_NUM_1 + i;
+        if (c == CLIP_NONE)
+            c = CLIP_NUM_1 + i;   /* no clip for this chip: say the position */
         if (c == spoken)
             continue;
         spoken = c;
@@ -438,7 +451,7 @@ static void sdram_setup(void)
  * the coverage it has.
  *
  * Which 8 KB block: the four CPU RAM chips are interleaved by data lane, not
- * by address range -- IC16/IC18 carry the even words, IC20/IC22 the odd ones,
+ * by address range -- IC9/IC10 carry the even words, IC11S/IC12S the odd ones,
  * sixteen bits of the sixty-four each. Every block therefore spans all four,
  * and no choice of address can dodge a chip that is dead across its range.
  * What moving the window does buy is immunity to a LOCALIZED fault, a bad row
@@ -764,10 +777,12 @@ static u32 test_vram(void)
     scif_puts(S_PVR_HDR);
     pvr_vram_enable();
     u32 tex0_ok = 1, tex1_ok = 1;
-    test_vram_region(S_L_VRAM_TEX0, VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
-                     tex0_comps, CLIP_VRAM, &tex0_ok);
-    test_vram_region(S_L_VRAM_TEX1, VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
-                     tex1_comps, CLIP_VRAM, &tex1_ok);
+    test_vram_region(g_ic_valid ? S_L_VRAM_TEX0_IC : S_L_VRAM_TEX0,
+                     VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
+                     IC(tex0_comps), CLIP_VRAM, &tex0_ok);
+    test_vram_region(g_ic_valid ? S_L_VRAM_TEX1_IC : S_L_VRAM_TEX1,
+                     VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
+                     IC(tex1_comps), CLIP_VRAM, &tex1_ok);
     return tex0_ok;                     /* the framebuffer lives in TEX0 */
 }
 

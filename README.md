@@ -254,11 +254,13 @@ under the DRC, so fault injection into it needs `-nodrc`.
   them from the order the original BIOS RAM TEST prints its numbers, which
   was wrong three times over — including having the CPU RAM and GPU RAM
   groups the wrong way round — so nothing rests on that inference any more.
-- Two things are still genuinely unknown, and the ROM says position numbers
-  rather than guessing at them:
-  - which group of four GPU RAM chips answers at **TEX0** (`0xA5000000`) and
-    which at **TEX1** (`0xA5800000`). The top/underside split is plausible,
-    not established;
+- The GPU RAM split is settled: **TEX0 is IC16/18/20/22**, the four chips on
+  top of the board, and **TEX1 is IC17S/19S/21S/23S**, the four underneath.
+  It comes from a table in the original BIOS RAM TEST at ROM offset `0x5C484`
+  whose first three entries — IC29 for the NVRAM, IC35 for the sound RAM,
+  IC9-12 for the CPU RAM — are independently confirmed on a real board.
+- One thing is still not measured, and the ROM says position numbers rather
+  than guessing:
   - the **lane→IC order** inside each group of four, though no longer
     entirely. A board this ROM reported as **IC10** was repaired by replacing
     IC10 alone, which confirms IC10 on D16-D31 of the even word and rules out
