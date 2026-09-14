@@ -293,6 +293,15 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
 - La lecture de l'EEPROM des réglages et le test JVS complet de la carte
   I/O nécessitent un upload de code Z80 dans le MIE (travail futur).
 
+## Carte DIMM
+
+Le protocole de mailbox entre la Naomi et une carte DIMM n'est pas documenté
+publiquement. Ce qui a été retrouvé dans le firmware de la carte elle-même —
+base de liaison, fenêtre mailbox vue du DIMM, format de réponse et signature
+du pilote mémoire — est consigné dans
+[`docs/DIMM_FIRMWARE.md`](docs/DIMM_FIRMWARE.md), avec ce qui manque encore
+et la voie qui ne fonctionne pas.
+
 ## Crédits
 
 Initié à partir du projet de BIOS Naomi minimal

@@ -273,6 +273,15 @@ under the DRC, so fault injection into it needs `-nodrc`.
 - The settings EEPROM read and full JVS I/O-board testing need a Z80 code
   upload into the MIE (future work).
 
+## DIMM board
+
+The mailbox protocol between the Naomi and a DIMM board is not publicly
+documented. What has been recovered from the board's own firmware — its load
+base, the mailbox window as the DIMM sees it, the response format and the
+memory driver's signature — is written up in
+[`docs/DIMM_FIRMWARE.md`](docs/DIMM_FIRMWARE.md), along with what is still
+missing and which approach does not work.
+
 ## Credits
 
 Bootstrapped from the [JinGasa](https://github.com/Tchan0/JinGasa) minimal
