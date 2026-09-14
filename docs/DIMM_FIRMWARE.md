@@ -57,6 +57,41 @@ _drv_fill_dimm (…)                                  entrée 0x0C085BE0
 appelés respectivement depuis 22, 23 et 2 endroits. Le firmware **sait donc
 écrire sa propre mémoire**.
 
+## Le répartiteur de commandes
+
+Trouvé, et il n'a pas la forme attendue : **il n'y a pas de grand `switch`**.
+
+**Lecture** (`0x0C085460`) — les quatre registres entrants `0xB4000014`,
+`18`, `1C`, `20` sont recopiés en 16 bits dans un tampon à `0x0C1242EC`.
+
+**Répartition** (`0x0C085340`) :
+
+```
+jsr  0x0C085460              ; lit les 4 mots
+r0 = (commande >> 13) & 3    ; deux bits seulement
+r1 = [0x0C1238AC + r0*4]     ; table de 4 gestionnaires
+if (r1) jsr @r1              ; appel avec le tampon
+jsr  0x0C085300              ; acquittement
+```
+
+La table est remplie à l'exécution par `0x0C0851C0`
+(`table[index] = gestionnaire`, avec contrôle de borne). Deux familles
+seulement sont inscrites dans ce firmware :
+
+| Famille | Gestionnaire | Action |
+|---|---|---|
+| 0 | `0x0C0854C0` | `msgQSend` de **8 octets** vers la file `0x0C113CF4` |
+| 1 | `0x0C089E80` | efface le bit 15, `msgQSend` de **2 octets** vers `0x0C1252C4` |
+| 2, 3 | — | non inscrites |
+
+Autrement dit, le premier niveau n'est qu'un **démultiplexage sur deux bits
+vers des files de messages VxWorks**. L'identifiant de commande proprement
+dit — les bits 9-14, masque `0x7E00` de libnaomi — est interprété par les
+**tâches qui consomment ces files**, pas par le répartiteur.
+
+**Sortie** (`0x0C0853A0`) : attente sur le bit 0 de `0xB4000025`, puis
+écriture des mots dans `0xB4000014`+.
+
 ## Ce qui reste
 
 **Le répartiteur de commandes entrantes n'est pas identifié.** Les 23
@@ -65,11 +100,15 @@ en sait ; rien n'établit qu'une commande émise par la Naomi y mène. Tant que
 ce point n'est pas tranché, un test en écriture de la mémoire DIMM depuis la
 Naomi reste hypothétique.
 
-Prochaine étape : partir de la boucle qui lit `0xB4000014`/`0xB4000028` et
-suivre le `switch` sur l'identifiant de commande jusqu'aux fonctions
-appelées. Les cibles d'appel se retrouvent de façon fiable en collectant les
-littéraux 32 bits chargés par `mov.l` puis consommés par un `jsr` — c'est la
-méthode qui a donné les entrées ci-dessus.
+Prochaine étape, désormais précise : trouver les **consommateurs** des deux
+files, par `msgQReceive` sur `0x0C113CF4` et `0x0C1252C4`. C'est là que
+l'identifiant de commande est décodé, et donc là que se saura si l'une des
+commandes mène à `_drv_write_dimm`.
+
+Les cibles d'appel se retrouvent de façon fiable en collectant les littéraux
+32 bits chargés par `mov.l` puis consommés par un `jsr` — c'est la méthode
+qui a donné toutes les entrées ci-dessus, après l'échec d'une détection par
+prologues.
 
 ## Voie fermée
 
