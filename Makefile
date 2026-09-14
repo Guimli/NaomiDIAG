@@ -38,7 +38,7 @@ LDFLAGS := -nostdlib -Wl,-T,linker.gen.ld -Wl,--build-id=none -Wl,-Map,$(ELF).ma
 
 OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.o src/ramtest_fast.o src/reloc.o \
         src/timer.o src/aica.o src/pvr.o src/periph.o src/dimm.o src/maple.o \
-        src/board.o src/sha1.o src/cart.o
+        src/input.o src/board.o src/sha1.o src/cart.o
 
 HDRS := src/config.h src/version.inc src/hw.h src/scif.h src/sdram.h src/ramtest.h src/timer.h src/aica.h \
         src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/sha1.h \
