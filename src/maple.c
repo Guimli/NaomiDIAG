@@ -124,3 +124,25 @@ u32 maple_eeprom_read(u32 port, u8 *out128)
     }
     return 1;
 }
+
+/* Read the JVS control state through the MIE: command 0x86 with subcommand
+ * 0x15, answered by 0x87 with subresponse 0x16 and 0x0E payload words.
+ *
+ * The protocol shape is documented (DragonMinded/netboot, docs/naomi.md);
+ * the BIT POSITIONS of TEST, SERVICE and the per-player buttons inside those
+ * words are NOT -- that document says outright that they were never mapped
+ * and that the way to find them is to print the response and press things.
+ * So this returns the raw words and the mapping is established by
+ * measurement, not by assumption. Returns 0 on success. */
+u32 maple_jvs_read(u32 port, u32 out[14])
+{
+    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    u32 pay = 0x00000015;
+    u32 hdr = maple_txn(port, 0x86, 1, &pay);
+
+    if ((hdr & 0xFF) != 0x87)
+        return 1;
+    for (u32 i = 0; i < 14; i++)
+        out[i] = rx[1 + i];
+    return 0;
+}

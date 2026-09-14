@@ -62,6 +62,10 @@ typedef uint32_t u32;
 
 #define SCFSR2_TEND 0x0040
 #define SCFSR2_TDFE 0x0020
+#define SCFSR2_RDF  0x0002      /* receive FIFO reached its trigger level */
+#define SCFSR2_DR   0x0001      /* data present but below the trigger     */
+#define SCFSR2_ER   0x0080      /* receive error: framing/parity          */
+#define SCFSR2_BRK  0x0010      /* break detected                         */
 
 /* ---- Memory map (P2 = uncached mirrors; mandatory while testing RAM) ---- */
 #define SDRAM_P2_BASE   0xAC000000u

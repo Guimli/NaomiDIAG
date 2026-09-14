@@ -8,4 +8,7 @@ void scif_puthex(u32 v);        /* 8 hex digits */
 void scif_putdec(u32 v);
 void scif_flush(void);
 
+/* One received byte, or -1 if none is waiting. Never blocks. */
+int  scif_getc(void);
+
 #endif

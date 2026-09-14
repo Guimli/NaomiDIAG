@@ -1487,6 +1487,52 @@ static void lane_beacon(void)
 }
 #endif  /* CFG_LANE_BEACON */
 
+
+#if CFG_JVS_MAP
+/* Print the MIE's control words whenever any bit changes, and say which bits
+ * moved. Press TEST, press START, read the answer off the serial console --
+ * this is how the mapping gets established, since no public source carries
+ * it. Runs after the report, forever. */
+static void jvs_map_aid(void)
+{
+    u32 prev[14], cur[14];
+    for (u32 i = 0; i < 14; i++)
+        prev[i] = 0;
+    if (!g_mie_port1) {
+        scif_puts(S_JVS_NO_MIE);
+        return;
+    }
+    scif_puts(S_JVS_MAP_HDR);
+    for (;;) {
+        if (maple_jvs_read(g_mie_port1 - 1, cur) == 0) {
+            u32 changed = 0;
+            for (u32 i = 0; i < 14; i++)
+                if (cur[i] != prev[i])
+                    changed = 1;
+            if (changed) {
+                for (u32 i = 0; i < 14; i++) {
+                    scif_puthex(cur[i]);
+                    scif_putc(i == 13 ? '\n' : ' ');
+                }
+                for (u32 i = 0; i < 14; i++) {
+                    u32 d = cur[i] ^ prev[i];
+                    if (!d)
+                        continue;
+                    scif_puts("  mot ");
+                    scif_putdec(i);
+                    scif_puts(" bits ");
+                    scif_puthex(d);
+                    scif_puts("\n");
+                    prev[i] = cur[i];
+                }
+            }
+        }
+        delay_ms(30);
+        progress_heartbeat();
+    }
+}
+#endif
+
 void cmain(void)
 {
     timer_init();
@@ -1616,6 +1662,9 @@ void cmain(void)
     say(CLIP_TESTS_DONE, REPORT_GAP_MS);
     scif_flush();
 
+#if CFG_JVS_MAP
+    jvs_map_aid();                      /* never returns */
+#endif
 #if CFG_LANE_BEACON
     lane_beacon();                      /* never returns */
 #else

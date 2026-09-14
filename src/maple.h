@@ -28,4 +28,10 @@ u32 maple_eeprom_read(u32 port, u8 *out128);
  * with the raw status in *status. */
 u32 maple_mie_selftest(u32 port, u32 *status);
 
+/* Raw JVS control words from the MIE (0x86/0x15 -> 0x87/0x16, 14 words).
+ * The bit positions of TEST, SERVICE and START are not documented anywhere
+ * and are established by watching these words while pressing the buttons --
+ * see CFG_JVS_MAP in config.h. Returns 0 on success. */
+u32 maple_jvs_read(u32 port, u32 out[14]);
+
 #endif

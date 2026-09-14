@@ -113,6 +113,8 @@
 /* component group names (report_comps) */
 #define S_CG_CPU            "RAM CPU"
 #define S_ARAM_LINES        "  lignes de donnees fautives (D0-D15) : "
+#define S_JVS_MAP_HDR       "\nReleve JVS : appuyez sur TEST puis START, les bits changes sont listes.\n"
+#define S_JVS_NO_MIE        "\nReleve JVS impossible : aucun MIE detecte.\n"
 #define S_CG_SOUND          "RAM son"
 #define S_CG_SRAM           "NVRAM"
 
@@ -262,6 +264,8 @@
 
 #define S_CG_CPU            "CPU RAM"
 #define S_ARAM_LINES        "  bad data lines (D0-D15): "
+#define S_JVS_MAP_HDR       "\nJVS survey: press TEST then START; changed bits are listed.\n"
+#define S_JVS_NO_MIE        "\nJVS survey impossible: no MIE detected.\n"
 #define S_CG_SOUND          "SOUND RAM"
 #define S_CG_SRAM           "SRAM"
 

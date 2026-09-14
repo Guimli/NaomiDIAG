@@ -57,3 +57,34 @@ void scif_putdec(u32 v)
         }
     }
 }
+
+/* Non-blocking read of one received byte; returns -1 when nothing waits.
+ *
+ * Reception has been on since crt0 set SCSCR2 = TE|RE, so bytes have always
+ * been landing in the 16-byte receive FIFO -- this ROM simply never looked.
+ * The FIFO is why polling is enough: a keystroke waits there until read, so
+ * checking once per test block cannot miss one.
+ *
+ * Both DR and RDF are tested. RDF rises only at the FIFO trigger level; DR
+ * covers the single byte that a human typing will actually produce, which
+ * RDF alone would leave sitting there indefinitely.
+ *
+ * Receive errors and breaks are cleared rather than reported: an unplugged
+ * or half-connected adapter generates them continuously, and a diagnostic
+ * must not turn a loose cable into a stream of complaints. */
+int scif_getc(void)
+{
+    u16 st = SCFSR2;
+
+    if (st & (SCFSR2_ER | SCFSR2_BRK)) {
+        SCFSR2 = (u16)~(SCFSR2_ER | SCFSR2_BRK);
+        SCLSR2 = 0;
+        return -1;
+    }
+    if (!(st & (SCFSR2_RDF | SCFSR2_DR)))
+        return -1;
+
+    int c = (int)(u8)SCFRDR2;
+    SCFSR2 = (u16)~(SCFSR2_RDF | SCFSR2_DR);
+    return c;
+}

@@ -63,6 +63,23 @@
  * comparison logic itself, which is the one thing it can still catch. */
 #ifndef CFG_RAM_CRC
 #define CFG_RAM_CRC 0
+
+/* JVS button mapping aid (0 = off, 1 = on).
+ *
+ * The MIE answers a control-state request with fourteen words, and no public
+ * source says which bit in them is TEST, which is SERVICE, which is START --
+ * the one document that describes the request says plainly that the mapping
+ * was never worked out and has to be found by pressing buttons and watching
+ * the response.
+ *
+ * With this on, the ROM polls those words after the report and prints them
+ * whenever any bit changes, with the changed bits called out. Press TEST,
+ * press START, read which bit moved. That is the measurement; once it is
+ * known the menu can be wired to it and this comes back out. */
+#ifndef CFG_JVS_MAP
+#define CFG_JVS_MAP 0
+#endif
+
 #endif
 
 #endif
