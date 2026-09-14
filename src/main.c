@@ -141,6 +141,60 @@ static u32 g_log_n;
 static u32 g_screen_ready;          /* TEX0 VRAM validated, display up */
 
 /* full-screen render of the whole log (screen = 3rd report channel) */
+/* Where the next report line goes. The report is append-only, so an added
+ * result does not need the screen rebuilt: it needs one line drawn. */
+static u32 g_screen_y;
+
+/* Draw one entry at y and return the y the next one starts at, or 0 if it
+ * did not fit. Shared by the append path and the full repaint so the two
+ * cannot lay the screen out differently. */
+static u32 screen_draw_entry(const log_entry *e, u32 y)
+{
+    /* The screen holds fewer lines than the suite produces results, so the
+     * bus tests give up their line while they pass. They still run, still
+     * print on serial and are still spoken; a failure takes its line back,
+     * because that is when it is worth the space. */
+    if (e->quiet_ok && e->status == T_OK)
+        return y;
+    if (y >= fb_report_ymax())
+        return y;
+
+    fb_text(16, y, e->name, COL_WHITE, FB_STATUS_X);
+    if (e->status == T_OK) {
+        fb_text(FB_W - 16 * 3, y, S_SCR_OK, COL_GREEN, FB_W);
+    } else {
+        fb_text(FB_W - 16 * 6, y, S_SCR_FAIL, COL_RED, FB_W);
+        if (e->detail && e->comps) {
+            y += 20;
+            u32 x = 32;
+            const char *last = 0;
+            for (u32 b = 0; b < 4 && x < FB_W - 80; b++) {
+                if (!(e->detail & (1u << b)) || e->comps[b].name == last)
+                    continue;
+                last = e->comps[b].name;
+                fb_text(x, y, e->comps[b].name, COL_RED, FB_W);
+                x += 16 * 5;
+            }
+        }
+    }
+    return y + 20;
+}
+
+/* Add the newest result to what is already on screen.
+ *
+ * This used to call screen_render, which clears all 640x480 and redraws
+ * every line -- 153,600 uncached VRAM writes to add one line, on every
+ * result. Nothing about an appended line requires that: its position depends
+ * only on the lines before it, and those are already correct on screen. */
+static void screen_append(void)
+{
+    if (!g_screen_ready || !g_log_n)
+        return;
+    g_screen_y = screen_draw_entry(&g_log[g_log_n - 1], g_screen_y);
+}
+
+/* Rebuild the whole screen. Needed exactly twice: when the display first
+ * comes up, and after the VRAM test has scribbled over the framebuffer. */
 static void screen_render(void)
 {
     if (!g_screen_ready)
@@ -148,35 +202,10 @@ static void screen_render(void)
     fb_clear(0);
     fb_text(112, 8, "NAOMI DIAG ROM v" DIAG_VERSION, COL_TITLE, FB_W);
     u32 y = 48;
-    for (u32 i = 0; i < g_log_n && y < fb_report_ymax(); i++) {
-        const log_entry *e = &g_log[i];
-        /* The screen holds fewer lines than the suite produces results, so
-         * the bus tests give up their line while they pass. They still run,
-         * still print on serial and are still spoken; a failure takes its
-         * line back, because that is when it is worth the space. */
-        if (e->quiet_ok && e->status == T_OK)
-            continue;
-        fb_text(16, y, e->name, COL_WHITE, FB_STATUS_X);
-        if (e->status == T_OK) {
-            fb_text(FB_W - 16 * 3, y, S_SCR_OK, COL_GREEN, FB_W);
-        } else {
-            fb_text(FB_W - 16 * 6, y, S_SCR_FAIL, COL_RED, FB_W);
-            if (e->detail && e->comps) {
-                y += 20;
-                u32 x = 32;
-                const char *last = 0;
-                for (u32 b = 0; b < 4 && x < FB_W - 80; b++) {
-                    if (!(e->detail & (1u << b)) || e->comps[b].name == last)
-                        continue;
-                    last = e->comps[b].name;
-                    fb_text(x, y, e->comps[b].name, COL_RED, FB_W);
-                    x += 16 * 5;
-                }
-            }
-        }
-        y += 20;
-    }
-    /* the repaint above cleared the whole screen: put the bar back whole */
+    for (u32 i = 0; i < g_log_n; i++)
+        y = screen_draw_entry(&g_log[i], y);
+    g_screen_y = y;
+    /* the clear above took the bar with it: put it back whole */
     fb_progress_full(progress_label(), progress_pct());
 }
 
@@ -270,8 +299,8 @@ static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
     }
     scif_puts(name);
     scif_puts(st == T_OK ? S_SUF_OK : S_SUF_FAIL);
-    /* live multi-channel report: screen refresh, then speech */
-    screen_render();
+    /* live multi-channel report: one line added, then speech */
+    screen_append();
     if (g_log_n)
         say_entry(&g_log[g_log_n - 1]);
 }
