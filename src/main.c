@@ -924,35 +924,74 @@ static void test_sram_rtc(void)
  * When present: the mailbox must not look stuck; any abnormal state
  * (e.g. a fan/boot error latched by the DIMM firmware) shows up in the
  * raw registers dumped on the SCIF. */
+/* Full DIMM board check.
+ *
+ * NOT a write/read/verify of the DIMM's memory, and that is a finding rather
+ * than a shortcut. The DIMM holds the game image in its own DRAM and presents
+ * it to the Naomi as if it were a ROM board: the machine READS it over G1 and
+ * there is no documented path by which it can write into it. Even if one
+ * existed, writing patterns there would destroy the loaded image. The three
+ * phases the other memories get simply have nowhere to land here.
+ *
+ * What can be done without writing anything is worth having: read every block
+ * TWICE and compare. A cell that will not hold, a marginal bus or a dying
+ * board shows up as a difference between two reads of the same addresses,
+ * which is exactly the failure a content checksum cannot tell from bad data.
+ * That is cart_pin_scan, already written and already validated, so this runs
+ * it over the DIMM's contents and reports per data line. */
 static void test_dimm(void)
 {
     dimm_info di;
+    g1_bus_init();
     dimm_probe(&di);
 
-    scif_puts("\nDIMM board (G1 mailbox) raw regs: cmd=");
+    scif_puts(S_DIMM_HDR);
+    scif_puts(S_DIMM_REGS);
     scif_puthex(di.command);
-    scif_puts(" off=");
+    scif_putc(' ');
     scif_puthex(di.offsetl);
-    scif_puts(" pl=");
+    scif_putc(' ');
     scif_puthex(di.paraml);
-    scif_puts(" ph=");
+    scif_putc(' ');
     scif_puthex(di.paramh);
-    scif_puts(" st=");
+    scif_putc(' ');
     scif_puthex(di.status);
     scif_puts("\n");
 
     if (!di.present) {
         log_result(S_L_DIMM_ABSENT, CLIP_NONE, T_OK, 0, 0);
-        say(CLIP_DIMM, 250);
-        say(CLIP_ABSENT, REPORT_GAP_MS);
         return;
     }
-    /* present: sanity — the handshake bits must not be all stuck low */
-    t_status st = (di.status == 0x0000) ? T_FAIL : T_OK;
-    log_result(S_L_DIMM_PRESENT, CLIP_NONE, st, 0, 0);
-    say(CLIP_DIMM, 250);
-    say(CLIP_PRESENT, 250);
-    say(st == T_OK ? CLIP_OK : CLIP_FAIL, REPORT_GAP_MS);
+    log_result(S_L_DIMM_PRESENT, CLIP_NONE, T_OK, 0, 0);
+
+    /* Read-twice-and-compare over as much of the board as the operator is
+     * willing to wait for; TEST or a key stops it at the next block. */
+#if QUICK_TEST
+    const u32 span = 0x00040000;
+#else
+    const u32 span = 0x01000000;        /* 16 MB, abortable */
+#endif
+    cart_pin_stats st;
+    progress_begin(S_P_DIMM, span);
+    cart_pin_scan(0, span, &st);
+    progress_end();
+
+    scif_puts(S_PINS_SAMPLED);
+    scif_putdec(st.words);
+    scif_puts("\n");
+
+    u32 unstable = 0;
+    for (u32 b = 0; b < 16; b++) {
+        if (st.flaky[b]) {
+            scif_puts(S_PIN);
+            scif_putdec(b);
+            scif_puts(S_PIN_FLAKY);
+            scif_putdec(st.flaky[b]);
+            scif_puts("\n");
+            unstable++;
+        }
+    }
+    log_result(S_L_DIMM_MEM, CLIP_NONE, unstable ? T_FAIL : T_OK, 0, 0);
 }
 
 /* ------------------------------------------------------------------ */

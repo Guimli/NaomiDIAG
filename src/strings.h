@@ -113,6 +113,10 @@
 /* component group names (report_comps) */
 #define S_CG_CPU            "RAM CPU"
 #define S_ARAM_LINES        "  lignes de donnees fautives (D0-D15) : "
+#define S_DIMM_HDR          "\nCarte DIMM : sonde et relecture double...\n"
+#define S_DIMM_REGS         "  mailbox (cmd offl parl parh status) : "
+#define S_L_DIMM_MEM        "DIMM : relecture double (stabilite)"
+#define S_P_DIMM            "Memoire DIMM"
 #define S_MENU_TITLE        "MENU  --  TEST/PSW1 : choisir   START/PSW2 : lancer"
 #define S_M_CPU             "Test RAM CPU en boucle"
 #define S_M_VRAM            "Test RAM video en boucle"
@@ -286,6 +290,10 @@
 
 #define S_CG_CPU            "CPU RAM"
 #define S_ARAM_LINES        "  bad data lines (D0-D15): "
+#define S_DIMM_HDR          "\nDIMM board: probe and double read...\n"
+#define S_DIMM_REGS         "  mailbox (cmd offl parl parh status): "
+#define S_L_DIMM_MEM        "DIMM: double read (stability)"
+#define S_P_DIMM            "DIMM memory"
 #define S_MENU_TITLE        "MENU  --  TEST/PSW1: select   START/PSW2: run"
 #define S_M_CPU             "CPU RAM test, looping"
 #define S_M_VRAM            "Video RAM test, looping"
