@@ -57,9 +57,17 @@ boot_phase_t progress_current_phase(void) { return g_phase; }
 
 static const char *g_label;
 static u32 g_pct, g_next, g_step, g_active, g_serial_mark;
-static u32 g_screen_off;   /* set while the bar would corrupt the test */
+static u32 g_screen_off;
+static u32 g_abort;
+static u32 g_in_loop;        /* a soak run: only the TEST button ends it */          /* 0 = running, else the action requested */   /* set while the bar would corrupt the test */
 
 void progress_screen_enable(u32 on) { g_screen_off = !on; }
+
+void progress_request_abort(u32 what)  { g_abort = what ? what : ABORT_PLAIN; }
+u32  progress_aborted(void)            { return g_abort; }
+u32  progress_abort_action(void)       { return g_abort; }
+void progress_clear_abort(void)        { g_abort = 0; }
+void progress_set_loop(u32 on)         { g_in_loop = on; }
 
 /* binary long division: no libgcc in a freestanding build, and this runs
  * once per test, never in the tick path */
@@ -95,6 +103,7 @@ void progress_begin(const char *label, u32 total)
 void progress_tick(u32 done)
 {
     progress_heartbeat();
+    diag_input_check(g_in_loop);
     if (!g_active || done < g_next)
         return;
     /* a tick can jump several percent if the caller samples coarsely */

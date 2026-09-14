@@ -13,13 +13,36 @@
 #define SB_MDAPRO   REG32(0xA05F6C8C)   /* address protection window     */
 
 /* scratch area in validated main RAM (P2 view / physical for the DMA) */
-#define MAPLE_DESC_P2   0xAC0FF000u
-#define MAPLE_DESC_PHY  0x0C0FF000u
-#define MAPLE_RX_P2     0xAC0FF100u
-#define MAPLE_RX_PHY    0x0C0FF100u
+/* Maple DMA descriptors and receive buffer live in main RAM, which is also
+ * what the CPU RAM test writes patterns over. Polling the buttons during that
+ * test therefore DMAs into the region under test and the test reads back
+ * corruption -- phantom faults on a perfectly good board.
+ *
+ * So the buffers are moved into the reserved block at the top of RAM, the one
+ * the cell test already stops below. Defaults kept for the boot path, before
+ * the reservation is known. */
+/* Zero-initialised on purpose: this ROM allows no writable .data, so the
+ * fallback is applied on first use rather than by an initialiser. */
+static u32 g_desc_p2, g_desc_phy, g_rx_p2, g_rx_phy;
+
+void maple_set_buffers(u32 p2_base)
+{
+    g_desc_p2  = p2_base;
+    g_desc_phy = p2_base & 0x1FFFFFFFu;
+    g_rx_p2    = p2_base + 0x100u;
+    g_rx_phy   = (p2_base & 0x1FFFFFFFu) + 0x100u;
+}
+
+#define MAPLE_DESC_P2   g_desc_p2
+#define MAPLE_DESC_PHY  g_desc_phy
+#define MAPLE_RX_P2     g_rx_p2
+#define MAPLE_RX_PHY    g_rx_phy
 
 static u32 maple_txn(u32 port, u32 cmd, u32 nwords, const u32 *payload)
 {
+    if (!g_desc_p2)
+        maple_set_buffers(0xAC0FF000u);     /* before anything reserved one */
+
     volatile u32 *desc = (volatile u32 *)MAPLE_DESC_P2;
     volatile u32 *rx   = (volatile u32 *)MAPLE_RX_P2;
 
@@ -145,4 +168,21 @@ u32 maple_jvs_read(u32 port, u32 out[14])
     for (u32 i = 0; i < 14; i++)
         out[i] = rx[1 + i];
     return 0;
+}
+
+/* Ask the JVS I/O board at `addr` for its switch state. The MIE relays it on
+ * the JVS bus and holds the reply until the next 0x15 read, so this is sent
+ * one poll ahead of the read that collects it.
+ *
+ * Subcommand 0x27 with a twelve-byte body, the shape libnaomi uses. The 0x77
+ * in the second byte is described there as a GPIO direction that these
+ * packets carry "for some reason"; it is reproduced rather than reasoned
+ * about. Returns 0 if the MIE accepted it. */
+u32 maple_jvs_request(u32 port, u32 addr)
+{
+    u32 pay[3];
+    pay[0] = 0x00007727u;                       /* 0x27, 0x77, 0, 0 */
+    pay[1] = (addr & 0xFFu) << 16 | 0x01000000u;/* 0, 0, addr, 1    */
+    pay[2] = 0x00000000u;
+    return (maple_txn(port, 0x86, 3, pay) & 0xFF) == 0x87 ? 0 : 1;
 }

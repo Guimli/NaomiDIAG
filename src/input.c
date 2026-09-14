@@ -14,6 +14,7 @@
 #define PSW_WORD        1
 #define PSW1_BIT        20
 #define PSW2_BIT        21
+#define JVS_PKT_WORD    5       /* length in bits 8-15, packet bytes after */
 
 #define BUTTON_PERIOD   (TIMER_HZ / 4u)     /* a Maple round trip, 4x/second */
 
@@ -27,6 +28,28 @@ void input_set_mie_port(u32 port_plus_1)
     g_last_poll = timer_ticks();
 }
 
+/* The cabinet's TEST and START, from the JVS packet the MIE relays. Unlike
+ * the board's own buttons these are active HIGH, and they only exist if a
+ * JVS I/O board is attached and answered the request sent on the previous
+ * poll. Absent one, both stay 0 and the board buttons carry the menu. */
+static void jvs_buttons(const u32 *words, u32 *test, u32 *start)
+{
+    *test = 0;
+    *start = 0;
+
+    u32 len = (words[JVS_PKT_WORD] >> 8) & 0xFFu;
+    if (len < 8)
+        return;
+    const volatile u8 *pkt = (const volatile u8 *)&words[JVS_PKT_WORD] + 2;
+    if (pkt[0] != 0xE0)                 /* JVS start of message */
+        return;
+    if (pkt[3] != 0x01 || pkt[4] != 0x01)  /* response code, report code */
+        return;
+
+    *test  = (pkt[5] >> 7) & 1u;
+    *start = (pkt[6] >> 7) & 1u;
+}
+
 static u32 buttons_poll(input_event *ev)
 {
     u32 words[14];
@@ -35,6 +58,16 @@ static u32 buttons_poll(input_event *ev)
 
     u32 psw1 = (~(words[PSW_WORD] >> PSW1_BIT)) & 1u;
     u32 psw2 = (~(words[PSW_WORD] >> PSW2_BIT)) & 1u;
+
+    /* Both routes drive the same two actions, so a board on a bench and a
+     * board in a cabinet behave identically without the operator choosing. */
+    u32 jtest, jstart;
+    jvs_buttons(words, &jtest, &jstart);
+    psw1 |= jtest;
+    psw2 |= jstart;
+
+    /* queue the request whose answer the next poll will read */
+    maple_jvs_request(g_mie_port1 - 1, 1);
 
     /* Report the press, not the hold: a finger rests on a button for far
      * longer than the poll interval, and a held button must not scroll the

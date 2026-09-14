@@ -113,6 +113,28 @@
 /* component group names (report_comps) */
 #define S_CG_CPU            "RAM CPU"
 #define S_ARAM_LINES        "  lignes de donnees fautives (D0-D15) : "
+#define S_MENU_TITLE        "MENU  --  TEST/PSW1 : choisir   START/PSW2 : lancer"
+#define S_M_CPU             "Test RAM CPU en boucle"
+#define S_M_VRAM            "Test RAM video en boucle"
+#define S_M_ARAM            "Test RAM son en boucle"
+#define S_M_DIMM            "Test complet de la carte DIMM"
+#define S_M_GAME            "Integrite des flash du jeu (SHA1)"
+#define S_M_FLASH           "Reflasher le DIMM"
+#define S_NOT_IMPL          "\nNon implemente pour le moment.\n"
+#define S_ABORTED           "\nTest interrompu.\n"
+#define S_L_ABORTED         "Test interrompu par l'operateur"
+#define S_LOOP_PASS         "passe "
+#define S_LOOP_ERR          "  erreurs cumulees : "
+#define S_WAIT_TEST         "\nAppuyez sur TEST (ou PSW1) pour le menu.\n"
+#define S_HELP              "\nTouches :\n"\
+                            "  h  cette aide (n'interrompt pas)\n"\
+                            "  a  interrompre le test en cours\n"\
+                            "  c  test RAM CPU en boucle\n"\
+                            "  v  test RAM video en boucle\n"\
+                            "  s  test RAM son en boucle\n"\
+                            "  d  test complet de la carte DIMM\n"\
+                            "  g  integrite des flash du jeu (SHA1)\n"\
+                            "  f  reflasher le DIMM (non implemente)\n"
 #define S_JVS_MAP_HDR       "\nReleve JVS : appuyez sur TEST puis START, les bits changes sont listes.\n"
 #define S_JVS_NO_MIE        "\nReleve JVS impossible : aucun MIE detecte.\n"
 #define S_CG_SOUND          "RAM son"
@@ -264,6 +286,28 @@
 
 #define S_CG_CPU            "CPU RAM"
 #define S_ARAM_LINES        "  bad data lines (D0-D15): "
+#define S_MENU_TITLE        "MENU  --  TEST/PSW1: select   START/PSW2: run"
+#define S_M_CPU             "CPU RAM test, looping"
+#define S_M_VRAM            "Video RAM test, looping"
+#define S_M_ARAM            "Sound RAM test, looping"
+#define S_M_DIMM            "Full DIMM board test"
+#define S_M_GAME            "Game flash integrity (SHA1)"
+#define S_M_FLASH           "Reflash the DIMM"
+#define S_NOT_IMPL          "\nNot implemented yet.\n"
+#define S_ABORTED           "\nTest interrupted.\n"
+#define S_L_ABORTED         "Test interrupted by the operator"
+#define S_LOOP_PASS         "pass "
+#define S_LOOP_ERR          "  errors so far: "
+#define S_WAIT_TEST         "\nPress TEST (or PSW1) for the menu.\n"
+#define S_HELP              "\nKeys:\n"\
+                            "  h  this help (does not interrupt)\n"\
+                            "  a  abort the running test\n"\
+                            "  c  CPU RAM test, looping\n"\
+                            "  v  video RAM test, looping\n"\
+                            "  s  sound RAM test, looping\n"\
+                            "  d  full DIMM board test\n"\
+                            "  g  game flash integrity (SHA1)\n"\
+                            "  f  reflash the DIMM (not implemented)\n"
 #define S_JVS_MAP_HDR       "\nJVS survey: press TEST then START; changed bits are listed.\n"
 #define S_JVS_NO_MIE        "\nJVS survey impossible: no MIE detected.\n"
 #define S_CG_SOUND          "SOUND RAM"

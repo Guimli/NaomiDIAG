@@ -30,6 +30,7 @@
 #include "cartdb.h"
 #include "progress.h"
 #include "reloc.h"
+#include "input.h"
 
 #ifndef QUICK_TEST
 #define QUICK_TEST 0
@@ -53,6 +54,58 @@ static u32 g_mie_port1;             /* MIE maple port + 1; 0 = none  */
 /* IC tables were extracted from the Naomi 1 BIOS; on any other board we
  * fall back to numbered positions instead of announcing wrong ICs. */
 #define IC(table) (g_ic_valid ? (table) : 0)
+
+
+/* ========================================================================
+ * Operator console: keys on the serial line, buttons on the board or the
+ * cabinet. Both drive the same set of actions.
+ * ===================================================================== */
+
+#define ACT_NONE    0
+#define ACT_CPU     1
+#define ACT_VRAM    2
+#define ACT_ARAM    3
+#define ACT_DIMM    4
+#define ACT_GAME    5
+#define ACT_FLASH   6
+#define ACT_COUNT   6
+
+static const char *const menu_label[ACT_COUNT] = {
+    S_M_CPU, S_M_VRAM, S_M_ARAM, S_M_DIMM, S_M_GAME, S_M_FLASH
+};
+static const char menu_key[ACT_COUNT] = { 'c', 'v', 's', 'd', 'g', 'f' };
+
+
+/* Called from progress_tick, once per test block. Decides whether what the
+ * operator did should stop the test, and what should happen next. */
+void diag_input_check(u32 in_loop)
+{
+    input_event ev;
+    if (!input_poll(&ev))
+        return;
+
+    if (ev.kind == INPUT_KEY) {
+        if (ev.key == 'h' || ev.key == 'H') {
+            scif_puts(S_HELP);          /* help never interrupts */
+            return;
+        }
+        if (in_loop)                    /* only TEST ends a soak run */
+            return;
+        if (ev.key == 'a' || ev.key == 'A') {
+            progress_request_abort(ABORT_PLAIN);
+            return;
+        }
+        for (u32 i = 0; i < ACT_COUNT; i++) {
+            if (ev.key == menu_key[i]) {
+                progress_request_abort(i + 1);
+                return;
+            }
+        }
+        return;                         /* unknown key: ignored */
+    }
+    if (ev.kind == INPUT_SELECT)        /* TEST / PSW1 always stops */
+        progress_request_abort(ABORT_PLAIN);
+}
 
 /* ------------------------------------------------------------------ */
 /* Replayable result log (lives in OC-RAM .bss, survives until reset) */
@@ -511,6 +564,13 @@ static void phase_begin(const char *label, u32 phase, const char *what,
 
 static void relocate_try(void)
 {
+    /* The top block is reserved whatever happens next: the Maple DMA buffers
+     * go there, clear of every pattern the cell test writes. Polling the
+     * buttons during a memory test would otherwise DMA into the region under
+     * test, and the test would report faults that are its own doing. */
+    g_reloc_win = SDRAM_P2_BASE + g_ram_size - RELOC_WINDOW;
+    maple_set_buffers(g_reloc_win + 0x1800u);
+
 #if RELOC
     if (g_ram_size < 0x00100000u) {
         log_result(S_L_RELOC, CLIP_NONE, T_FAIL, 0, 0);
@@ -532,16 +592,17 @@ static void relocate_try(void)
     ram_result scan;                /* accumulates every bad block found */
     ram_result_clear(&scan);
     u32 nbad = 0;
+    u32 win = 0;                    /* the block the loops are copied into */
 
     for (u32 k = 0; k < RELOC_TRIES; k++) {
-        u32 cand = SDRAM_P2_BASE + g_ram_size - (k + 1) * RELOC_WINDOW;
+        u32 cand = SDRAM_P2_BASE + g_ram_size - (k + 2) * RELOC_WINDOW;
         ram_result res;
         ram_result_clear(&res);
         ram_test_pattern(cand, RELOC_WINDOW, 0x55555555, &res);
         ram_test_pattern(cand, RELOC_WINDOW, 0xAAAAAAAA, &res);
         ram_test_prng(cand, RELOC_WINDOW, 0x5EED1234, &res);
         if (!res.errors) {
-            g_reloc_win = cand;
+            win = cand;
             break;
         }
         nbad++;
@@ -561,21 +622,21 @@ static void relocate_try(void)
         report_comps(S_CG_CPU, ram_comp_mask(&scan), IC(work_comps));
     }
 
-    if (!g_reloc_win) {
+    if (!win) {
         log_result(S_L_RELOC, CLIP_NONE, T_FAIL, 0, 0);
         scif_puts(S_RELOC_ROM);
         return;
     }
+    g_reloc_win = win;          /* the cell test now stops below this block */
 
     /* the first execution of relocated code happens inside reloc_install.
      * Flag it on the border first: if this board refuses cached execution
      * from RAM the way it refused it from ROM, the screen stops on this
      * colour and says so without a serial cable. */
     progress_phase(PH_RELOC);
-    u32 ok = reloc_install(g_reloc_win);
+    u32 ok = reloc_install(win);
     log_result(S_L_RELOC, CLIP_NONE, ok ? T_OK : T_FAIL, 0, 0);
     if (!ok) {
-        g_reloc_win = 0;            /* stayed in ROM: nothing is reserved */
         scif_puts(S_RELOC_ROM);
     }
 #endif
@@ -932,7 +993,8 @@ static void test_maple_mie(u32 ram_ok)
         scif_puts("  MIE self-test status word: ");
         scif_puthex(st_word);
         scif_puts("\n");
-        log_result(S_L_MIE_SELFTEST, CLIP_JVS,
+        input_set_mie_port(g_mie_port1);
+    log_result(S_L_MIE_SELFTEST, CLIP_JVS,
                    bad ? T_FAIL : T_OK, 0, 0);
     }
 }
@@ -1533,6 +1595,173 @@ static void jvs_map_aid(void)
 }
 #endif
 
+
+/* ---- looping memory tests -------------------------------------------- */
+
+/* One region, over and over, counting passes and accumulated errors. Runs
+ * until the TEST button; a stray byte on the console must not end a soak. */
+static void loop_region(u32 base, u32 len, const char *what)
+{
+    u32 pass = 0, errors = 0;
+    progress_set_loop(1);
+    while (!progress_aborted()) {
+        ram_result res;
+        ram_result_clear(&res);
+        pass++;
+
+        scif_puts(S_LOOP_PASS);
+        scif_putdec(pass);
+        scif_puts(": ");
+        progress_begin(what, (len >> 2) * 2);
+        if (base == ARAM_P2_BASE) {
+            aram_test_pattern(0, len, 0x55555555, &res);
+            aram_test_pattern(0, len, 0xAAAAAAAA, &res);
+            aram_test_prng(0, len, 0xC0FFEE42 ^ pass, &res);
+        } else if (base == SDRAM_P2_BASE) {
+            ram_test_pattern(base, len, 0x55555555, &res);
+            ram_test_pattern(base, len, 0xAAAAAAAA, &res);
+            ram_test_prng(base, len, 0xDEADBEEF ^ pass, &res);
+        } else {
+            vram_test_pattern(base, len, 0x55555555, &res);
+            vram_test_pattern(base, len, 0xAAAAAAAA, &res);
+            vram_test_prng(base, len, 0x7E0CBEEF ^ pass, &res);
+        }
+        progress_end();
+
+        errors += res.errors;
+        scif_puts(S_LOOP_ERR);
+        scif_putdec(errors);
+        scif_puts("\n");
+        if (res.errors) {
+            report_badbits(res.badbits);
+            report_comps(S_CG_CPU, ram_comp_mask(&res),
+                         IC(base == SDRAM_P2_BASE ? work_comps : 0));
+        }
+    }
+    progress_set_loop(0);
+    progress_clear_abort();
+    scif_puts(S_ABORTED);
+}
+
+/* ---- the menu -------------------------------------------------------- */
+
+/* Replaces the report: the screen is short of lines and a menu overlaid on
+ * results would be readable as neither. The report is rebuilt on the way
+ * out, from the log, which is still intact. */
+static void menu_draw(u32 sel)
+{
+    if (!g_screen_ready)
+        return;
+    fb_clear(0);
+    fb_text(16, 8, S_MENU_TITLE, COL_TITLE, FB_W);
+    for (u32 i = 0; i < ACT_COUNT; i++) {
+        u32 y = 64 + i * 28;
+        fb_text(16, y, i == sel ? ">" : " ", COL_TITLE, FB_W);
+        fb_text(48, y, menu_label[i], i == sel ? COL_TITLE : COL_WHITE, FB_W);
+    }
+}
+
+static void run_action(u32 act);
+
+/* TEST steps through the entries and wraps at the end; START runs the one
+ * shown. A serial key jumps straight to its action without the menu. */
+static void menu_run(void)
+{
+    u32 sel = 0;
+    menu_draw(sel);
+    scif_puts(S_MENU_TITLE);
+    scif_puts("\n");
+
+    for (;;) {
+        input_event ev;
+        if (input_poll(&ev)) {
+            if (ev.kind == INPUT_SELECT) {
+                sel = (sel + 1) % ACT_COUNT;
+                menu_draw(sel);
+            } else if (ev.kind == INPUT_CONFIRM) {
+                run_action(sel + 1);
+                return;
+            } else if (ev.kind == INPUT_KEY) {
+                if (ev.key == 'h' || ev.key == 'H') {
+                    scif_puts(S_HELP);
+                } else {
+                    for (u32 i = 0; i < ACT_COUNT; i++) {
+                        if (ev.key == menu_key[i]) {
+                            run_action(i + 1);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        progress_heartbeat();
+        delay_ms(20);
+    }
+}
+
+static void run_action(u32 act)
+{
+    progress_clear_abort();
+    switch (act) {
+    case ACT_CPU:
+        loop_region(SDRAM_P2_BASE,
+                    g_reloc_win ? g_reloc_win - SDRAM_P2_BASE : g_ram_size,
+                    S_M_CPU);
+        break;
+    case ACT_VRAM:
+        loop_region(VRAM_TEX0_BASE, VRAM_TEX0_SIZE, S_M_VRAM);
+        break;
+    case ACT_ARAM:
+        aica_arm_halt();
+        loop_region(ARAM_P2_BASE, ARAM_SIZE, S_M_ARAM);
+        aica_arm_park();
+        break;
+    case ACT_DIMM:
+        test_dimm();
+        break;
+    case ACT_GAME:
+        test_x76();
+        test_cartridge();
+        break;
+    case ACT_FLASH:
+        scif_puts(S_NOT_IMPL);
+        break;
+    default:
+        break;
+    }
+}
+
+/* Idle on the report until the operator asks for something. */
+static void console_idle(void)
+{
+    scif_puts(S_WAIT_TEST);
+    for (;;) {
+        input_event ev;
+        if (input_poll(&ev)) {
+            if (ev.kind == INPUT_SELECT || ev.kind == INPUT_CONFIRM) {
+                menu_run();
+                screen_render();
+                scif_puts(S_WAIT_TEST);
+            } else if (ev.kind == INPUT_KEY) {
+                if (ev.key == 'h' || ev.key == 'H') {
+                    scif_puts(S_HELP);
+                } else {
+                    for (u32 i = 0; i < ACT_COUNT; i++) {
+                        if (ev.key == menu_key[i]) {
+                            run_action(i + 1);
+                            screen_render();
+                            scif_puts(S_WAIT_TEST);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        progress_heartbeat();
+        delay_ms(20);
+    }
+}
+
 void cmain(void)
 {
     timer_init();
@@ -1601,12 +1830,6 @@ void cmain(void)
     test_naomi2_ram();
 
     /* peripheral stage: backup SRAM (non-destructive), RTC, DIMM, MIE */
-    /* The cartridge test reads tens of megabytes over the G1 bus and needs
-     * the bar, so it runs before the bar is retired rather than at the end
-     * of the suite where it used to sit. */
-    test_x76();
-    test_cartridge();
-
     /* From here on nothing measures anything: the NVRAM, the RTC, the DIMM
      * probe, Maple and the EEPROMs all answer yes or no. A bar left up would
      * sit at whatever the last test put it, which says less than no bar at
@@ -1614,7 +1837,6 @@ void cmain(void)
     progress_retire();
 
     test_sram_rtc();
-    test_dimm();
     test_maple_mie(usable);
     test_settings_eeprom();
     test_serial_eeprom();
@@ -1668,7 +1890,6 @@ void cmain(void)
 #if CFG_LANE_BEACON
     lane_beacon();                      /* never returns */
 #else
-    for (;;)                            /* report stays on screen */
-        progress_heartbeat();
+    console_idle();                     /* never returns */
 #endif
 }

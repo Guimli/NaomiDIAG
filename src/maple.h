@@ -34,4 +34,12 @@ u32 maple_mie_selftest(u32 port, u32 *status);
  * see CFG_JVS_MAP in config.h. Returns 0 on success. */
 u32 maple_jvs_read(u32 port, u32 out[14]);
 
+/* Ask the JVS I/O at `addr` (1 = first board) for its switches. The answer
+ * arrives in the NEXT maple_jvs_read, inside the packet its words carry. */
+u32 maple_jvs_request(u32 port, u32 addr);
+
+/* Put the DMA descriptors and receive buffer at p2_base (needs 0x200 bytes).
+ * They must NOT sit in memory a running test is writing patterns over. */
+void maple_set_buffers(u32 p2_base);
+
 #endif

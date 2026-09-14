@@ -66,6 +66,30 @@ void progress_end(void);
  * measure. */
 void progress_retire(void);
 
+/* -------------------------------------------------------------------------
+ * Aborting a running test.
+ *
+ * progress_tick already runs once per 1024-word block, outside the assembly
+ * loops, so that is where the operator's input is looked at. A request is
+ * recorded there and acted on at the next block boundary -- never inside a
+ * hand-written loop with the PRNG state and CRCs live in registers.
+ *
+ * The request carries what was asked for, because a key does more than stop
+ * the test: it says which test to run instead. */
+#define ABORT_NONE      0
+#define ABORT_PLAIN     1       /* stop, no follow-up action */
+
+void progress_request_abort(u32 what);
+u32  progress_aborted(void);    /* non-zero once a stop has been asked for */
+u32  progress_abort_action(void);
+void progress_clear_abort(void);
+void progress_set_loop(u32 on);     /* in a soak run: ignore serial stops */
+
+/* Implemented in main.c: looks at the operator's input and decides whether
+ * the running test should stop. Called from progress_tick so the cost stays
+ * out of the assembly loops entirely. */
+void diag_input_check(u32 in_loop);
+
 /* Suppress the on-screen bar while a test writes over the framebuffer's own
  * VRAM: drawing the bar there would corrupt the very data under test and
  * manufacture failures. Serial marks and the border colour keep working. */
