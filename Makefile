@@ -12,6 +12,11 @@ OBJDUMP := $(CROSS)objdump
 LANG    ?= EN
 QUICK   ?= 0
 
+# AUDIO=1 (default) embeds the spoken-report PCM (~1.7 MB). AUDIO=0 builds a
+# silent ROM from a stub clip table, freeing that space -- used by the DIMM
+# firmware-update variant, which spends the room on compressed firmware images.
+AUDIO   ?= 1
+
 # lowercase language tag for the generated audio header / clip source
 lang_lc := $(shell echo $(LANG) | tr A-Z a-z)
 BIN     := NaomiDIAG_$(LANG).bin
@@ -38,7 +43,7 @@ LDFLAGS := -nostdlib -Wl,-T,linker.gen.ld -Wl,--build-id=none -Wl,-Map,$(ELF).ma
 
 OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.o src/ramtest_fast.o src/reloc.o \
         src/timer.o src/aica.o src/pvr.o src/periph.o src/dimm.o src/maple.o \
-        src/input.o src/board.o src/sha1.o src/cart.o
+        src/input.o src/board.o src/sha1.o src/cart.o src/dimm_flash.o
 
 HDRS := src/config.h src/version.inc src/hw.h src/scif.h src/sdram.h src/ramtest.h src/timer.h src/aica.h \
         src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/sha1.h \
@@ -48,13 +53,20 @@ all: $(BIN)
 
 # config stamp: objects carry no LANG/QUICK in their name, so force a
 # rebuild whenever the selected language or QUICK setting changes.
-STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)$(subst -,,$(subst =,,$(CFLAGS_EXTRA)))
+STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)_A$(AUDIO)$(subst -,,$(subst =,,$(CFLAGS_EXTRA)))
 $(STAMP):
 	rm -f .build_* && touch $@
 
-# the active audio clips header is a copy of the per-language one, so the
-# C code can always #include "audio_clips.h"
-src/audio_clips.h: src/audio_clips_$(lang_lc).h $(STAMP)
+# the active audio clips header is a copy of the per-language one (AUDIO=1) or
+# of the silent stub (AUDIO=0), so the C code can always #include "audio_clips.h"
+ifeq ($(AUDIO),0)
+audio_src := src/audio_stub.h
+CFLAGS    += -DNO_AUDIO=1
+else
+audio_src := src/audio_clips_$(lang_lc).h
+endif
+
+src/audio_clips.h: $(audio_src) $(STAMP)
 	cp -f $< $@
 
 src/%.o: src/%.c $(HDRS) src/audio_clips.h $(STAMP)

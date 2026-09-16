@@ -19,6 +19,7 @@
 #include "pvr.h"
 #include "periph.h"
 #include "dimm.h"
+#include "dimm_flash.h"
 #include "maple.h"
 #include "board.h"
 #include "cart.h"
@@ -924,21 +925,22 @@ static void test_sram_rtc(void)
  * When present: the mailbox must not look stuck; any abnormal state
  * (e.g. a fan/boot error latched by the DIMM firmware) shows up in the
  * raw registers dumped on the SCIF. */
-/* Full DIMM board check.
+/* Full DIMM board check, in two parts.
  *
- * NOT a write/read/verify of the DIMM's memory, and that is a finding rather
- * than a shortcut. The DIMM holds the game image in its own DRAM and presents
- * it to the Naomi as if it were a ROM board: the machine READS it over G1 and
- * there is no documented path by which it can write into it. Even if one
- * existed, writing patterns there would destroy the loaded image. The three
- * phases the other memories get simply have nowhere to land here.
+ * (1) Non-destructive, always: read every block TWICE and compare. A cell
+ * that will not hold, a marginal bus or a dying board shows up as a
+ * difference between two reads of the same addresses -- exactly the failure a
+ * content checksum cannot tell from bad data. That is cart_pin_scan, already
+ * validated, run over the DIMM's contents with a per-data-line report.
  *
- * What can be done without writing anything is worth having: read every block
- * TWICE and compare. A cell that will not hold, a marginal bus or a dying
- * board shows up as a difference between two reads of the same addresses,
- * which is exactly the failure a content checksum cannot tell from bad data.
- * That is cart_pin_scan, already written and already validated, so this runs
- * it over the DIMM's contents and reports per data line. */
+ * (2) Destructive, operator-initiated: a real write/read/verify of the DIMM
+ * SDRAM. The DIMM presents its DRAM to the Naomi as a ROM board, but the same
+ * GD-DMA engine that loads a game can also write it back (SB_GDDIR=1) -- a
+ * path reversed from the DIMM-aware BIOS, not present in MAME's model. So we
+ * push the requested patterns over G1-DMA, read them back and CRC them. This
+ * overwrites the loaded game image, which is why it belongs to this
+ * operator-chosen test and nowhere in the automatic sweep. It cannot touch
+ * the DIMM's firmware (that runs from the board's own flash, not this SDRAM). */
 static void test_dimm(void)
 {
     dimm_info di;
@@ -992,6 +994,131 @@ static void test_dimm(void)
         }
     }
     log_result(S_L_DIMM_MEM, CLIP_NONE, unstable ? T_FAIL : T_OK, 0, 0);
+
+    /* Destructive cell test: write the requested patterns over the DIMM
+     * SDRAM via G1-DMA and read them back with a CRC. Overwrites the game
+     * image, hence gated behind this operator-initiated test. dimm_mem_test
+     * checks its own system-RAM scratch, so it is safe to call here without
+     * threading the main-RAM verdict. */
+#if QUICK_TEST
+    const u32 mspan = 0x00040000;       /* 256 KB */
+#else
+    const u32 mspan = 0x00400000;       /* 4 MB, abortable at each block */
+#endif
+    static const u32 patterns[2] = { 0x01010101u, 0x10101010u };
+    u32 mem_fail = 0, mem_ran = 0;
+
+    scif_puts(S_DIMM_MEM_HDR);
+    for (u32 p = 0; p < 2; p++) {
+        dimm_mem_result mr;
+        progress_begin(S_P_DIMM, mspan);
+        dimm_mem_test(mspan, patterns[p], &mr);
+        progress_end();
+
+        scif_puts(S_DIMM_MEM_PAT);
+        scif_puthex(patterns[p]);
+        scif_puts("\n");
+
+        if (mr.timeout) {               /* present but DMA never completed */
+            scif_puts(S_DIMM_MEM_TIMEOUT);
+            mem_fail = 1;
+            break;                      /* the second pattern would only stall too */
+        }
+        if (mr.blocks == 0) {           /* scratch RAM bad: same both passes */
+            scif_puts(S_DIMM_SCRATCH_BAD);
+            break;
+        }
+        mem_ran = 1;
+
+        scif_puts(S_DIMM_MEM_BLOCKS);
+        scif_putdec(mr.blocks);
+        scif_puts("\n");
+        scif_puts(S_DIMM_MEM_CRC);
+        scif_puthex(mr.crc_w ^ 0xFFFFFFFFu);
+        scif_putc('/');
+        scif_puthex(mr.crc_r ^ 0xFFFFFFFFu);
+        scif_puts("\n");
+        scif_puts(S_DIMM_MEM_ERRS);
+        scif_putdec(mr.errors);
+        scif_puts("\n");
+
+        if (mr.errors) {
+            scif_puts(S_DIMM_MEM_BADBITS);
+            scif_puthex(mr.badbits);
+            scif_puts("\n");
+            scif_puts(S_DIMM_MEM_FIRST);
+            scif_puthex(mr.first_addr);
+            scif_puts(S_DIMM_MEM_EXPGOT);
+            scif_puthex(mr.first_exp);
+            scif_putc('/');
+            scif_puthex(mr.first_got);
+            scif_puts("\n");
+            mem_fail = 1;
+        }
+    }
+    if (mem_ran || mem_fail)
+        log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, mem_fail ? T_FAIL : T_OK, 0, 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* DIMM firmware update: identify the flash, then let the operator pick a
+ * version. Reversed from Sega's own DIMM FIRMWARE UPDATE program; the flash
+ * is driven over the G1 PIO (see dimm_flash.c). Only the non-destructive
+ * identify + the version menu are wired: the write path is a single AMD
+ * chip-erase + full-image reprogram, which wipes the recovery slot too, so
+ * it stays disarmed until validated on real hardware. */
+static const char *const g_fw_ver[3] = { "3.17", "4.01", "4.03" };
+
+static void test_dimm_flash(void)
+{
+    dimm_info di;
+    g1_bus_init();
+    dimm_probe(&di);
+
+    scif_puts(S_FW_HDR);
+    if (!di.present) {
+        scif_puts(S_FW_NO_DIMM);
+        return;
+    }
+
+    scif_puts(S_FW_IDING);
+    dimm_flash_id fi;
+    dimm_flash_identify(&fi);
+    if (!fi.id_ok) {
+        scif_puts(S_FW_NO_DIMM);
+        return;
+    }
+    scif_puts(S_FW_ID);
+    scif_puthex(fi.mfr);
+    scif_putc('/');
+    scif_puthex(fi.dev);
+    scif_puts("\n");
+
+    /* version selection on the serial console (board buttons cancel) */
+    scif_puts(S_FW_MENU);
+    int sel = -1;
+    for (;;) {
+        input_event ev;
+        if (input_poll(&ev)) {
+            if (ev.kind == INPUT_KEY) {
+                if (ev.key >= '1' && ev.key <= '3')
+                    sel = ev.key - '1';
+                break;
+            }
+            if (ev.kind == INPUT_SELECT || ev.kind == INPUT_CONFIRM)
+                break;
+        }
+        progress_heartbeat();
+    }
+
+    if (sel < 0) {
+        scif_puts(S_FW_ABORT);
+        return;
+    }
+    scif_puts(S_FW_SEL);
+    scif_puts(g_fw_ver[sel]);
+    scif_puts("\n");
+    scif_puts(S_FW_PENDING);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1429,7 +1556,9 @@ static void test_cartridge(void)
  * Rule 1 is preserved: nothing is used before being proven; we simply
  * prove the part we need first. */
 
+#if !NO_AUDIO
 static void audio_replay_log(void);   /* defined below */
+#endif
 
 #define AUDIO_ZONE_OFF  0x00010000u     /* clip landing zone in sound RAM */
 #define AUDIO_ZONE_LEN  0x00020000u     /* 128 KB: longest clip fits */
@@ -1450,10 +1579,11 @@ static void quick_audio_bringup(void)
     t_status st = (bad || res.errors) ? T_FAIL : T_OK;
     log_result(S_L_AUDIO_QUICK, CLIP_NONE, st, 0, 0);
     if (st == T_OK) {
-        g_audio_ready = 1;
         progress_phase(PH_AUDIO_ON);    /* yellow */
-
-        audio_replay_log();
+#if !NO_AUDIO
+        g_audio_ready = 1;
+        audio_replay_log();             /* spoken replay of the report so far */
+#endif
     }
 }
 
@@ -1484,6 +1614,7 @@ static void quick_video_bringup(void)
 }
 
 /* spoken replay of everything acquired before audio came up */
+#if !NO_AUDIO
 static void audio_replay_log(void)
 {
     scif_puts(S_AUDIO_ONLINE);
@@ -1491,6 +1622,7 @@ static void audio_replay_log(void)
     for (u32 i = 0; i < g_log_n; i++)
         say_entry(&g_log[i]);
 }
+#endif
 
 /* ------------------------------------------------------------------ */
 
@@ -1763,7 +1895,7 @@ static void run_action(u32 act)
         test_cartridge();
         break;
     case ACT_FLASH:
-        scif_puts(S_NOT_IMPL);
+        test_dimm_flash();
         break;
     default:
         break;

@@ -228,6 +228,8 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
 
 void aica_say(const signed char *pcm, u32 len, u32 gap_ms)
 {
+    if (pcm == 0 || len == 0)        /* no-audio build: empty clip table */
+        return;
     u32 samples = len >> 1;          /* 16-bit PCM (PCMS=0) */
     if (samples > 0xFFF0) {
         samples = 0xFFF0;            /* LEA is 16-bit: max ~2.9 s per clip */
