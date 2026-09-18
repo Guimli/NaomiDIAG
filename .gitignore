@@ -81,3 +81,4 @@ Thumbs.db
 .idea/
 # generated from linker.ld by the Makefile
 linker.gen.ld
+tools/__pycache__/

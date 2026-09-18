@@ -59,6 +59,12 @@ shows the earlier results and the SCIF prints per-pass progress.
 Spoken reports are blocking, with at least one second of silence between two
 messages so clips never overlap.
 
+The clips are stored as **4-bit Yamaha ADPCM** and handed to the AICA in that
+form (`PCMS=2`), which decodes it in hardware. That is a straight 4:1 saving
+on the EPROM with no decompressor, no scratch buffer and no CPU cost — the
+bytes are copied into sound RAM exactly as they sit in the ROM. The full
+French build went from 98 % of the EPROM to 29 %.
+
 ## What it tests
 
 In order. Items **1-9 and 11-13 are the boot suite** and run on their own.
@@ -248,9 +254,11 @@ so the report stays up but the machine never settles. Turn it on when you
 have a probe in hand.
 
 **`AUDIO=0`** builds a silent ROM: the spoken-clip table is replaced by a
-stub, and the image drops from 89 % of the EPROM to 5 %. It exists to free
-the ~1.7 MB of speech PCM for embedded DIMM firmware images, and it also
-boots faster. `AUDIO=1` is the default and is unchanged.
+stub and the image drops to 6 % of the EPROM. It was introduced when the
+clips were 16-bit PCM and left no room for anything else; since they became
+ADPCM a full bilingual build sits at 27-29 %, so this is no longer a way of
+making room — it is for a bench where the speech is in the way, and it boots
+a little faster. `AUDIO=1` is the default.
 
 ```sh
 make LANG=EN AUDIO=0
@@ -271,6 +279,7 @@ Regenerating generated sources (rarely needed, committed in the repo):
 
 ```sh
 make audio     # re-render the spoken clips (needs the Piper venv + sox)
+               # TTS -> 22050 Hz mono -> ADPCM (tools/adpcm.py)
 make cartdb    # rebuild the cartridge SHA-1 DB from `mame -listxml`
 ```
 

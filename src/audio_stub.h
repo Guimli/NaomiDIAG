@@ -1,11 +1,12 @@
 /* Auto-generated stub for AUDIO=0 builds -- no PCM data embedded.
  * Keeps the CLIP_* enum and the audio_clips[] table so the report code
- * compiles unchanged; every clip is empty and aica_say() no-ops on len==0,
- * so nothing is spoken and the ROM carries none of the ~1.7 MB of speech.
+ * compiles unchanged; every clip is empty and aica_say() no-ops on a zero
+ * sample count, so nothing is spoken and the ROM carries no speech at all.
  * Regenerate with: make AUDIO=0 (the Makefile writes this into audio_clips.h). */
 #ifndef AUDIO_CLIPS_H
 #define AUDIO_CLIPS_H
 
+/* len is a sample count (ADPCM), matching the generated headers. */
 typedef struct { const signed char *pcm; unsigned len; } audio_clip;
 
 enum {

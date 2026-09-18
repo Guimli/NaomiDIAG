@@ -226,15 +226,17 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
 /* ---- speech ---- */
 
 
-void aica_say(const signed char *pcm, u32 len, u32 gap_ms)
+void aica_say(const signed char *pcm, u32 samples, u32 gap_ms)
 {
-    if (pcm == 0 || len == 0)        /* no-audio build: empty clip table */
+    if (pcm == 0 || samples == 0)    /* no-audio build: empty clip table */
         return;
-    u32 samples = len >> 1;          /* 16-bit PCM (PCMS=0) */
-    if (samples > 0xFFF0) {
+    if (samples > 0xFFF0)
         samples = 0xFFF0;            /* LEA is 16-bit: max ~2.9 s per clip */
-        len = samples << 1;
-    }
+    /* 4-bit ADPCM (PCMS=2): two samples per byte, low nibble first. The
+     * AICA decodes it in hardware, so the clip is copied byte for byte --
+     * a quarter of the ROM and a quarter of the G2 traffic of 16-bit PCM,
+     * for nothing but the format field below. */
+    u32 len = (samples + 1) >> 1;
     /* copy clip into sound RAM, 8 words per FIFO window */
     volatile u32 *dst = (volatile u32 *)(ARAM_P2_BASE + VOICE_ARAM_OFF);
     const u32 *src = (const u32 *)pcm;
@@ -246,12 +248,15 @@ void aica_say(const signed char *pcm, u32 len, u32 gap_ms)
     }
 
     g2_fifo_wait();
-    /* key off + settings: PCMS=0 (16-bit LE), no loop, SA = clip address */
+    /* key off + settings: PCMS=2 (4-bit ADPCM), no loop, SA = clip address.
+     * PCMS is bits 8-7 of slot register 0x00, so 2 << 7 = 0x0100. The
+     * decoder state (signal 0, step 0x7F) is reset by the key-on below, so
+     * every clip starts from silence and clips stay independent. */
     u32 sa = VOICE_ARAM_OFF;
-    SLOT(0, 0x00) = (u32)((sa >> 16) & 0x7F);
+    SLOT(0, 0x00) = (u32)(0x0100 | ((sa >> 16) & 0x7F));
     SLOT(0, 0x04) = sa & 0xFFFF;
     SLOT(0, 0x08) = 0;                       /* LSA */
-    SLOT(0, 0x0C) = samples;                 /* LEA in samples (16-bit) */
+    SLOT(0, 0x0C) = samples;                 /* LEA counts samples, not bytes */
     SLOT(0, 0x10) = 0x001F;                  /* AR max, D1R=D2R=0 */
     SLOT(0, 0x14) = 0x001F;                  /* RR max, DL=0 */
     g2_fifo_wait();
@@ -284,7 +289,7 @@ void aica_say(const signed char *pcm, u32 len, u32 gap_ms)
     SLOT(0, 0x44) = 0x0000;                  /* FD2R / FRR */
     g2_fifo_wait();
     /* key on */
-    SLOT(0, 0x00) = (u32)(0x8000 | 0x4000 | ((sa >> 16) & 0x7F));
+    SLOT(0, 0x00) = (u32)(0x8000 | 0x4000 | 0x0100 | ((sa >> 16) & 0x7F));
     g2_fifo_wait();
 
     /* blocking wait: clip duration + user-mandated inter-report gap.
@@ -293,7 +298,7 @@ void aica_say(const signed char *pcm, u32 len, u32 gap_ms)
     progress_wait_ms(dur_ms + 60);
 
     g2_fifo_wait();
-    SLOT(0, 0x00) = (u32)(0x8000 | ((sa >> 16) & 0x7F)); /* key off */
+    SLOT(0, 0x00) = (u32)(0x8000 | 0x0100 | ((sa >> 16) & 0x7F)); /* key off */
     g2_fifo_wait();
     progress_wait_ms(gap_ms);
 }

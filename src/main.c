@@ -1561,7 +1561,10 @@ static void audio_replay_log(void);   /* defined below */
 #endif
 
 #define AUDIO_ZONE_OFF  0x00010000u     /* clip landing zone in sound RAM */
-#define AUDIO_ZONE_LEN  0x00020000u     /* 128 KB: longest clip fits */
+#define AUDIO_ZONE_LEN  0x00020000u     /* 128 KB: was sized for 16-bit
+                                         * clips; ADPCM needs a quarter of
+                                         * that, so it now proves more
+                                         * sound RAM than speech requires */
 #define FB_ZONE_LEN     ((u32)FB_W * FB_H * 2)   /* 640x480 RGB565 */
 
 static void quick_audio_bringup(void)

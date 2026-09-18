@@ -30,7 +30,8 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r);
 
 /* Blocking speech: copy the clip into sound RAM, play it on slot 0,
  * wait for the end of playback, then wait `gap_ms` more.
- * Rate is fixed at 22050 Hz signed 8-bit mono. */
-void aica_say(const signed char *pcm, u32 len, u32 gap_ms);
+ * Clips are 4-bit Yamaha ADPCM at 22050 Hz mono, decoded by the AICA
+ * itself (PCMS=2); `samples` is a sample count, not a byte count. */
+void aica_say(const signed char *pcm, u32 samples, u32 gap_ms);
 
 #endif

@@ -286,13 +286,23 @@ Il existe par ailleurs un chemin `FirmUpdate` interne au firmware
 grave depuis la SDRAM du DIMM et n'existe qu'en 3.x/4.x. Le cadrage exact
 des octets de la boîte aux lettres qui le déclenche n'est pas terminé.
 
-### Une variante sans audio pour faire de la place
+### La place : réglée par le codec, pas par le silence
 
-Embarquer des images de firmware DIMM demande de la place : l'option
-`AUDIO=0` du Makefile remplace la table des clips vocaux par un stub muet et
-fait tomber la ROM de 89 % à 5 % de l'EPROM, soit environ 1,9 Mo libres —
-de quoi loger cinq slots de 1 Mo compressés en deflate, six en lzma. La
-construction `AUDIO=1` est inchangée.
+Embarquer des images de firmware DIMM demandait de la place, et la première
+réponse a été l'option `AUDIO=0` du Makefile, qui remplace la table des clips
+vocaux par un stub muet et fait tomber la ROM à 6 % de l'EPROM.
+
+Elle n'est plus nécessaire. Les clips sont passés en **ADPCM 4 bits décodé
+par l'AICA** (`PCMS=2`), soit un facteur 4 sans décompresseur : le build
+français complet occupe 29 % de l'EPROM au lieu de 98 %. Et les trois images
+de firmware, compressées **ensemble** en un flux LZMA solide — elles
+partagent l'essentiel de leur code — tiennent en 526 116 octets au lieu des
+1,9 Mo qu'aurait coûté un deflate par image.
+
+Le budget tient donc largement avec la voix : base 126 Ko + décodeur LZMA et
+primitives flash ~18 Ko + firmwares 514 Ko + voix française 470 Ko = **55 %
+de l'EPROM**, presque 1 Mo de libre. `AUDIO=0` reste disponible pour un banc
+où la parole gêne.
 
 ### Sécurité de ce qu'on émet
 
