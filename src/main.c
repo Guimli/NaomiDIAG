@@ -190,7 +190,7 @@ typedef struct {
     t_status status;
     u32 detail;                     /* component bitmask (bit n = comp n+1) */
     const comp_map *comps;          /* NULL, or 4-entry position->IC table */
-    u32 quiet_ok;                   /* screen shows it only when it FAILS  */
+    u32 quiet_ok;                   /* screen+speech: only when it FAILS   */
 } log_entry;
 
 static log_entry g_log[LOG_MAX];
@@ -208,9 +208,10 @@ static u32 g_screen_y;
 static u32 screen_draw_entry(const log_entry *e, u32 y)
 {
     /* The screen holds fewer lines than the suite produces results, so the
-     * bus tests give up their line while they pass. They still run, still
-     * print on serial and are still spoken; a failure takes its line back,
-     * because that is when it is worth the space. */
+     * bus tests give up their line while they pass. They still run and still
+     * print on serial; a failure takes the line back, because that is when
+     * it is worth the space. say_entry() follows the same rule, so screen
+     * and speech never disagree. */
     if (e->quiet_ok && e->status == T_OK)
         return y;
     if (y >= fb_report_ymax())
@@ -311,6 +312,13 @@ static void say_entry(const log_entry *e)
 {
     if (!g_audio_ready || e->clip == CLIP_NONE)
         return;
+    /* Same rule as the screen: an entry that gives up its line while it
+     * passes gives up its clip too. The operator hears what is written in
+     * front of them, and a bus test announcing itself with nothing to show
+     * for it is the report contradicting the screen. Serial still carries
+     * every line -- it is the full log, and it has no line budget. */
+    if (e->quiet_ok && e->status == T_OK)
+        return;
     if (e->status == T_OK) {
         say(e->clip, 250);
         say(CLIP_OK, 250);
@@ -340,8 +348,9 @@ static void say_entry(const log_entry *e)
     }
 }
 
-/* quiet_ok: the screen shows this result only if it FAILS. Serial and speech
- * report it either way -- it is the screen that is short of lines. */
+/* quiet_ok: the screen and the speech report this result only if it FAILS.
+ * Serial reports it either way -- it is the screen that is short of lines,
+ * and the spoken report follows the screen so the two agree. */
 static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
                          const comp_map *comps, u32 quiet_ok)
 {
