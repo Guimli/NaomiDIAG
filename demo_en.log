@@ -1,0 +1,86 @@
+
+
+==== NAOMI DIAG ROM v0.14 (SH4/SCIF, no-RAM boot) ====
+CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
+SCIF console up, 115200 8N1
+CPU OC-RAM (SH-4 IC1) ........ OK
+
+SDRAM init (BSC values from original BIOS)...
+SDRAM detected size: 32 MB
+VRAM framebuffer quick check ........ OK
+Screen online: report displayed on VGA output.
+Sound RAM clip zone quick check ........ OK
+Audio online: replaying acquired results on speaker...
+Board probe: SH4 ver 040205C1, HOLLY id 17FD11DB rev 00000011, Elan id 00000000, dual PVR 0
+Board: Naomi 1 (837-13544) ........ OK
+10% 20% 30% 40% 50% 60% 70% 80% 90% BIOS ROM (IC27) CRC32 ........ OK
+Test loops relocated to CPU RAM ........ OK
+  loops execute at 8DFFC0AA (CPU RAM, cached: fast mode)
+
+AICA: ARM7 held in reset, testing sound RAM (8MB, G2 bus)...
+Sound RAM data bus ........ OK
+pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+pass 3/3 pseudo-random + CRC: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+Sound RAM cell test ........ OK
+
+PVR: enabling VRAM controller, testing texture RAM...
+pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+pass 3/3 pseudo-random + CRC: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+
+VRAM TEX0 (IC16/18/20/22) ........ OK
+pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+pass 3/3 pseudo-random + CRC: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+
+VRAM TEX1 (IC17S-23S) ........ OK
+SDRAM data bus ........ OK
+SDRAM address bus ........ OK
+pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+pass 3/3 pseudo-random + CRC: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+SDRAM cell test ........ OK
+
+Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
+Backup NVRAM IC29 (non-destructive) ........ OK
+RTC (AICA, must tick) ........ OK
+  RTC counter: 904C372B (ticking)
+  MIE on maple port 0, resp cmd 0x00000083
+  MIE version: "315-6149    COPYRIGHT SEGA E"
+Maple bus / MIE (JVS) ........ OK
+  MIE self-test status word: 00000000
+MIE self-test (Z80 ROM+RAM) ........ OK
+  (stock MIE firmware: EEPROM read needs a Z80 code upload - future work)
+
+Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
+Serial EEPROM (IC31, 93C46) ........ OK
+Relocated code integrity ........ OK
+
+==== SUMMARY ====
+CPU OC-RAM (SH-4 IC1): OK
+VRAM framebuffer quick check: OK
+Sound RAM clip zone quick check: OK
+Board: Naomi 1 (837-13544): OK
+BIOS ROM (IC27) CRC32: OK
+Test loops relocated to CPU RAM: OK
+Sound RAM data bus: OK
+Sound RAM cell test: OK
+VRAM TEX0 (IC16/18/20/22): OK
+VRAM TEX1 (IC17S-23S): OK
+SDRAM data bus: OK
+SDRAM address bus: OK
+SDRAM cell test: OK
+Backup NVRAM IC29 (non-destructive): OK
+RTC (AICA, must tick): OK
+Maple bus / MIE (JVS): OK
+MIE self-test (Z80 ROM+RAM): OK
+Serial EEPROM (IC31, 93C46): OK
+Relocated code integrity: OK
+Main RAM usable.
+Sound RAM usable, audio reports active.
+VRAM usable, on-screen report active.
+
+*** DIAG COMPLETE ***
+
+Press TEST (or PSW1) for the menu.

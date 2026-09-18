@@ -1,24 +1,86 @@
-ALSA lib seq_hw.c:540:(snd_seq_hw_open) open /dev/snd/seq failed: Permission denied
-epr-21576h.ic27 WRONG CHECKSUMS:
-    EXPECTED: CRC(d4895685) SHA1(91424d481ff99a8d3f4c45cea6d3f0eada049a6d)
-       FOUND: CRC(2144df1c) SHA1(e3397443453203288e28f6348bbcdfd6a1c3283a)
-WARNING: the machine might not run correctly.
-[random_fault] a fault was injected (see fault_answer.txt)
 
 
-==== NAOMI DIAG ROM v0.9 (SH4/SCIF, boot sans RAM) ====
+==== NAOMI DIAG ROM v0.14 (SH4/SCIF, boot sans RAM) ====
 OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 Console SCIF active, 115200 8N1
-OC-RAM CPU (cache en RAM) ........ OK
-Board probe: SH4 ver 040205C1, HOLLY id 17FD11DB rev 00000011, Elan id 00000000, dual PVR 0
-Carte : Naomi 1 (837-13544) ........ OK
-ROM BIOS (IC27) CRC32 ........ OK
+OC-RAM CPU (SH-4 IC1) ........ OK
 
 Init SDRAM (valeurs BSC du BIOS d'origine)...
 Taille SDRAM detectee : 32 Mo
+VRAM framebuffer (rapide) ........ OK
+Ecran actif : rapport affiche sur la sortie VGA.
+RAM son zone clips (rapide) ........ OK
+Audio actif : relecture des resultats acquis sur haut-parleur...
+Board probe: SH4 ver 040205C1, HOLLY id 17FD11DB rev 00000011, Elan id 00000000, dual PVR 0
+Carte : Naomi 1 (837-13544) ........ OK
+10% 20% 30% 40% 50% 60% 70% 80% 90% ROM BIOS (IC27) CRC32 ........ OK
+Boucles de test relogees en RAM ........ OK
+  loops execute at 8DFFC0AA (RAM CPU, cache: mode rapide)
 
 AICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...
 RAM son bus de donnees ........ OK
-Build QUICK : test du 1er Mo seulement
-passe 1/10: 5555Caught unhandled N3sol5errorE exception: integer value will be misrepresented in lua
-Average speed: 91.00% (2 seconds)
+passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+RAM son test cellules ........ OK
+
+PVR : activation controleur VRAM, test RAM texture...
+passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+
+VRAM TEX0 (IC16/18/20/22) ........ OK
+passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+
+VRAM TEX1 (IC17S-23S) ........ OK
+SDRAM bus de donnees ........ OK
+SDRAM bus d'adresses ........ OK
+passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+SDRAM test cellules ........ OK
+
+NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
+NVRAM IC29 sauvegarde (non destructif) ........ OK
+RTC (AICA, doit avancer) ........ OK
+  Compteur RTC : 904C3704 (avance)
+  MIE on maple port 0, resp cmd 0x00000083
+  MIE version: "315-6149    COPYRIGHT SEGA E"
+Bus Maple / MIE (JVS) ........ OK
+  MIE self-test status word: 00000000
+Auto-test MIE (Z80 ROM+RAM) ........ OK
+  (firmware MIE d'usine : la lecture EEPROM exige un upload de code Z80 - a venir)
+
+Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
+EEPROM serie (IC31, 93C46) ........ OK
+Integrite du code reloge en RAM ........ OK
+
+==== RESUME ====
+OC-RAM CPU (SH-4 IC1): OK
+VRAM framebuffer (rapide): OK
+RAM son zone clips (rapide): OK
+Carte : Naomi 1 (837-13544): OK
+ROM BIOS (IC27) CRC32: OK
+Boucles de test relogees en RAM: OK
+RAM son bus de donnees: OK
+RAM son test cellules: OK
+VRAM TEX0 (IC16/18/20/22): OK
+VRAM TEX1 (IC17S-23S): OK
+SDRAM bus de donnees: OK
+SDRAM bus d'adresses: OK
+SDRAM test cellules: OK
+NVRAM IC29 sauvegarde (non destructif): OK
+RTC (AICA, doit avancer): OK
+Bus Maple / MIE (JVS): OK
+Auto-test MIE (Z80 ROM+RAM): OK
+EEPROM serie (IC31, 93C46): OK
+Integrite du code reloge en RAM: OK
+RAM principale utilisable.
+RAM son utilisable, rapports audio actifs.
+VRAM utilisable, rapport a l'ecran actif.
+
+*** DIAGNOSTIC TERMINE ***
+
+Appuyez sur TEST (ou PSW1) pour le menu.
