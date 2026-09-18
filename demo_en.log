@@ -43,9 +43,9 @@ pass 3/3 pseudo-random + CRC: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 SDRAM cell test ........ OK
 
 Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
-Backup NVRAM IC29 (non-destructive) ........ OK
+Backup NVRAM IC29 (kept intact) ........ OK
 RTC (AICA, must tick) ........ OK
-  RTC counter: 904C3B68 (ticking)
+  RTC counter: 904C3EFC (ticking)
   MIE on maple port 0, resp cmd 0x00000083
   MIE version: "315-6149    COPYRIGHT SEGA E"
 Maple bus / MIE (JVS) ........ OK
@@ -71,7 +71,7 @@ VRAM TEX1 (IC17S/19S/21S/23S): OK
 SDRAM data bus: OK
 SDRAM address bus: OK
 SDRAM cell test: OK
-Backup NVRAM IC29 (non-destructive): OK
+Backup NVRAM IC29 (kept intact): OK
 RTC (AICA, must tick): OK
 Maple bus / MIE (JVS): OK
 MIE self-test (Z80 ROM+RAM): OK
