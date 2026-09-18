@@ -1284,21 +1284,31 @@ static void test_settings_eeprom(void)
         log_result(S_L_EEPROM_MIE, CLIP_EEPROM, T_FAIL, 0, 0);
         return;
     }
-    g_mie_prog = 1;
     scif_puts(S_MIE_UP_OK);
+
+    /* Ask the program something before trusting it. Matching checksums say
+     * the bytes arrived, not that the code runs: a MIE that took the upload
+     * and then did nothing would leave the console polling a program that
+     * never answers, four times a second, each poll spinning out a Maple
+     * timeout. So the button path is armed by a reply, not by an upload.
+     *
+     * The DIP switches and the two front buttons sit on the MIE port the
+     * EEPROM's data line shares, so this probe is also the report. */
+    {
+        u8 in5;
+        if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0) {
+            g_mie_prog = 1;
+            report_mie_inputs(in5);
+        } else {
+            scif_puts(S_MIE_NO_ANSWER);
+        }
+    }
 
     u8 ee[128];
     if (maple_eeprom_read(g_mie_port1 - 1, ee)) {
         scif_puts(S_EEPROM_MIE_NOTE);
         log_result(S_L_EEPROM_MIE, CLIP_EEPROM, T_FAIL, 0, 0);
         return;
-    }
-
-    {   /* Free with the same program: the DIP switches and the two front
-         * buttons sit on the MIE port the EEPROM's data line shares. */
-        u8 in5;
-        if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0)
-            report_mie_inputs(in5);
     }
     u16 stored1 = (u16)(ee[0] | (ee[1] << 8));
     u16 calc1   = sega_eeprom_crc(&ee[2], 16);

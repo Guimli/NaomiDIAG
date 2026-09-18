@@ -52,13 +52,13 @@ SDRAM test cellules ........ OK
 NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 NVRAM sauvegarde IC29 (intacte) ........ OK
 RTC (AICA, doit avancer) ........ OK
-  Compteur RTC : 904C4EA6 (avance)
+  Compteur RTC : 904C5376 (avance)
   MIE on maple port 0, resp cmd 0x00000083
   MIE version: "315-6149    COPYRIGHT SEGA E"
 Bus Maple / MIE (JVS) ........ OK
   MIE self-test status word: 00000000
 Auto-test MIE (Z80 ROM+RAM) ........ OK
-  programme Z80 charge dans le MIE, EEPROM et boutons actifs
+  programme Z80 charge dans le MIE
   DIP SW1 : 1=15 kHz  2=OFF  3=OFF  4=OFF   (port brut 000000FE)
   Boutons carte : TEST relache, SERVICE relache
 

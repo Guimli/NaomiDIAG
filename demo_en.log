@@ -52,13 +52,13 @@ SDRAM cell test ........ OK
 Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
 Backup NVRAM IC29 (kept intact) ........ OK
 RTC (AICA, must tick) ........ OK
-  RTC counter: 904C4ED5 (ticking)
+  RTC counter: 904C53A5 (ticking)
   MIE on maple port 0, resp cmd 0x00000083
   MIE version: "315-6149    COPYRIGHT SEGA E"
 Maple bus / MIE (JVS) ........ OK
   MIE self-test status word: 00000000
 MIE self-test (Z80 ROM+RAM) ........ OK
-  Z80 program loaded into the MIE, EEPROM and buttons live
+  Z80 program loaded into the MIE
   DIP SW1: 1=15 kHz  2=OFF  3=OFF  4=OFF   (raw port 000000FE)
   Board buttons: TEST released, SERVICE released
 
