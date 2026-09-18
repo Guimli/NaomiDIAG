@@ -53,7 +53,8 @@ u32 crc32_rom_block(const u32 *src, u32 nquads, u32 crc);
 static u32 g_audio_ready;           /* sound RAM validated, AICA usable */
 static u32 g_ic_valid;              /* identified board: IC tables apply */
 static board_type g_board_type;     /* set by test_board() */
-static u32 g_mie_port1;             /* MIE maple port + 1; 0 = none  */
+static u32 g_mie_port1;
+u32 g_mie_prog;                     /* our Z80 program is resident */             /* MIE maple port + 1; 0 = none  */
 
 /* IC tables were extracted from the Naomi 1 BIOS; on any other board we
  * fall back to numbered positions instead of announcing wrong ICs. */
@@ -1243,13 +1244,36 @@ static void test_settings_eeprom(void)
         scif_puts(S_EEPROM_SKIP);
         return;
     }
+    /* The MIE's factory firmware cannot read this EEPROM, and cannot read
+     * the push buttons either -- it answers four Maple commands and none of
+     * them is either. So a small Z80 program goes in first, and it stays
+     * resident: from here on it is what serves the operator console. */
+    u32 bad = maple_mie_upload(g_mie_port1 - 1);
+    if (bad) {
+        scif_puts(S_MIE_UP_FAIL);
+        scif_putdec(bad);
+        scif_puts("\n");
+        log_result(S_L_EEPROM_MIE, CLIP_EEPROM, T_FAIL, 0, 0);
+        return;
+    }
+    g_mie_prog = 1;
+    scif_puts(S_MIE_UP_OK);
+
     u8 ee[128];
     if (maple_eeprom_read(g_mie_port1 - 1, ee)) {
-        /* Stock 315-6146 firmware has no 0x86 handler: reading this
-         * EEPROM needs a code upload into the MIE (as the BIOS does).
-         * Not a fault -> reported as a documented skip. */
         scif_puts(S_EEPROM_MIE_NOTE);
+        log_result(S_L_EEPROM_MIE, CLIP_EEPROM, T_FAIL, 0, 0);
         return;
+    }
+
+    {   /* Free with the same program: the DIP switches and the two front
+         * buttons sit on the MIE port the EEPROM's data line shares. */
+        u8 in5;
+        if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0) {
+            scif_puts(S_MIE_DIP);
+            scif_puthex(in5);
+            scif_puts("\n");
+        }
     }
     u16 stored1 = (u16)(ee[0] | (ee[1] << 8));
     u16 calc1   = sega_eeprom_crc(&ee[2], 16);

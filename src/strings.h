@@ -54,6 +54,9 @@
 #define S_L_SDRAM_CELL      "SDRAM test cellules"
 #define S_L_ARAM_DBUS       "RAM son bus de donnees"
 #define S_L_ARAM_ABUS       "RAM son bus d'adresses"
+#define S_MIE_UP_OK         "  programme Z80 charge dans le MIE, EEPROM et boutons actifs\n"
+#define S_MIE_UP_FAIL       "  echec du chargement Z80 dans le MIE, paquet "
+#define S_MIE_DIP           "  MIE port entree (DIP/TEST/SERVICE) : "
 #define S_L_VRAM_T0_DBUS    "VRAM TEX0 bus de donnees"
 #define S_L_VRAM_T0_ABUS    "VRAM TEX0 bus d'adresses"
 #define S_L_VRAM_T1_DBUS    "VRAM TEX1 bus de donnees"
@@ -138,7 +141,7 @@
 #define S_DIMM_MEM_TIMEOUT  "  DMA sans reponse (DIMM non amorce ?)\n"
 #define S_DIMM_SCRATCH_BAD  "  RAM tampon inutilisable, test cellules ignore\n"
 #define S_L_DIMM_MEM_PAT    "DIMM : test cellules + CRC"
-#define S_MENU_TITLE        "MENU  --  TEST/PSW1 : choisir   START/PSW2 : lancer"
+#define S_MENU_TITLE        "MENU  --  TEST : choisir   SERVICE : lancer"
 #define S_M_CPU             "Test RAM CPU en boucle"
 #define S_M_VRAM            "Test RAM video en boucle"
 #define S_M_ARAM            "Test RAM son en boucle"
@@ -158,7 +161,7 @@
 #define S_L_ABORTED         "Test interrompu par l'operateur"
 #define S_LOOP_PASS         "passe "
 #define S_LOOP_ERR          "  erreurs cumulees : "
-#define S_WAIT_TEST         "\nAppuyez sur TEST (ou PSW1) pour le menu.\n"
+#define S_WAIT_TEST         "\nAppuyez sur TEST (carte) pour le menu.\n"
 #define S_HELP              "\nTouches :\n"\
                             "  h  cette aide (n'interrompt pas)\n"\
                             "  a  interrompre le test en cours\n"\
@@ -263,6 +266,9 @@
 #define S_L_SDRAM_CELL      "SDRAM cell test"
 #define S_L_ARAM_DBUS       "Sound RAM data bus"
 #define S_L_ARAM_ABUS       "Sound RAM address bus"
+#define S_MIE_UP_OK         "  Z80 program loaded into the MIE, EEPROM and buttons live\n"
+#define S_MIE_UP_FAIL       "  MIE Z80 upload failed at packet "
+#define S_MIE_DIP           "  MIE input port (DIP/TEST/SERVICE): "
 #define S_L_VRAM_T0_DBUS    "VRAM TEX0 data bus"
 #define S_L_VRAM_T0_ABUS    "VRAM TEX0 address bus"
 #define S_L_VRAM_T1_DBUS    "VRAM TEX1 data bus"
@@ -345,7 +351,7 @@
 #define S_DIMM_MEM_TIMEOUT  "  DMA no response (DIMM not booted?)\n"
 #define S_DIMM_SCRATCH_BAD  "  scratch RAM unusable, cell test skipped\n"
 #define S_L_DIMM_MEM_PAT    "DIMM: cell test + CRC"
-#define S_MENU_TITLE        "MENU  --  TEST/PSW1: select   START/PSW2: run"
+#define S_MENU_TITLE        "MENU  --  TEST: select   SERVICE: run"
 #define S_M_CPU             "CPU RAM test, looping"
 #define S_M_VRAM            "Video RAM test, looping"
 #define S_M_ARAM            "Sound RAM test, looping"
@@ -365,7 +371,7 @@
 #define S_L_ABORTED         "Test interrupted by the operator"
 #define S_LOOP_PASS         "pass "
 #define S_LOOP_ERR          "  errors so far: "
-#define S_WAIT_TEST         "\nPress TEST (or PSW1) for the menu.\n"
+#define S_WAIT_TEST         "\nPress TEST (on the board) for the menu.\n"
 #define S_HELP              "\nKeys:\n"\
                             "  h  this help (does not interrupt)\n"\
                             "  a  abort the running test\n"\

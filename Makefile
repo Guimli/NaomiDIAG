@@ -47,7 +47,7 @@ OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.
 
 HDRS := src/config.h src/version.inc src/hw.h src/scif.h src/sdram.h src/ramtest.h src/timer.h src/aica.h \
         src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/sha1.h \
-        src/cart.h src/cartdb.h src/strings.h
+        src/cart.h src/cartdb.h src/strings.h src/mie_prog.h src/input.h
 
 all: $(BIN)
 
@@ -95,6 +95,10 @@ audio:
 	python3 tools/gen_audio.py fr src/audio_clips_fr.h
 	python3 tools/gen_audio.py en src/audio_clips_en.h
 
+# regenerate the MIE Z80 program header (needs z80asm)
+mieprog:
+	python3 tools/gen_mieprog.py src/mie_prog.z80 src/mie_prog.h
+
 # regenerate the cartridge SHA1 database (needs a mame -listxml dump)
 cartdb:
 	python3 tools/gen_cartdb.py mamelist.xml src/cartdb.h
@@ -125,4 +129,4 @@ clean:
 	rm -f src/*.o naomi_diag_*.elf naomi_diag_*.map naomi_diag_*.dis \
 	      NaomiDIAG_*.bin src/audio_clips.h .build_* linker.gen.ld
 
-.PHONY: all audio cartdb dis mame-rom run-mame clean
+.PHONY: all audio cartdb mieprog dis mame-rom run-mame clean

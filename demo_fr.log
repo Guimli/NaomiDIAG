@@ -52,13 +52,17 @@ SDRAM test cellules ........ OK
 NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 NVRAM sauvegarde IC29 (intacte) ........ OK
 RTC (AICA, doit avancer) ........ OK
-  Compteur RTC : 904C42D9 (avance)
+  Compteur RTC : 904C4C26 (avance)
   MIE on maple port 0, resp cmd 0x00000083
   MIE version: "315-6149    COPYRIGHT SEGA E"
 Bus Maple / MIE (JVS) ........ OK
   MIE self-test status word: 00000000
 Auto-test MIE (Z80 ROM+RAM) ........ OK
-  (firmware MIE d'usine : la lecture EEPROM exige un upload de code Z80 - a venir)
+  programme Z80 charge dans le MIE, EEPROM et boutons actifs
+  MIE port entree (DIP/TEST/SERVICE) : 000000FE
+
+Settings EEPROM: crc1 00004822 ok, crc2 00004822 ok, copies match
+EEPROM reglages (93C46 via MIE) ........ OK
 
 Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
 EEPROM serie (IC31, 93C46) ........ OK
@@ -87,6 +91,7 @@ NVRAM sauvegarde IC29 (intacte): OK
 RTC (AICA, doit avancer): OK
 Bus Maple / MIE (JVS): OK
 Auto-test MIE (Z80 ROM+RAM): OK
+EEPROM reglages (93C46 via MIE): OK
 EEPROM serie (IC31, 93C46): OK
 Integrite du code reloge en RAM: OK
 RAM principale utilisable.
@@ -95,4 +100,4 @@ VRAM utilisable, rapport a l'ecran actif.
 
 *** DIAGNOSTIC TERMINE ***
 
-Appuyez sur TEST (ou PSW1) pour le menu.
+Appuyez sur TEST (carte) pour le menu.

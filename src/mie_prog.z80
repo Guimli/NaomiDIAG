@@ -1,0 +1,190 @@
+; -----------------------------------------------------------------------
+; NaomiDIAG: Z80 program uploaded into the MIE (315-6146).
+;
+; The MIE's own 2 KB boot ROM answers exactly four Maple commands -- 0x03,
+; 0x80, 0x82 and 0x84 -- and nothing else. It cannot read the settings
+; EEPROM, and it has no 0x86 handler either, which is why the board's push
+; buttons never reached the diagnostic: every JVS read was answered with
+; "unknown command". So this is not only how the EEPROM is read, it is what
+; makes the operator console's buttons work at all.
+;
+; Uploaded 24 bytes at a time by Maple command 0x80 and entered at 0x8010
+; by the execute packet (address field 0xFFFF). Once running it OWNS the
+; Maple interface: the boot ROM's dispatcher is gone, so this loop has to
+; answer everything the host sends, including what it does not understand.
+; It stays resident for the rest of the session.
+;
+; Everything below was read off the hardware rather than assumed: the port
+; map from MAME's mie.cpp, the 93C46 wiring from the same file, and the
+; command framing and 93C46 opcodes from the blob the original BIOS
+; uploads, captured out of the MIE's own RAM while it ran.
+; -----------------------------------------------------------------------
+
+CTRL0:       equ 07000h      ; TXB bit0, CTXB bit1, ENDP bit2
+CTRL1:       equ 07001h      ; PERR b1, BFOV b3, RXB b4, RFB b5, TFB b6
+LREG:        equ 07003h      ; reply length in words, minus one
+TBUF:        equ 07004h      ; [cmd][dst][src][len] then up to 7 payload words
+
+GPIO3:       equ 003h        ; EEPROM control lines, output
+GPIODIR:     equ 008h        ; bit clear = that port is an output
+IN5:         equ 005h        ; EEPROM DO, DIP switches, TEST, SERVICE
+
+EE_DI:       equ 010h
+EE_CS:       equ 020h
+EE_CLK:      equ 040h
+
+EEBUF:       equ 09000h      ; 128 bytes, clear of this code
+STACK:       equ 0fff0h
+
+            org 08010h
+
+; ---- entry ------------------------------------------------------------
+start:      di
+            ld sp,STACK
+            ld a,077h               ; port 3 out, ports 0-2/4-6 in, port 7 out
+            out (GPIODIR),a
+
+            ; Pull the whole EEPROM in one go. 128 byte-wide reads take a
+            ; few milliseconds; doing it once here keeps the Maple replies
+            ; instant, which matters because the host polls this loop for
+            ; button state between every test.
+            ld hl,EEBUF
+            ld e,000h
+fill:       call ee_read            ; E = address -> C = byte
+            ld (hl),c
+            inc hl
+            inc e
+            ld a,e
+            cp 080h
+            jr nz,fill
+
+; ---- Maple service loop ----------------------------------------------
+main:       ld hl,CTRL1
+waitrx:     bit 5,(hl)              ; RFB: a packet has been received
+            jr z,waitrx
+            ld a,(TBUF+1)           ; destination must be this device
+            cp 020h
+            jr nz,main
+            ld a,(TBUF)
+            cp 0e0h
+            jr z,cmd_eeprom
+            cp 0e2h
+            jr z,cmd_input
+            ; Anything else gets a short refusal rather than silence: a
+            ; host left waiting for a reply that never comes would spin
+            ; until its own timeout on every poll.
+            ld a,0fch
+            ld c,000h
+            jr reply
+
+; ---- 0xE0: one 28-byte slice of the EEPROM, index in payload byte 0 ----
+cmd_eeprom: ld a,(TBUF+4)           ; block index 0..4
+            cp 005h
+            jr nc,bad_index
+            ld l,a
+            ld h,000h
+            add hl,hl               ; index * 28, as 32x minus 4x
+            add hl,hl               ; 4x
+            ld d,h
+            ld e,l                  ; DE = 4x
+            add hl,hl               ; 8x
+            add hl,hl               ; 16x
+            add hl,hl               ; 32x
+            or a                    ; clear carry for the subtract
+            sbc hl,de               ; 28x
+            ld de,EEBUF
+            add hl,de
+            ld de,TBUF+4
+            ld bc,001ch
+            ldir
+            ld a,0e1h
+            ld c,007h               ; 7 payload words
+            jr reply
+bad_index:  ld a,0fch
+            ld c,000h
+            jr reply
+
+; ---- 0xE2: the input port, live -------------------------------------
+; Port 5 carries DIP SW1:1-4 (bits 0-3), TEST (bit 4), SERVICE1/2 (bits
+; 5-6) and the EEPROM's DO line (bit 7), all active low but for DO. It is
+; read here and not cached: this is the command the console polls.
+cmd_input:  in a,(IN5)
+            ld (TBUF+4),a
+            xor a
+            ld (TBUF+5),a
+            ld (TBUF+6),a
+            ld (TBUF+7),a
+            ld a,0e3h
+            ld c,001h               ; 1 payload word
+
+; ---- reply: A = command byte, C = payload words ----------------------
+reply:      ld (TBUF),a
+            xor a
+            ld (TBUF+1),a           ; destination: the host
+            ld a,020h
+            ld (TBUF+2),a           ; source: this device
+            ld a,c
+            ld (TBUF+3),a
+            ld (LREG),a
+            ld hl,CTRL0
+            set 2,(hl)              ; ENDP
+            set 0,(hl)              ; TXB: start sending
+            ld hl,CTRL1
+waittx:     bit 6,(hl)              ; TFB: sent
+            jr z,waittx
+            jp main
+
+; ---- 93C46 byte read, 8-bit mode -------------------------------------
+; E = address (7 bits, A6 in bit 6) -> C = byte. Opcode is start bit 1
+; then 10, taken from the preamble the original BIOS clocks out.
+ee_read:    xor a
+            out (GPIO3),a           ; CS low twice, as the BIOS does
+            out (GPIO3),a
+            ld a,EE_CS+EE_DI        ; start bit: 1
+            out (GPIO3),a
+            ld a,EE_CS+EE_CLK+EE_DI
+            out (GPIO3),a
+            ld a,EE_CS+EE_DI        ; opcode bit: 1
+            out (GPIO3),a
+            ld a,EE_CS+EE_CLK+EE_DI
+            out (GPIO3),a
+            ld a,EE_CS              ; opcode bit: 0  -> READ
+            out (GPIO3),a
+            ld a,EE_CS+EE_CLK
+            out (GPIO3),a
+
+            ld c,e                  ; 7 address bits, MSB first
+            ld b,007h
+eeaddr:     ld a,c
+            and 040h
+            srl a
+            srl a                   ; line up with DI at bit 4
+            or EE_CS
+            out (GPIO3),a
+            or EE_CLK
+            out (GPIO3),a
+            sla c
+            djnz eeaddr
+
+            ld b,008h               ; 8 data bits, MSB first
+            ld c,000h
+eedata:     sla c
+            ld a,EE_CS
+            out (GPIO3),a
+            ld a,EE_CS+EE_CLK
+            out (GPIO3),a
+            in a,(IN5)
+            and 080h
+            jr z,eeskip
+            inc c
+eeskip:     djnz eedata
+
+            ld a,EE_CS              ; one trailing clock, then release CS
+            out (GPIO3),a
+            ld a,EE_CS+EE_CLK
+            out (GPIO3),a
+            xor a
+            out (GPIO3),a
+            ld a,EE_CLK
+            out (GPIO3),a
+            ret

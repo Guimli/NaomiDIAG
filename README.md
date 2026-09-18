@@ -108,8 +108,10 @@ the report (see [Operator console](#operator-console)).
     firmware flash.
 11. **Maple bus / MIE** (315-6146 Z80) — version request + factory
     self-test.
-12. **Settings EEPROM** (93C46 via MIE) — groundwork (needs a Z80 code
-    upload; documented).
+12. **Settings EEPROM** (93C46 via MIE) — read and both CRC-checked copies
+    verified. Needs a Z80 program uploaded into the MIE first
+    (`src/mie_prog.z80`), which then stays resident and also serves the
+    board's buttons and DIP switches.
 13. **Serial-number EEPROM** (93C46 on SH-4 GPIO) — read + content check.
 14. **Cartridge security** (X76F100) — presence via response-to-reset.
     Menu action `g`, with items 15-17.
@@ -186,11 +188,15 @@ that needs diagnosing. Build with `RELOC=0` to disable it entirely.
 
 ## Operator console
 
-The boot suite is not the end of it. A key on the serial port, or either of
-the two push buttons, interrupts the tests and brings up a menu. Both button
-paths work at once: **PSW1 / PSW2** on the motherboard and **TEST / START**
-from a cabinet's JVS I/O board are polled together, so the ROM behaves the
-same on a bare board on a bench and in a cabinet.
+The boot suite is not the end of it. A key on the serial port, or the board's
+**TEST** and **SERVICE** buttons, interrupts the tests and brings up a menu.
+
+The buttons need a small Z80 program uploaded into the MIE first — the
+315-6146's factory firmware answers four Maple commands and reading the
+buttons is not one of them. That upload happens during the settings-EEPROM
+test and the program stays resident, so buttons work from the report onward.
+A cabinet's JVS **TEST/START** are *not* wired up: reaching those means
+driving the MIE's JVS UART from the Z80 side, which is separate work.
 
 Keys on the serial console:
 
@@ -203,7 +209,7 @@ Keys on the serial console:
 | `g` | game flash SHA-1 integrity |
 | `f` | DIMM firmware flash — identify, and choose a version |
 
-**TEST** steps through the menu and wraps; **START** runs the selection. The
+**TEST** steps through the menu and wraps; **SERVICE** runs the selection. The
 three RAM loops run until **TEST** is pressed and nothing else stops them —
 that is the point, since an intermittent fault shows up on the tenth pass,
 not the first. Every other action prints its report and waits for **TEST** to
@@ -333,8 +339,11 @@ under the DRC, so fault injection into it needs `-nodrc`.
 - The spoken clips say the number without the **S** suffix, so a fault on
   IC11S is heard as "I C eleven". The screen and the serial console are
   authoritative.
-- The settings EEPROM read and full JVS I/O-board testing need a Z80 code
-  upload into the MIE (future work).
+- Full JVS I/O-board testing still needs a JVS master in the MIE's Z80. The
+  settings EEPROM and the board's own buttons no longer do: `make mieprog`
+  rebuilds `src/mie_prog.h` from the Z80 source if you change it, and the
+  generated header is committed so the ROM builds with the SH-4 toolchain
+  alone.
 
 ## DIMM board
 

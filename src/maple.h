@@ -23,6 +23,11 @@ void maple_scan(maple_result *mr);
  * Returns 0 on success. */
 u32 maple_eeprom_read(u32 port, u8 *out128);
 
+/* Upload and start the MIE program (src/mie_prog.z80). Everything below
+ * needs it: the stock MIE firmware can do neither of these. */
+u32 maple_mie_upload(u32 port);
+u32 maple_mie_inputs(u32 port, u8 *state);
+
 /* MIE self-test (stock kernel command 0x84 -> 0x85): the Z80 runs its
  * own ROM/RAM test; status word 0x00000000 = pass. Returns 0 on pass,
  * with the raw status in *status. */

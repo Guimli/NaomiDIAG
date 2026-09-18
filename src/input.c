@@ -3,18 +3,29 @@
 #include "maple.h"
 #include "timer.h"
 
-/* The board's two push buttons live in the MIE's own status word, not in a
- * JVS packet: no I/O board has to be attached for them to work. Their bits
- * are active LOW, which is why each is inverted before use.
+/* set by main.c once the MIE program is up; before that our commands
+ * do not exist and every poll would be a wasted Maple round trip */
+extern u32 g_mie_prog;
+
+/* The board's two push buttons, read through the Z80 program uploaded into
+ * the MIE (src/mie_prog.z80).
  *
- * Positions confirmed against libnaomi's maple driver, which reads the same
- * 0x86/0x15 response:  dip switches bits 16-19, PSW1 bit 20, PSW2 bit 21 of
- * the second payload word. Our maple_jvs_read hands back the payload starting
- * at word 0, so that word is out[1]. */
-#define PSW_WORD        1
-#define PSW1_BIT        20
-#define PSW2_BIT        21
-#define JVS_PKT_WORD    5       /* length in bits 8-15, packet bytes after */
+ * This used to go through Maple command 0x86, which the MIE's factory
+ * firmware does not implement -- its boot ROM answers 0x03, 0x80, 0x82 and
+ * 0x84 and refuses everything else. Every poll failed, silently, so no
+ * button press ever reached the diagnostic. Disassembling the MIE ROM said
+ * so and a probe confirmed it: command 0x86 returns rc=1 on a stock board.
+ *
+ * The uploaded program answers 0xE2 with the MIE's input port instead:
+ * DIP SW1:1-4 in bits 0-3, TEST in bit 4, SERVICE in bits 5-6, all active
+ * LOW, which is why each is inverted before use. Wiring confirmed in MAME's
+ * mie.cpp and in the blob the original BIOS uploads.
+ *
+ * The cabinet's JVS TEST/START are NOT here. Reaching them means driving
+ * the MIE's JVS UART from the Z80 -- a JVS master in 2 KB -- which is a
+ * separate piece of work. The board buttons carry the console for now. */
+#define MIE_TEST_BIT    4
+#define MIE_SERVICE_BIT 5
 
 #define BUTTON_PERIOD   (TIMER_HZ / 4u)     /* a Maple round trip, 4x/second */
 
@@ -32,42 +43,14 @@ void input_set_mie_port(u32 port_plus_1)
  * the board's own buttons these are active HIGH, and they only exist if a
  * JVS I/O board is attached and answered the request sent on the previous
  * poll. Absent one, both stay 0 and the board buttons carry the menu. */
-static void jvs_buttons(const u32 *words, u32 *test, u32 *start)
-{
-    *test = 0;
-    *start = 0;
-
-    u32 len = (words[JVS_PKT_WORD] >> 8) & 0xFFu;
-    if (len < 8)
-        return;
-    const volatile u8 *pkt = (const volatile u8 *)&words[JVS_PKT_WORD] + 2;
-    if (pkt[0] != 0xE0)                 /* JVS start of message */
-        return;
-    if (pkt[3] != 0x01 || pkt[4] != 0x01)  /* response code, report code */
-        return;
-
-    *test  = (pkt[5] >> 7) & 1u;
-    *start = (pkt[6] >> 7) & 1u;
-}
-
 static u32 buttons_poll(input_event *ev)
 {
-    u32 words[14];
-    if (maple_jvs_read(g_mie_port1 - 1, words) != 0)
+    u8 in5;
+    if (maple_mie_inputs(g_mie_port1 - 1, &in5) != 0)
         return 0;
 
-    u32 psw1 = (~(words[PSW_WORD] >> PSW1_BIT)) & 1u;
-    u32 psw2 = (~(words[PSW_WORD] >> PSW2_BIT)) & 1u;
-
-    /* Both routes drive the same two actions, so a board on a bench and a
-     * board in a cabinet behave identically without the operator choosing. */
-    u32 jtest, jstart;
-    jvs_buttons(words, &jtest, &jstart);
-    psw1 |= jtest;
-    psw2 |= jstart;
-
-    /* queue the request whose answer the next poll will read */
-    maple_jvs_request(g_mie_port1 - 1, 1);
+    u32 psw1 = (~(in5 >> MIE_TEST_BIT)) & 1u;
+    u32 psw2 = (~(in5 >> MIE_SERVICE_BIT)) & 1u;
 
     /* Report the press, not the hold: a finger rests on a button for far
      * longer than the poll interval, and a held button must not scroll the
@@ -94,7 +77,7 @@ u32 input_poll(input_event *ev)
         return 1;
     }
 
-    if (!g_mie_port1)
+    if (!g_mie_port1 || !g_mie_prog)
         return 0;
 
     /* The serial check above is a register read; this one is a Maple round

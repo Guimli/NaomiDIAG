@@ -2,6 +2,7 @@
  * device address of each port and collect the response.
  * Register/protocol references: KallistiOS maple driver, MAME maple-dc. */
 #include "maple.h"
+#include "mie_prog.h"
 #include "timer.h"
 #include "scif.h"
 
@@ -124,28 +125,89 @@ u32 maple_mie_selftest(u32 port, u32 *status)
     return 1;
 }
 
+/* Upload our Z80 program into the MIE and start it.
+ *
+ * Maple command 0x80, as the MIE's boot ROM implements it: payload word 0
+ * carries the destination address in its upper two bytes -- high byte at
+ * offset 2, low at offset 3 -- and words 1..6 carry 24 bytes of code. The
+ * MIE answers 0x81 with one word whose low byte is the sum of the 28
+ * payload bytes, so every packet is checked rather than hoped for. A packet
+ * whose first two payload bytes are 0xFF 0xFF means "run it", and the MIE
+ * jumps to 0x8010.
+ *
+ * From that point the MIE no longer runs its factory dispatcher: this
+ * program owns the Maple interface until the board is reset.
+ *
+ * Returns 0 on success, or the 1-based number of the packet that failed. */
+u32 maple_mie_upload(u32 port)
+{
+    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    u32 pay[7];
+
+    for (u32 off = 0; off < MIE_PROG_LEN; off += 24) {
+        u32 addr = MIE_PROG_ORG + off;
+        const u8 *src = &mie_prog[off];
+        u32 left = MIE_PROG_LEN - off;
+        if (left > 24)
+            left = 24;
+
+        /* word 0: bytes 0,1 free (they only mean something as FFFF),
+         * byte 2 = address high, byte 3 = address low */
+        pay[0] = ((addr & 0xFF00u) << 8) | ((addr & 0x00FFu) << 24);
+        u8 *pb = (u8 *)&pay[1];
+        for (u32 i = 0; i < 24; i++)
+            pb[i] = (i < left) ? src[i] : 0;
+
+        u32 sum = 0;
+        const u8 *all = (const u8 *)pay;
+        for (u32 i = 0; i < 28; i++)
+            sum += all[i];
+
+        u32 hdr = maple_txn(port, 0x80, 7, pay);
+        if ((hdr & 0xFF) != 0x81 || (rx[1] & 0xFF) != (sum & 0xFF))
+            return (off / 24) + 1;
+    }
+
+    pay[0] = 0x0000FFFFu;                   /* bytes 0,1 = FF FF: execute */
+    for (u32 i = 1; i < 7; i++)
+        pay[i] = 0;
+    maple_txn(port, 0x80, 7, pay);          /* no reply: the MIE jumps away */
+    delay_ms(20);                           /* it reads the whole EEPROM first */
+    return 0;
+}
+
+/* Read the 128-byte settings EEPROM through the uploaded program: command
+ * 0xE0, payload byte 0 = which 28-byte slice, answered by 0xE1. */
 u32 maple_eeprom_read(u32 port, u8 *out128)
 {
     volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
-    u32 pay;
 
-    pay = 0x00000001;                       /* start EEPROM -> MIE read */
-    u32 hdr = maple_txn(port, 0x86, 1, &pay);
-    (void)hdr;
-
-    for (u32 tries = 0; tries < 50; tries++) {
-        delay_ms(10);
-        pay = 0x00000003;                   /* fetch read result */
-        hdr = maple_txn(port, 0x86, 1, &pay);
-        if ((hdr & 0xFF) == 0x87 && ((hdr >> 24) & 0xFF) >= 32) {
-            /* fetch response: 32 payload words = the 128 EEPROM bytes */
-            const volatile u8 *src = (const volatile u8 *)&rx[1];
-            for (u32 i = 0; i < 128; i++)
-                out128[i] = src[i];
-            return 0;
+    for (u32 blk = 0; blk < 5; blk++) {
+        u32 pay = blk;
+        u32 hdr = maple_txn(port, 0xE0, 1, &pay);
+        if ((hdr & 0xFF) != 0xE1)
+            return 1;
+        const volatile u8 *src = (const volatile u8 *)&rx[1];
+        for (u32 i = 0; i < 28; i++) {
+            u32 d = blk * 28 + i;
+            if (d < 128)
+                out128[d] = src[i];
         }
     }
-    return 1;
+    return 0;
+}
+
+/* The MIE input port, live: DIP SW1:1-4 in bits 0-3, TEST in bit 4,
+ * SERVICE1/2 in bits 5-6, all active low. Command 0xE2 -> 0xE3. */
+u32 maple_mie_inputs(u32 port, u8 *state)
+{
+    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    u32 pay = 0;
+    u32 hdr = maple_txn(port, 0xE2, 1, &pay);
+    if ((hdr & 0xFF) != 0xE3)
+        return 1;
+    *state = (u8)(rx[1] & 0xFF);
+    return 0;
 }
 
 /* Read the JVS control state through the MIE: command 0x86 with subcommand
