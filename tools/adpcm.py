@@ -42,6 +42,7 @@ def encode(pcm):
     signal, quant = 0, 0x7f
     hi, held = False, 0
     for s in pcm:
+        s = int(s)          # a numpy int16 would wrap in the arithmetic below
         best, best_err = 0, None
         for code in range(8):
             x = (quant * DIFF[code]) // 8
