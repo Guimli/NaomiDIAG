@@ -1238,6 +1238,34 @@ static void test_maple_mie(u32 ram_ok)
 /* Settings EEPROM (93C46 behind the MIE): read all 128 bytes through
  * the MIE protocol, then verify SEGA CRCs and the duplicated copies of
  * the system area. Read-only. */
+/* The MIE input port, spelled out. SW1:1 selects the monitor frequency and
+ * is the only one of the four whose meaning is documented; 2 to 4 are
+ * reported as positions rather than given an invented meaning. All the bits
+ * are active LOW, switches and buttons alike, so a closed switch reads 0.
+ *
+ * Serial only: it is context, not a verdict, and the CRT has no row to
+ * spare for something that never fails. The raw byte is printed after it
+ * because that is what you want when the decoding looks wrong. */
+static void report_mie_inputs(u8 in5)
+{
+    scif_puts(S_DIP_HDR);
+    scif_puts((in5 & 0x01u) ? S_DIP_31K : S_DIP_15K);
+    for (u32 i = 1; i < 4; i++) {
+        scif_puts("  ");
+        scif_putdec(i + 1);
+        scif_puts((in5 & (1u << i)) ? S_DIP_OFF : S_DIP_ON);
+    }
+    scif_puts(S_DIP_RAW);
+    scif_puthex(in5);
+    scif_puts(")\n");
+
+    scif_puts(S_BTN_HDR);
+    scif_puts((in5 & 0x10u) ? S_BTN_UP : S_BTN_DOWN);
+    scif_puts(S_BTN_SVC);
+    scif_puts((in5 & 0x20u) ? S_BTN_UP : S_BTN_DOWN);
+    scif_puts("\n");
+}
+
 static void test_settings_eeprom(void)
 {
     if (!g_mie_port1) {
@@ -1269,11 +1297,8 @@ static void test_settings_eeprom(void)
     {   /* Free with the same program: the DIP switches and the two front
          * buttons sit on the MIE port the EEPROM's data line shares. */
         u8 in5;
-        if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0) {
-            scif_puts(S_MIE_DIP);
-            scif_puthex(in5);
-            scif_puts("\n");
-        }
+        if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0)
+            report_mie_inputs(in5);
     }
     u16 stored1 = (u16)(ee[0] | (ee[1] << 8));
     u16 calc1   = sega_eeprom_crc(&ee[2], 16);
