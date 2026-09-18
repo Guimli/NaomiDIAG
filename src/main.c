@@ -14,6 +14,9 @@
 #include "scif.h"
 #include "sdram.h"
 #include "ramtest.h"
+
+/* hand-written CRC-32 of the boot EPROM, src/crc32_fast.S */
+u32 crc32_rom_block(const u32 *src, u32 nquads, u32 crc);
 #include "timer.h"
 #include "aica.h"
 #include "pvr.h"
@@ -468,29 +471,34 @@ static void test_board(void)
  * bytes, where the build system stored the expected value. Catches worn
  * EPROM cells and oxidised DIP42 socket contacts. Runs from ROM with the
  * OC-RAM stack only. */
-static const u32 bios_crc4tab[16] = {
-    0x00000000, 0x1DB71064, 0x3B6E20C8, 0x26D930AC,
-    0x76DC4190, 0x6B6B51F4, 0x4DB26158, 0x5005713C,
-    0xEDB88320, 0xF00F9344, 0xD6D6A3E8, 0xCB61B38C,
-    0x9B64C2B0, 0x86D3D2D4, 0xA00AE278, 0xBDBDF21C
-};
+/* Words per progress_tick: the bar, the border heartbeat and the operator's
+ * key/button poll all hang off it, so it has to keep running through the
+ * longest test of the suite. 1024 words is ~0.2 % of the ROM. */
+#define BIOS_CRC_CHUNK  1024u
 
 static void test_bios_rom(void)
 {
     /* read through P1: cached, so one 32-byte line fill serves 8 words
      * instead of 8 separate EPROM cycles. Correct for a checksum -- the
      * content is read-only and the cache was invalidated at reset. */
-    const volatile u32 *rom = (const volatile u32 *)0x80000000;
+    const u32 *rom = (const u32 *)0x80000000;
     u32 n = (0x00200000 - 4) >> 2;
-    register u32 crc = 0xFFFFFFFF;
+    u32 crc = 0xFFFFFFFF;
     progress_begin(S_P_BIOS, n);
-    for (u32 i = 0; i < n; i++) {
-        if ((i & 1023) == 0)
-            progress_tick(i);
-        crc ^= rom[i];
-        for (int k = 0; k < 8; k++)
-            crc = (crc >> 4) ^ bios_crc4tab[crc & 0xF];
+    /* crc32_rom_block eats groups of four words; the odd tail (n is 0x7FFFF,
+     * not a multiple of four) goes through the same table one word at a
+     * time. See src/crc32_fast.S for why this loop is hand-written. */
+    u32 nq = n >> 2, done = 0;
+    while (done < nq) {
+        u32 q = nq - done;
+        if (q > BIOS_CRC_CHUNK / 4u)
+            q = BIOS_CRC_CHUNK / 4u;
+        progress_tick(done << 2);
+        crc = crc32_rom_block(rom + (done << 2), q, crc);
+        done += q;
     }
+    for (u32 i = nq << 2; i < n; i++)
+        crc = crc32_word(crc, rom[i]);
     progress_end();
     crc = ~crc;
     u32 expect = rom[n];
