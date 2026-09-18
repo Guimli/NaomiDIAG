@@ -25,6 +25,7 @@ void aica_init(void);
 
 /* Sound-RAM tests (G2-safe: FIFO wait every 8 words on the write side). */
 u32  aram_test_databus(void);
+u32  aram_test_addrbus(void);
 void aram_test_pattern(u32 off, u32 len, u32 pattern, ram_result *r);
 void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r);
 

@@ -19,22 +19,29 @@ Boucles de test relogees en RAM ........ OK
 
 AICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...
 RAM son bus de donnees ........ OK
+RAM son bus d'adresses ........ OK
 passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 RAM son test cellules ........ OK
 
 PVR : activation controleur VRAM, test RAM texture...
+VRAM TEX0 bus de donnees ........ OK
+VRAM TEX0 bus d'adresses ........ OK
 passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
 passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
 passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 
 VRAM TEX0 (IC16/18/20/22) ........ OK
+VRAM TEX1 bus de donnees ........ OK
+VRAM TEX1 bus d'adresses ........ OK
 passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
 passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
 passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 
 VRAM TEX1 (IC17S/19S/21S/23S) ........ OK
+
+SDRAM : test RAM CPU, bus et cellules...
 SDRAM bus de donnees ........ OK
 SDRAM bus d'adresses ........ OK
 passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
@@ -45,7 +52,7 @@ SDRAM test cellules ........ OK
 NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 NVRAM sauvegarde IC29 (intacte) ........ OK
 RTC (AICA, doit avancer) ........ OK
-  Compteur RTC : 904C3ED5 (avance)
+  Compteur RTC : 904C42D9 (avance)
   MIE on maple port 0, resp cmd 0x00000083
   MIE version: "315-6149    COPYRIGHT SEGA E"
 Bus Maple / MIE (JVS) ........ OK
@@ -65,8 +72,13 @@ Carte : Naomi 1 (837-13544): OK
 ROM BIOS (IC27) CRC32: OK
 Boucles de test relogees en RAM: OK
 RAM son bus de donnees: OK
+RAM son bus d'adresses: OK
 RAM son test cellules: OK
+VRAM TEX0 bus de donnees: OK
+VRAM TEX0 bus d'adresses: OK
 VRAM TEX0 (IC16/18/20/22): OK
+VRAM TEX1 bus de donnees: OK
+VRAM TEX1 bus d'adresses: OK
 VRAM TEX1 (IC17S/19S/21S/23S): OK
 SDRAM bus de donnees: OK
 SDRAM bus d'adresses: OK

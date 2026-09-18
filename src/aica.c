@@ -133,6 +133,52 @@ u32 aram_test_databus(void)
     return bad;
 }
 
+/* Address-bus walk, same shape as ram_test_addrbus() in ramtest.c but with a
+ * FIFO wait around every access: sound RAM sits behind the AICA on the other
+ * side of the G2 bus, and a write posted into a full FIFO is lost.
+ *
+ * The lines it walks are the AICA's, not the SH-4's -- the SH-4 never drives
+ * this RAM directly. A dead one shows up the same way: two offsets that are
+ * meant to be distinct cells turning out to be one. */
+u32 aram_test_addrbus(void)
+{
+    volatile u32 *b = (volatile u32 *)ARAM_P2_BASE;
+    const u32 pat = 0xAAAAAAAA, anti = 0x55555555;
+    u32 nwords = ARAM_SIZE >> 2;
+    u32 bad = 0;
+
+    for (u32 off = 1; off < nwords; off <<= 1) {
+        g2_fifo_wait();
+        b[off] = pat;
+    }
+    g2_fifo_wait();
+    b[0] = anti;                        /* stuck-high check */
+    for (u32 off = 1; off < nwords; off <<= 1) {
+        g2_fifo_wait();
+        if (b[off] != pat)
+            bad |= off << 2;
+    }
+    g2_fifo_wait();
+    b[0] = pat;
+    for (u32 test = 1; test < nwords; test <<= 1) {   /* stuck-low / shorts */
+        g2_fifo_wait();
+        b[test] = anti;
+        g2_fifo_wait();
+        if (b[0] != pat)
+            bad |= test << 2;
+        for (u32 off = 1; off < nwords; off <<= 1) {
+            if (off == test)
+                continue;
+            g2_fifo_wait();
+            if (b[off] != pat)
+                bad |= test << 2;
+        }
+        g2_fifo_wait();
+        b[test] = pat;
+    }
+    return bad;
+}
+
 static void note_fail(ram_result *r, u32 addr, u32 exp, u32 got)
 {
     r->errors++;

@@ -114,7 +114,12 @@ void diag_input_check(u32 in_loop)
 /* ------------------------------------------------------------------ */
 /* Replayable result log (lives in OC-RAM .bss, survives until reset) */
 /* ------------------------------------------------------------------ */
-#define LOG_MAX 32
+/* A Naomi 1 boot suite fills 24 of these, a Naomi 2 thirty, and a menu
+ * action (cartridge, DIMM) adds several more on top -- entries past the end
+ * are dropped silently, so the ceiling needs real headroom, not two spare
+ * slots. The array lives in the 4 KB OC-RAM .bss; 48 entries cost 1.3 KB of
+ * it and the linker refuses anything that does not fit. */
+#define LOG_MAX 48
 typedef enum { T_OK = 0, T_FAIL = 1 } t_status;
 
 /* numbered position -> silkscreen IC (see analysis/ADDRESS_MAP.md).
@@ -685,6 +690,7 @@ static void relocate_fast_loops(void)
 static u32 test_sdram_cells(void)
 {
     u32 size = g_ram_size;
+    scif_puts(S_SDRAM_HDR);
 
     /* data bus test runs at an even word address (A2=0): comps 1/2 */
     u32 bad = ram_test_databus(SDRAM_P2_BASE);
@@ -700,7 +706,7 @@ static u32 test_sdram_cells(void)
     log_result_q(S_L_SDRAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1,
                  CLIP_CPU_RAM);
     if (bad) {
-        scif_puts("  bad address bits mask: ");
+        scif_puts(S_BAD_ABITS);
         scif_puthex(bad);
         scif_puts("\n");
     }
@@ -776,6 +782,18 @@ static u32 test_aram(void)
      * vector: leave it running and it would execute the test pattern. */
     aica_arm_halt();
 
+    /* Address bus. Runs with the ARM already parked because it writes offset
+     * 0 too, and it is cheap: 8 MB is 21 address lines, so the walk is a few
+     * hundred accesses, not a sweep of the chip. */
+    bad = aram_test_addrbus();
+    log_result_q(S_L_ARAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1,
+                 CLIP_SOUND_RAM);
+    if (bad) {
+        scif_puts(S_BAD_ABITS);
+        scif_puthex(bad);
+        scif_puts("\n");
+    }
+
     ram_result res;
     ram_result_clear(&res);
     u32 words = len >> 2;
@@ -822,25 +840,44 @@ static u32 test_aram(void)
 }
 
 /* ------------------------------------------------------------------ */
-static void test_vram_region(const char *name, u32 base, u32 size,
+static void test_vram_region(const char *name, const char *dbus, const char *abus,
+                             u32 base, u32 size,
                              const comp_map *comps, u32 name_clip,
                              u32 *ok_flag)
 {
     ram_result res;
     ram_result_clear(&res);
-#if QUICK_TEST
-    (void)size;
-#endif
 
+    /* The bus results get their own log entries, as the CPU RAM and the
+     * sound RAM ones do. They were folded into the region result before,
+     * which meant a healthy board never showed that the VRAM bus had been
+     * tested at all -- the one memory whose bus said nothing either way. */
     u32 bad = vram_test_databus(base);
+    u32 c = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
+    log_result_q(dbus, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, c, comps, 1, name_clip);
     if (bad) {
-        u32 c = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
-        log_result(name, name_clip, T_FAIL, c, comps);
         report_badbits(bad);
         report_comps(name, c, comps);
         *ok_flag = 0;
         return;
     }
+
+    /* Address bus. vram_test_databus() is byte-for-byte ram_test_databus(),
+     * so this window takes a plain pointer and the SDRAM walk applies to it
+     * unchanged -- no VRAM-specific variant needed. */
+    bad = ram_test_addrbus(base, size);
+    log_result_q(abus, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1, name_clip);
+    if (bad) {
+        scif_puts(S_BAD_ABITS);
+        scif_puthex(bad);
+        scif_puts("\n");
+        *ok_flag = 0;
+        return;
+    }
+
+#if QUICK_TEST
+    (void)size;
+#endif
 
 #if QUICK_TEST
     u32 len = 0x00100000;
@@ -896,9 +933,11 @@ static u32 test_vram(void)
     pvr_vram_enable();
     u32 tex0_ok = 1, tex1_ok = 1;
     test_vram_region(g_ic_valid ? S_L_VRAM_TEX0_IC : S_L_VRAM_TEX0,
+                     S_L_VRAM_T0_DBUS, S_L_VRAM_T0_ABUS,
                      VRAM_TEX0_BASE, VRAM_TEX0_SIZE,
                      IC(tex0_comps), CLIP_VRAM, &tex0_ok);
     test_vram_region(g_ic_valid ? S_L_VRAM_TEX1_IC : S_L_VRAM_TEX1,
+                     S_L_VRAM_T1_DBUS, S_L_VRAM_T1_ABUS,
                      VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
                      IC(tex1_comps), CLIP_VRAM, &tex1_ok);
     return tex0_ok;                     /* the framebuffer lives in TEX0 */
@@ -914,10 +953,12 @@ static void test_naomi2_ram(void)
     scif_puts(S_N2_HDR);
     u32 ok = 1;
     pvr2_vram_enable();
-    test_vram_region(S_L_VRAM_B, VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
+    test_vram_region(S_L_VRAM_B, S_L_VRAM_B_DBUS, S_L_VRAM_B_ABUS,
+                     VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
                      0, CLIP_VRAM_B, &ok);
     elan_init();
-    test_vram_region(S_L_ELAN, ELAN_RAM_BASE, ELAN_RAM_SIZE,
+    test_vram_region(S_L_ELAN, S_L_ELAN_DBUS, S_L_ELAN_ABUS,
+                     ELAN_RAM_BASE, ELAN_RAM_SIZE,
                      0, CLIP_ELAN, &ok);
 }
 
