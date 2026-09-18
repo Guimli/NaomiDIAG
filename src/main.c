@@ -949,8 +949,15 @@ static u32 test_vram(void)
  * numbered positions. */
 static void test_naomi2_ram(void)
 {
-    if (g_board_type != BOARD_NAOMI2)
+    if (g_board_type != BOARD_NAOMI2) {
+        /* Saying nothing is the worst answer for an operator holding a
+         * Naomi 2: two whole memories vanish from the report and it reads
+         * as a test that was never written. Name the reason instead, and
+         * point at the probe result that decided it -- if the board really
+         * is a Naomi 2, that line is where the fault is, not here. */
+        scif_puts(S_N2_SKIP);
         return;
+    }
     scif_puts(S_N2_HDR);
     u32 ok = 1;
     pvr2_vram_enable();

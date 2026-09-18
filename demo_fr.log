@@ -49,10 +49,13 @@ passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 SDRAM test cellules ........ OK
 
+Memoires Naomi 2 (2e PVR + RAM Elan) non testees :
+  la sonde n'a pas vu de seconde VRAM (voir 'dual PVR' plus haut).
+
 NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 NVRAM sauvegarde IC29 (intacte) ........ OK
 RTC (AICA, doit avancer) ........ OK
-  Compteur RTC : 904C5376 (avance)
+  Compteur RTC : 904C54F5 (avance)
   MIE on maple port 0, resp cmd 0x00000083
   MIE version: "315-6149    COPYRIGHT SEGA E"
 Bus Maple / MIE (JVS) ........ OK
