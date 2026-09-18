@@ -228,20 +228,85 @@ couvre 374 fonctions. Les gestionnaires 7, 12 et 15 appellent bien
 `_drv_write_dimm` — pour déposer les données reçues du réseau dans la
 mémoire du jeu, ce qui est exactement leur rôle.
 
-**Conclusion pour NaomiDIAG.** La boîte aux lettres du DIMM n'offre pas de
-service exploitable par une ROM de diagnostic :
+**La boîte aux lettres, en tant que telle, n'offre rien à une ROM de
+diagnostic** : pas de commande d'identité, pas de test mémoire, pas de
+reflashage, et les trois seules commandes acceptées exigent d'avoir déjà
+écrit un bloc de 32 octets dans la SDRAM du DIMM.
 
-- pas de commande d'identité ni de version ;
-- pas de test mémoire ;
-- pas de reflashage ;
-- les trois seules commandes acceptées exigent d'avoir déjà écrit un bloc de
-  32 octets dans la SDRAM du DIMM — ce qu'on ne peut faire qu'à travers le
-  protocole GD-ROM/DIMM de chargement, hors de portée d'un test matériel.
+## Ce qui a suivi : on passe à côté de la boîte aux lettres
 
-Le test DIMM de NaomiDIAG reste donc ce qu'il est aujourd'hui : un vidage de
-la boîte aux lettres et un contrôle de stabilité de lecture
-(`cart_pin_scan`). C'est le maximum atteignable sans réimplémenter le
-chargeur de jeu complet, et ce n'est pas l'objet du projet.
+La conclusion ci-dessus concerne **la boîte aux lettres** et reste exacte.
+Elle a d'abord été lue comme fermant le sujet DIMM ; c'était aller trop loin.
+Une seconde passe de rétro-analyse (firmwares 2.06 à 4.03 de `segadimm.zip`,
+pseudo-C Ghidra, et l'updater officiel Sega) a trouvé deux chemins qui
+**n'empruntent pas la boîte aux lettres du tout**, et les deux sont
+maintenant dans la ROM.
+
+### 1. Test de la SDRAM du DIMM par DMA G1 — implémenté
+
+La carte DIMM est vue par la Naomi comme une carte ROM sur le bus G1. Les
+registres GD-DMA de Holly (`0xA05F74xx`) ont un bit de **sens** :
+`SB_GDDIR = 0` lit le DIMM vers la RAM système (c'est ainsi que le jeu est
+chargé), `SB_GDDIR = 1` **écrit la RAM système vers le DIMM**. Le bit est
+utilisé dans les deux sens par le BIOS compatible DIMM (`epr-23605c.ic27`),
+à trois sites.
+
+`src/dimm.c` s'en sert pour un vrai test mémoire : motifs `0x01010101` puis
+`0x10101010`, écriture DMA, relecture DMA, comparaison mot à mot et CRC-32,
+avec un délai de garde d'une seconde sur `SB_GDST` pour ne pas se figer si
+le DIMM est absent ou non amorcé. Le test est **destructeur pour le jeu
+chargé** (pas pour le firmware, qui tourne depuis sa propre RAM), donc il
+n'est jamais lancé par le balayage automatique : il vit derrière l'action
+`d` du menu opérateur.
+
+Le test RAM *interne* du DIMM (« CHECKING MEMORY %d%% ») n'est, lui, pas
+déclenchable : le firmware ne le lance qu'à son propre amorçage et le rend
+sur sa sortie vidéo, pas vers la Naomi.
+
+### 2. Flash du firmware DIMM — identification faite, gravure désarmée
+
+La flash de 2 Mo du DIMM se pilote **par le PIO ROM-board G1**
+(`0x5F7000`/`0x5F7004`/`0x5F7008` — les registres que `cart.c` utilise
+déjà), avec un jeu de commandes AMD. `src/dimm_flash.c` fait le **read-ID**
+(`0x90`/`0xF0`), strictement non destructeur, et l'action `f` du menu
+identifie la puce puis propose un choix de version 3.17 / 4.01 / 4.03.
+
+La **gravure reste délibérément non armée**. L'updater officiel Sega a été
+décompilé : sa machine à états fait un **chip-erase unique** (`0x10`) suivi
+de la reprogrammation de l'image entière depuis un tampon RAM — pas de
+boucle par secteur. Le filet de sécurité de la carte (deux slots de 1 Mo,
+chacun validé par un CRC-32 nul, l'amorceur retombant sur le slot 0 si le
+slot 1 est faux) **survit à un flash réussi mais pas pendant** : une coupure
+en cours de gravure brique la carte. Tant que la portée exacte de
+l'effacement n'est pas vérifiée sur du matériel réel par le read-ID, écrire
+le code de gravure serait irresponsable.
+
+Il existe par ailleurs un chemin `FirmUpdate` interne au firmware
+(`CmdInput` → `HostIf` → `TestTask`, TestCode `0x301` puis `0x303`) qui
+grave depuis la SDRAM du DIMM et n'existe qu'en 3.x/4.x. Le cadrage exact
+des octets de la boîte aux lettres qui le déclenche n'est pas terminé.
+
+### Une variante sans audio pour faire de la place
+
+Embarquer des images de firmware DIMM demande de la place : l'option
+`AUDIO=0` du Makefile remplace la table des clips vocaux par un stub muet et
+fait tomber la ROM de 89 % à 5 % de l'EPROM, soit environ 1,9 Mo libres —
+de quoi loger cinq slots de 1 Mo compressés en deflate, six en lzma. La
+construction `AUDIO=1` est inchangée.
+
+### Sécurité de ce qu'on émet
+
+Un audit des commandes atteignables depuis la Naomi a relevé trois défauts
+dans le firmware DIMM (borne signée sur `fb[0]`, index de socket non borné
+dans `connect`/`getsockopt`/`ioctl`, masque trop large dans le gestionnaire
+`FFxx`). Tous sont derrière les commandes 17 et 18. **NaomiDIAG ne doit
+jamais les émettre** ; `0x2000` (commande 16) est un no-op sûr, et lire la
+boîte aux lettres est sans effet.
+
+Le détail complet de cette seconde passe est hors du dépôt, dans
+`analysis/dimm_dis/` (`AUDIT_MAILBOX.md`, `DIMM_G1_ACCES.md`,
+`DIMM_FLASH_PROTO.md`), parce qu'il s'appuie sur du contenu SEGA
+propriétaire qui n'a pas à être publié.
 
 ## Méthode
 

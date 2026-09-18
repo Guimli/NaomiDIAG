@@ -61,7 +61,10 @@ messages so clips never overlap.
 
 ## What it tests
 
-In order:
+In order. Items **1-9 and 11-13 are the boot suite** and run on their own.
+Items **10 and 14-17 are operator actions** on the menu below: they either
+write to something or take long enough that they have no business delaying
+the report (see [Operator console](#operator-console)).
 
 1. **SH-4 core** — the operand cache is configured as on-chip RAM and
    self-tested; this is also the stack/`.bss` for the whole ROM (no external
@@ -94,13 +97,16 @@ In order:
 7. **Naomi 2 only** — slave PVR VRAM (16 MB) and Elan RAM (32 MB).
 8. **Backup SRAM** — non-destructive save/restore test.
 9. **RTC** (inside the AICA, IC33) — non-destructive tick check.
-10. **DIMM board** (G1 mailbox) — presence and mailbox sanity.
+10. **DIMM board** — mailbox dump and read stability, then the destructive
+    SDRAM test over the G1 DMA. Menu action `d`; `f` identifies the DIMM's
+    firmware flash.
 11. **Maple bus / MIE** (315-6146 Z80) — version request + factory
     self-test.
 12. **Settings EEPROM** (93C46 via MIE) — groundwork (needs a Z80 code
     upload; documented).
 13. **Serial-number EEPROM** (93C46 on SH-4 GPIO) — read + content check.
 14. **Cartridge security** (X76F100) — presence via response-to-reset.
+    Menu action `g`, with items 15-17.
 15. **Cartridge content** — identifies the game against an embedded
     database of every known Naomi/Naomi 2 cartridge (192 games, 2298 ICs)
     and verifies each ROM chip by SHA-1, reporting the failing IC by its
@@ -130,6 +136,10 @@ In order:
 
 RAM faults are reported per component: a bit mask, the affected data lanes,
 and the silkscreen IC designator (e.g. `CPU RAM 1 (IC16) DEFECTIVE`).
+
+The progress bar retires after item 7: from there on nothing is being
+measured — the NVRAM, the RTC, the DIMM probe, Maple and the EEPROMs all
+answer yes or no — and the two rows it occupied go to the report instead.
 
 
 ### Where the test loops execute
@@ -167,6 +177,36 @@ through P2, so the data path stays uncached and the test keeps its coverage.
 If no usable RAM is found the pointers keep addressing the ROM copies and the
 diagnostic runs slowly rather than not at all -- which is exactly the board
 that needs diagnosing. Build with `RELOC=0` to disable it entirely.
+
+## Operator console
+
+The boot suite is not the end of it. A key on the serial port, or either of
+the two push buttons, interrupts the tests and brings up a menu. Both button
+paths work at once: **PSW1 / PSW2** on the motherboard and **TEST / START**
+from a cabinet's JVS I/O board are polled together, so the ROM behaves the
+same on a bare board on a bench and in a cabinet.
+
+Keys on the serial console:
+
+| Key | Action |
+|---|---|
+| `h` | help — the only key that never interrupts |
+| `a` | abort the current test and go to the report |
+| `c` / `v` / `s` | loop the CPU / video / sound RAM test |
+| `d` | full DIMM SDRAM test |
+| `g` | game flash SHA-1 integrity |
+| `f` | DIMM firmware flash — identify, and choose a version |
+
+**TEST** steps through the menu and wraps; **START** runs the selection. The
+three RAM loops run until **TEST** is pressed and nothing else stops them —
+that is the point, since an intermittent fault shows up on the tenth pass,
+not the first. Every other action prints its report and waits for **TEST** to
+bring the menu back.
+
+Two of these are operator-initiated precisely because they are not safe to
+run unattended: the DIMM SDRAM test overwrites whatever game is loaded in the
+DIMM (not the firmware, which runs from its own RAM), and the flash action
+touches the DIMM's firmware flash — read-only for now, see below.
 
 ## Building
 
@@ -206,6 +246,20 @@ which package carries which lane. It is a bench instrument for establishing
 the lane-to-designator map, not part of diagnosing a board — it never ends,
 so the report stays up but the machine never settles. Turn it on when you
 have a probe in hand.
+
+**`AUDIO=0`** builds a silent ROM: the spoken-clip table is replaced by a
+stub, and the image drops from 89 % of the EPROM to 5 %. It exists to free
+the ~1.7 MB of speech PCM for embedded DIMM firmware images, and it also
+boots faster. `AUDIO=1` is the default and is unchanged.
+
+```sh
+make LANG=EN AUDIO=0
+```
+
+Note that the shell often exports `LANG=fr_FR.UTF-8`, which overrides the
+Makefile's `LANG ?= EN`. Always pass `LANG=` explicitly on every `make`,
+including `make mame-rom`, or a target will rebuild with different flags.
+
 
 A 2 MB image is produced, ready to burn on a 27C160 EPROM (IC27). The build
 refuses to produce an image larger than 2 MB (no silent truncation).
@@ -276,11 +330,32 @@ under the DRC, so fault injection into it needs `-nodrc`.
 ## DIMM board
 
 The mailbox protocol between the Naomi and a DIMM board is not publicly
-documented. What has been recovered from the board's own firmware — its load
-base, the mailbox window as the DIMM sees it, the response format and the
-memory driver's signature — is written up in
-[`docs/DIMM_FIRMWARE.md`](docs/DIMM_FIRMWARE.md), along with what is still
-missing and which approach does not work.
+documented. What has been recovered from the board's own firmware is written
+up in [`docs/DIMM_FIRMWARE.md`](docs/DIMM_FIRMWARE.md): the load base, the
+mailbox window as the DIMM sees it, the response format, the command
+dispatcher, and the two VxWorks message queues behind it.
+
+The short version is that **the mailbox itself offers a diagnostic ROM
+nothing** — no identity, no version, no memory test, no reflash. The only
+three commands it accepts from the Naomi are a doorbell for a BSD socket
+proxy, and one of them is a no-op.
+
+What does work goes around it, on the G1 bus:
+
+- **`d` — DIMM SDRAM test.** Holly's GD-DMA has a direction bit; with
+  `SB_GDDIR = 1` the Naomi writes system RAM into the DIMM. The ROM uses it
+  for a real memory test (`0x01010101`, `0x10101010`, CRC-32, one-second DMA
+  timeout). It overwrites the loaded game, so it is menu-only.
+- **`f` — DIMM firmware flash.** The flash is reachable through the G1
+  ROM-board PIO with AMD commands. The ROM performs a read-ID, which is
+  non-destructive, and offers a 3.17 / 4.01 / 4.03 selection. **Writing is
+  deliberately not armed.** Sega's own updater was decompiled and it does a
+  single chip-erase followed by a full-image reprogram — so the board's
+  two-slot recovery net survives a successful flash but not an interrupted
+  one. That waits on hardware validation, not on more reading.
+
+The supporting analysis of SEGA's firmware images stays out of this
+repository on purpose.
 
 ## Credits
 
