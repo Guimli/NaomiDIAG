@@ -34,7 +34,7 @@ pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%
 pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
 pass 3/3 pseudo-random + CRC: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 
-VRAM TEX1 (IC17S-23S) ........ OK
+VRAM TEX1 (IC17S/19S/21S/23S) ........ OK
 SDRAM data bus ........ OK
 SDRAM address bus ........ OK
 pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
@@ -45,7 +45,7 @@ SDRAM cell test ........ OK
 Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
 Backup NVRAM IC29 (non-destructive) ........ OK
 RTC (AICA, must tick) ........ OK
-  RTC counter: 904C372B (ticking)
+  RTC counter: 904C3B68 (ticking)
   MIE on maple port 0, resp cmd 0x00000083
   MIE version: "315-6149    COPYRIGHT SEGA E"
 Maple bus / MIE (JVS) ........ OK
@@ -67,7 +67,7 @@ Test loops relocated to CPU RAM: OK
 Sound RAM data bus: OK
 Sound RAM cell test: OK
 VRAM TEX0 (IC16/18/20/22): OK
-VRAM TEX1 (IC17S-23S): OK
+VRAM TEX1 (IC17S/19S/21S/23S): OK
 SDRAM data bus: OK
 SDRAM address bus: OK
 SDRAM cell test: OK
