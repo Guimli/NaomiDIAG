@@ -191,6 +191,7 @@ typedef struct {
     u32 detail;                     /* component bitmask (bit n = comp n+1) */
     const comp_map *comps;          /* NULL, or 4-entry position->IC table */
     u32 quiet_ok;                   /* screen+speech: only when it FAILS   */
+    u32 pre;                        /* clip spoken first, or CLIP_NONE     */
 } log_entry;
 
 static log_entry g_log[LOG_MAX];
@@ -319,6 +320,13 @@ static void say_entry(const log_entry *e)
      * every line -- it is the full log, and it has no line budget. */
     if (e->quiet_ok && e->status == T_OK)
         return;
+    /* The bus tests share their clip between memories -- "data bus" belongs
+     * to the CPU RAM and to the sound RAM alike, and "address bus" names no
+     * memory at all. The screen line says which one ("SDRAM address bus");
+     * the speech did not, so a bus fault announced itself as "address bus,
+     * test failed" and the operator had to guess which memory. Name it. */
+    if (e->pre != CLIP_NONE)
+        say(e->pre, 250);
     if (e->status == T_OK) {
         say(e->clip, 250);
         say(CLIP_OK, 250);
@@ -352,7 +360,7 @@ static void say_entry(const log_entry *e)
  * Serial reports it either way -- it is the screen that is short of lines,
  * and the spoken report follows the screen so the two agree. */
 static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
-                         const comp_map *comps, u32 quiet_ok)
+                         const comp_map *comps, u32 quiet_ok, u32 pre)
 {
     if (g_log_n < LOG_MAX) {
         g_log[g_log_n].name = name;
@@ -361,6 +369,7 @@ static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
         g_log[g_log_n].detail = detail;
         g_log[g_log_n].comps = comps;
         g_log[g_log_n].quiet_ok = quiet_ok;
+        g_log[g_log_n].pre = pre;
         g_log_n++;
     }
     scif_puts(name);
@@ -374,7 +383,7 @@ static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
 static void log_result(const char *name, u32 clip, t_status st, u32 detail,
                        const comp_map *comps)
 {
-    log_result_q(name, clip, st, detail, comps, 0);
+    log_result_q(name, clip, st, detail, comps, 0, CLIP_NONE);
 }
 
 /* Sound RAM is ONE 16-bit chip behind the AICA, not four chips on a 64-bit
@@ -681,14 +690,15 @@ static u32 test_sdram_cells(void)
     u32 bad = ram_test_databus(SDRAM_P2_BASE);
     u32 comps = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
     log_result_q(S_L_SDRAM_DBUS, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
-                 IC(work_comps), 1);
+                 IC(work_comps), 1, CLIP_CPU_RAM);
     if (bad) {
         report_badbits(bad);
         report_comps(S_CG_CPU, comps, IC(work_comps));
     }
 
     bad = ram_test_addrbus(SDRAM_P2_BASE, size);
-    log_result_q(S_L_SDRAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1);
+    log_result_q(S_L_SDRAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1,
+                 CLIP_CPU_RAM);
     if (bad) {
         scif_puts("  bad address bits mask: ");
         scif_puthex(bad);
@@ -749,7 +759,7 @@ static u32 test_aram(void)
     u32 bad = aram_test_databus();
     u32 comps = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
     log_result_q(S_L_ARAM_DBUS, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
-                 IC(aram_comps), 1);
+                 IC(aram_comps), 1, CLIP_SOUND_RAM);
     if (bad) {
         report_badbits_aram(bad);
         report_comps(S_CG_SOUND, comps, IC(aram_comps));
