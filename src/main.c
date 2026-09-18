@@ -1976,17 +1976,29 @@ void cmain(void)
     quick_video_bringup();   /* screen first: richest channel, no replay */
     quick_audio_bringup();   /* then audio, which replays the history */
 
+    /* Board identification, before the ROM checksum for two reasons.
+     *
+     * It sets g_ic_valid, which is what lets every later result name a
+     * silkscreen designator -- including the EPROM's own. With the checksum
+     * first, IC(bios_comps) was still 0 when it logged, so a worn EPROM was
+     * reported as a bad checksum and nothing else, which is precisely the
+     * case where the operator most wants to be told IC27.
+     *
+     * And it takes milliseconds while the checksum takes the longest minute
+     * of the suite, so the board type reaches the screen and the speaker
+     * straight away instead of after it.
+     *
+     * The caution it used to carry still holds and is still satisfied: it
+     * probes addresses whose behaviour on real hardware is less certain
+     * than plain memory, so it must run with screen and audio already up --
+     * which the two bring-ups above have just done. */
+    test_board();
+    progress_phase(PH_BOARD_ID);        /* magenta */
+
     /* Only now the 2 MB ROM checksum: it is the single longest test in the
      * whole suite (4.2 M table steps) and it must never run while the
      * operator is still staring at a black screen. */
     test_bios_rom();
-
-    /* Board identification runs only now: it probes addresses whose
-     * behaviour on real hardware is less certain than plain memory, so if
-     * it ever misbehaves the operator already has screen and audio up to
-     * see how far the diagnostic got. */
-    test_board();
-    progress_phase(PH_BOARD_ID);        /* magenta */
 
     relocate_fast_loops();
 
