@@ -1,5 +1,9 @@
 # NaomiDiag
 
+> **Work in progress.** The video RAM IC numbers are wrong. Naomi 2 testing
+> is incomplete. And other functions have not been tested yet. But I am
+> working on it as fast as I can :-)
+
 A replacement diagnostic BIOS ROM for the **SEGA Naomi** and **Naomi 2**
 arcade boards. It replaces the stock BIOS in the IC27 socket and tests the
 board's components one by one, reporting results on up to three channels —
@@ -19,21 +23,6 @@ direct downloads:
 
 > Français : voir [README.fr.md](README.fr.md).
 
-![NaomiDiag running on a real Naomi](NaomiDIAG_001.jpg)
-
-The on-screen report, photographed on a real Naomi 1. This board is not a
-healthy one, and the ROM says so: both the sound RAM and the CPU RAM cell
-tests fail. The bus tests pass, so the chips answer; it is their cells that do
-not hold. Everything else reads OK.
-
-The photograph is v0.9, whose IC designators were wrong. They came from the
-original BIOS RAM TEST screens, which are genuine, but which number belonged
-to which region was inferred from the order they appear in — and that
-inference had the two RAM groups the wrong way round. The correct map, read
-off a board, is in [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md): CPU RAM is IC9, IC10, IC11S and
-IC12S; the eight GPU RAM chips are IC16/18/20/22 on top and IC17S/19S/21S/23S
-underneath. Designators ending in **S** are on the underside of the PCB.
-
 ### A run, with a fault
 
 ![Finding a dead data line on CPU RAM](docs/fault_ic9.gif)
@@ -45,7 +34,7 @@ flashing border is the heartbeat, which pulses for as long as the ROM is
 alive.
 
 The full run is on the release page:
-[**NaomiDIAG_EN_v0.14_IC9_fault.mp4**](https://github.com/Guimli/NaomiDIAG/releases/download/v0.14/NaomiDIAG_EN_v0.14_IC9_fault.mp4)
+[**NaomiDIAG_EN_IC9_fault.mp4**](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_EN_IC9_fault.mp4)
 — 125 seconds, every test, **with the sound**, so you can hear the fault
 announced as well as read it. GitHub will not play a video that lives in a
 repository (it strips the `<video>` tag), hence the silent GIF above and the
@@ -342,11 +331,15 @@ under the DRC, so fault injection into it needs `-nodrc`.
   them from the order the original BIOS RAM TEST prints its numbers, which
   was wrong three times over — including having the CPU RAM and GPU RAM
   groups the wrong way round — so nothing rests on that inference any more.
-- The GPU RAM split is settled: **TEX0 is IC16/18/20/22**, the four chips on
-  top of the board, and **TEX1 is IC17S/19S/21S/23S**, the four underneath.
-  It comes from a table in the original BIOS RAM TEST at ROM offset `0x5C484`
-  whose first three entries — IC29 for the NVRAM, IC35 for the sound RAM,
-  IC9-12 for the CPU RAM — are independently confirmed on a real board.
+- **The GPU RAM designators are wrong.** The ROM prints TEX0 as
+  IC16/18/20/22 and TEX1 as IC17S/19S/21S/23S, taken from a table in the
+  original BIOS RAM TEST at ROM offset `0x5C484`. That table's first three
+  entries — IC29 for the NVRAM, IC35 for the sound RAM, IC9-12 for the CPU
+  RAM — are confirmed on a real board, but the GPU RAM rows do not survive
+  contact with one. Until they are read off a PCB, treat any GPU RAM chip
+  this ROM names as a group, not as a part number. The CPU RAM designators
+  are not affected. Designators ending in **S** are on the underside of the
+  PCB; the map is in [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md).
 - One thing is still not measured, and the ROM says position numbers rather
   than guessing:
   - the **lane→IC order** inside each group of four, though no longer
