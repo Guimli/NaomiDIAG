@@ -17,6 +17,10 @@ u32 sram_test(ram_result *r);
  * that it ticks. Returns 0 = OK, 1 = stuck/dead. *value out = counter. */
 u32 rtc_test(u32 *value);
 
+/* Format an AICA RTC reading (seconds since 1950) as
+ * "YYYY-MM-DD HH:MM:SS". `out` needs 20 bytes. */
+void rtc_fmt(u32 secs, char *out);
+
 /* SEGA CRC over a settings-EEPROM block (algorithm from the netboot
  * project, validated against a BIOS-written EEPROM image). */
 u16 sega_eeprom_crc(const u8 *data, u32 len);

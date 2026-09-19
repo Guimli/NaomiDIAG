@@ -204,6 +204,19 @@ static log_entry g_log[LOG_MAX];
 static u32 g_log_n;
 static u32 g_screen_ready;          /* TEX0 VRAM validated, display up */
 
+/* The RTC reading, rendered once and kept: the screen needs it again after
+ * any full repaint, and re-reading would cross G2 for nothing. Empty until
+ * the RTC test has run, which is late in the suite. */
+static char g_rtc_str[20];
+
+/* Under the title, centred: 19 characters at 16 px. Costs no report row --
+ * the rows start at y=48. */
+static void screen_draw_date(void)
+{
+    if (g_screen_ready && g_rtc_str[0])
+        fb_text(168, 28, g_rtc_str, COL_WHITE, FB_W);
+}
+
 /* full-screen render of the whole log (screen = 3rd report channel) */
 /* Where the next report line goes. The report is append-only, so an added
  * result does not need the screen rebuilt: it needs one line drawn. */
@@ -266,6 +279,7 @@ static void screen_render(void)
         return;
     fb_clear(0);
     fb_text(112, 8, "NAOMI DIAG ROM v" DIAG_VERSION, COL_TITLE, FB_W);
+    screen_draw_date();
     u32 y = 48;
     for (u32 i = 0; i < g_log_n; i++)
         y = screen_draw_entry(&g_log[i], y);
@@ -991,9 +1005,13 @@ static void test_sram_rtc(void)
     u32 rtcval = 0;
     u32 bad = rtc_test(&rtcval);
     log_result(S_L_RTC, CLIP_RTC, bad ? T_FAIL : T_OK, 0, 0);
-    scif_puts(S_RTC_COUNTER);
-    scif_puthex(rtcval);
+    /* A raw counter tells the operator nothing; the date tells them when
+     * this board was last on, and whether its battery still holds. */
+    rtc_fmt(rtcval, g_rtc_str);
+    scif_puts(S_RTC_DATE);
+    scif_puts(g_rtc_str);
     scif_puts(bad ? S_RTC_STUCK : S_RTC_TICK);
+    screen_draw_date();
 }
 
 /* ------------------------------------------------------------------ */

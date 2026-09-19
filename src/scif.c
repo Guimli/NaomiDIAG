@@ -1,19 +1,78 @@
 /* SCIF console output. The SCIF was initialised in crt0.S before any RAM
  * existed; these helpers only need a few bytes of stack (OC-RAM). */
 #include "scif.h"
+#include "timer.h"
 
 /* Bounded waits: exit early when the flag rises (real hardware), or time
  * out and proceed — a diagnostic must never hang on its own console, and
  * some emulators model the SCIF status flags only partially. */
 #define SCIF_SPIN 0x20000
 
-void scif_putc(char c)
+static void scif_raw(char c)
 {
     for (u32 spin = 0; spin < SCIF_SPIN; spin++)
         if (SCFSR2 & SCFSR2_TDFE)
             break;
     SCFTDR2 = (u8)c;
     SCFSR2 &= (u16)~(SCFSR2_TDFE | SCFSR2_TEND);
+}
+
+/* Every line is stamped with the time since reset, [MM:SS.mmm].
+ *
+ * It goes in here rather than at each call site because the report is
+ * built from fragments -- a label, then a status, then a newline -- and a
+ * stamp per fragment would be nonsense. Tracking the start of a line is
+ * the only place that knows where a message really begins.
+ *
+ * Blank lines are left bare: they separate sections, and a timestamp on
+ * nothing is just noise. The stamp costs 13 characters, about a
+ * millisecond of serial time at 115200 baud, a tenth of a second over a
+ * whole run.
+ *
+ * TMU and not the RTC: the RTC counts whole seconds, so a dozen
+ * consecutive lines would carry the same stamp and the one thing the log
+ * is wanted for -- how long each test took -- would be invisible. The RTC
+ * dates the run instead, once, where the clock's coarseness does not
+ * matter. */
+/* Zero-initialised on purpose: this ROM links with no writable .data, so
+ * the flag has to mean "mid-line" rather than "at a line start". */
+static u32 g_mid_line;
+static u32 g_stamping;
+
+static void scif_stamp(void)
+{
+    u32 ms = timer_ms();
+    u32 min = 0, sec = 0;
+    while (ms >= 60000u) { ms -= 60000u; min++; }
+    while (ms >= 1000u)  { ms -= 1000u;  sec++; }
+
+    g_stamping = 1;
+    scif_raw('[');
+    scif_raw((char)('0' + (min / 10u) % 10u));
+    scif_raw((char)('0' + min % 10u));
+    scif_raw(':');
+    scif_raw((char)('0' + sec / 10u));
+    scif_raw((char)('0' + sec % 10u));
+    scif_raw('.');
+    scif_raw((char)('0' + ms / 100u));
+    scif_raw((char)('0' + (ms / 10u) % 10u));
+    scif_raw((char)('0' + ms % 10u));
+    scif_raw(']');
+    scif_raw(' ');
+    g_stamping = 0;
+}
+
+void scif_putc(char c)
+{
+    if (!g_stamping) {
+        if (!g_mid_line && c != '\n' && c != '\r') {
+            scif_stamp();
+            g_mid_line = 1;
+        }
+        if (c == '\n')
+            g_mid_line = 0;
+    }
+    scif_raw(c);
 }
 
 void scif_flush(void)

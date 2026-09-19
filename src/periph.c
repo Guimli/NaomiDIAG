@@ -185,6 +185,68 @@ static u32 rtc_read(void)
     return (RTC_HI << 16) | (RTC_LO & 0xFFFF);
 }
 
+/* The AICA RTC counts seconds since 1950-01-01 00:00:00, the epoch Sega
+ * used on this family. Rendered as "YYYY-MM-DD HH:MM:SS" into a 20-byte
+ * buffer, caller-supplied.
+ *
+ * The constant divisors here compile to multiply-and-shift, so nothing
+ * calls into libgcc -- which matters, because this ROM links without it.
+ *
+ * A board whose RTC is stopped or whose battery is flat will produce a
+ * perfectly well-formed nonsense date. That is deliberate: the caller
+ * prints the verdict beside it, and a visibly absurd date is more use to
+ * an operator than a refusal to show anything. */
+void rtc_fmt(u32 secs, char *out)
+{
+    static const unsigned char mlen[12] =
+        { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+    u32 days = secs / 86400u;
+    u32 rem  = secs % 86400u;
+    u32 hh = rem / 3600u;
+    u32 mi = (rem / 60u) % 60u;
+    u32 ss = rem % 60u;
+
+    u32 y = 1950, leap;
+    for (;;) {
+        leap = ((y % 4u) == 0u && ((y % 100u) != 0u || (y % 400u) == 0u));
+        u32 dy = leap ? 366u : 365u;
+        if (days < dy)
+            break;
+        days -= dy;
+        y++;
+    }
+    u32 m = 0;
+    for (;;) {
+        u32 dm = mlen[m] + ((m == 1u && leap) ? 1u : 0u);
+        if (days < dm || m == 11u)
+            break;
+        days -= dm;
+        m++;
+    }
+
+    out[0]  = (char)('0' + (y / 1000u) % 10u);
+    out[1]  = (char)('0' + (y / 100u) % 10u);
+    out[2]  = (char)('0' + (y / 10u) % 10u);
+    out[3]  = (char)('0' + y % 10u);
+    out[4]  = '-';
+    out[5]  = (char)('0' + (m + 1u) / 10u);
+    out[6]  = (char)('0' + (m + 1u) % 10u);
+    out[7]  = '-';
+    out[8]  = (char)('0' + (days + 1u) / 10u);
+    out[9]  = (char)('0' + (days + 1u) % 10u);
+    out[10] = ' ';
+    out[11] = (char)('0' + hh / 10u);
+    out[12] = (char)('0' + hh % 10u);
+    out[13] = ':';
+    out[14] = (char)('0' + mi / 10u);
+    out[15] = (char)('0' + mi % 10u);
+    out[16] = ':';
+    out[17] = (char)('0' + ss / 10u);
+    out[18] = (char)('0' + ss % 10u);
+    out[19] = 0;
+}
+
 u32 rtc_test(u32 *value)
 {
     u32 t0 = rtc_read();

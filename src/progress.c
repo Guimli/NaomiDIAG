@@ -24,6 +24,7 @@ static u32 g_hb_dim;                /* currently showing the dim half */
 
 void progress_heartbeat(void)
 {
+    timer_ms();                     /* keeps the elapsed clock past its wrap */
     u32 now = timer_ticks();
     if ((u32)(now - g_hb_last) < HB_TICKS)
         return;
