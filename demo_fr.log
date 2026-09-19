@@ -55,7 +55,7 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:39.314] NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 [00:39.565] NVRAM sauvegarde IC29 (intacte) ........ OK
 [00:45.274] RTC (AICA, doit avancer) ........ OK
-[00:48.981]   Date RTC : 2026-09-20 00:59:21 (avance)
+[00:48.981]   Date RTC : 2026-09-20 01:26:00 (avance)
 [00:49.164]   MIE on maple port 0, resp cmd 0x00000083
 [00:49.348]   MIE version: "315-6149    COPYRIGHT SEGA E"
 [00:49.541] Bus Maple / MIE (JVS) ........ OK

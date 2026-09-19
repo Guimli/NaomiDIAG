@@ -793,13 +793,19 @@ static u32 test_aram(void)
     u32 len = ARAM_SIZE;
 #endif
 
-    /* The cell test overwrites sound RAM offset 0, which is the ARM's reset
-     * vector: leave it running and it would execute the test pattern. */
+    /* Belt and braces. aica_init() already left the ARM7 in reset and
+     * nothing has released it since, but the cell test below overwrites
+     * sound RAM offset 0 -- the ARM's reset vector -- and an ARM left
+     * running would execute the test pattern. Cheap enough to state twice
+     * rather than depend on a promise made three functions away.
+     *
+     * Note the vocabulary: halt puts the ARM7 IN reset, park is the
+     * opposite -- it writes a b . loop and RELEASES it. */
     aica_arm_halt();
 
-    /* Address bus. Runs with the ARM already parked because it writes offset
-     * 0 too, and it is cheap: 8 MB is 21 address lines, so the walk is a few
-     * hundred accesses, not a sweep of the chip. */
+    /* Address bus. Safe for the same reason, and it writes offset 0 too.
+     * Cheap: 8 MB is 21 address lines, so the walk is a few hundred
+     * accesses, not a sweep of the chip. */
     bad = aram_test_addrbus();
     log_result_q(S_L_ARAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1,
                  CLIP_SOUND_RAM);
@@ -1721,7 +1727,9 @@ static void audio_replay_log(void);   /* defined below */
 
 static void quick_audio_bringup(void)
 {
-    aica_init();                        /* ARM7 held in reset */
+    aica_init();                        /* ARM7 held in reset: the data bus
+                                         * test below writes offset 0, which
+                                         * is where a running ARM7 fetches */
 
     ram_result res;
     ram_result_clear(&res);

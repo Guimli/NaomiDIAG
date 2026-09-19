@@ -87,7 +87,24 @@ void aica_init(void)
     SLOT(0, 0x00) = 0x8000;             /* KYONEX: apply */
     g2_fifo_wait();
 
-    aica_arm_park();
+    /* The ARM7 stays in reset, as the header promises and as the name of
+     * this function implies. It used to be parked and released here, which
+     * quietly broke every caller: aram_test_databus() walks a bit through
+     * sound RAM offset 0, and offset 0 is the word the parked ARM7 is
+     * executing. It would fetch the test pattern as an instruction and run
+     * it, with the whole 8 MB and the AICA register file in reach -- so it
+     * could corrupt the very memory under test, or the audio setup, or
+     * neither, depending on which pattern landed. That is what an
+     * intermittent false report on IC35 looks like.
+     *
+     * Reported by Rolel on real Naomi 1 and Naomi 2 hardware (issue #1),
+     * and reproduced here: instrumenting the ARM7's program counter under
+     * MAME showed it outside its b . loop on 1937 frames of a single run,
+     * fetching from addresses as far out as 0x10A30D1C. With this call
+     * removed, zero.
+     *
+     * Releasing it is now the caller's business, once the destructive
+     * tests are done -- see aica_arm_park() at the end of test_aram(). */
 }
 
 /* Park the ARM7 on a four-byte program that branches to itself, then let it
