@@ -17,37 +17,37 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:15.536] Boucles de test relogees en RAM ........ OK
 [00:15.723]   loops execute at 8DFFC0AA (RAM CPU, cache: mode rapide)
 
-[00:15.962] AICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...
-[00:16.178] RAM son bus de donnees ........ OK
-[00:16.336] RAM son bus d'adresses ........ OK
-[00:16.493] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:16.930] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:17.366] passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:18.011] RAM son test cellules ........ OK
+[00:15.962] SDRAM : test RAM CPU, bus et cellules...
+[00:16.139] SDRAM bus de donnees ........ OK
+[00:16.290] SDRAM bus d'adresses ........ OK
+[00:16.441] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:16.890] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:17.340] passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:18.992] SDRAM test cellules ........ OK
 
-[00:21.478] PVR : activation controleur VRAM, test RAM texture...
-[00:21.698] VRAM TEX0 bus de donnees ........ OK
-[00:21.861] VRAM TEX0 bus d'adresses ........ OK
-[00:22.025] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:22.298] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:22.570] passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:22.844] PVR : activation controleur VRAM, test RAM texture...
+[00:23.064] VRAM TEX0 bus de donnees ........ OK
+[00:23.227] VRAM TEX0 bus d'adresses ........ OK
+[00:23.391] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+[00:23.664] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+[00:23.936] passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 
-[00:23.206] VRAM TEX0 (IC16/18/20/22) ........ OK
-[00:26.802] VRAM TEX1 bus de donnees ........ OK
-[00:26.966] VRAM TEX1 bus d'adresses ........ OK
-[00:27.130] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:27.411] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:27.693] passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:24.572] VRAM TEX0 (IC16/18/20/22) ........ OK
+[00:28.168] VRAM TEX1 bus de donnees ........ OK
+[00:28.332] VRAM TEX1 bus d'adresses ........ OK
+[00:28.496] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+[00:28.777] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+[00:29.059] passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 
-[00:28.338] VRAM TEX1 (IC17S/19S/21S/23S) ........ OK
+[00:29.704] VRAM TEX1 (IC17S/19S/21S/23S) ........ OK
 
-[00:31.953] SDRAM : test RAM CPU, bus et cellules...
-[00:32.130] SDRAM bus de donnees ........ OK
-[00:32.281] SDRAM bus d'adresses ........ OK
-[00:32.432] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:32.881] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:33.331] passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:34.984] SDRAM test cellules ........ OK
+[00:33.319] AICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...
+[00:33.536] RAM son bus de donnees ........ OK
+[00:33.693] RAM son bus d'adresses ........ OK
+[00:33.850] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:34.287] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:34.723] passe 3/3 pseudo-aleatoire + CRC : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:35.368] RAM son test cellules ........ OK
 
 [00:38.835] Memoires Naomi 2 (2e PVR + RAM Elan) non testees :
 [00:39.045]   la sonde n'a pas vu de seconde VRAM (voir 'dual PVR' plus haut).
@@ -55,7 +55,7 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:39.314] NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 [00:39.565] NVRAM sauvegarde IC29 (intacte) ........ OK
 [00:45.274] RTC (AICA, doit avancer) ........ OK
-[00:48.982]   Date RTC : 2026-09-19 22:53:17 (avance)
+[00:48.981]   Date RTC : 2026-09-20 00:44:26 (avance)
 [00:49.164]   MIE on maple port 0, resp cmd 0x00000083
 [00:49.348]   MIE version: "315-6149    COPYRIGHT SEGA E"
 [00:49.541] Bus Maple / MIE (JVS) ........ OK
@@ -70,27 +70,27 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 
 [01:03.371] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
 [01:03.672] EEPROM serie (IC31, 93C46) ........ OK
-[01:07.476] Integrite du code reloge en RAM ........ OK
+[01:07.475] Integrite du code reloge en RAM ........ OK
 
 [01:07.669] ==== RESUME ====
 [01:07.767] OC-RAM CPU (SH-4 IC1): OK
 [01:07.895] VRAM framebuffer (rapide): OK
 [01:08.036] RAM son zone clips (rapide): OK
-[01:08.184] Carte : Naomi 1 (837-13544): OK
+[01:08.183] Carte : Naomi 1 (837-13544): OK
 [01:08.331] ROM BIOS (IC27) CRC32: OK
 [01:08.459] Boucles de test relogees en RAM: OK
-[01:08.619] RAM son bus de donnees: OK
-[01:08.750] RAM son bus d'adresses: OK
-[01:08.882] RAM son test cellules: OK
-[01:09.009] VRAM TEX0 bus de donnees: OK
-[01:09.147] VRAM TEX0 bus d'adresses: OK
-[01:09.285] VRAM TEX0 (IC16/18/20/22): OK
-[01:09.426] VRAM TEX1 bus de donnees: OK
-[01:09.563] VRAM TEX1 bus d'adresses: OK
-[01:09.701] VRAM TEX1 (IC17S/19S/21S/23S): OK
-[01:09.855] SDRAM bus de donnees: OK
-[01:09.979] SDRAM bus d'adresses: OK
-[01:10.104] SDRAM test cellules: OK
+[01:08.619] SDRAM bus de donnees: OK
+[01:08.744] SDRAM bus d'adresses: OK
+[01:08.868] SDRAM test cellules: OK
+[01:08.990] VRAM TEX0 bus de donnees: OK
+[01:09.127] VRAM TEX0 bus d'adresses: OK
+[01:09.265] VRAM TEX0 (IC16/18/20/22): OK
+[01:09.406] VRAM TEX1 bus de donnees: OK
+[01:09.544] VRAM TEX1 bus d'adresses: OK
+[01:09.681] VRAM TEX1 (IC17S/19S/21S/23S): OK
+[01:09.835] RAM son bus de donnees: OK
+[01:09.966] RAM son bus d'adresses: OK
+[01:10.097] RAM son test cellules: OK
 [01:10.225] NVRAM sauvegarde IC29 (intacte): OK
 [01:10.386] RTC (AICA, doit avancer): OK
 [01:10.523] Bus Maple / MIE (JVS): OK

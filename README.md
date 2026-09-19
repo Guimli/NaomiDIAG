@@ -84,7 +84,10 @@ French build went from 98 % of the EPROM to 29 %.
 
 ## What it tests
 
-In order. Items **1-9 and 11-13 are the boot suite** and run on their own.
+In order. The screen and the speaker are alive long before the memories
+they live in are fully tested: each channel is brought up on the small
+region it actually uses, so results are reported as they land. Items **1-9
+and 11-13 are the boot suite** and run on their own.
 Items **10 and 14-17 are operator actions** on the menu below: they either
 write to something or take long enough that they have no business delaying
 the report (see [Operator console](#operator-console)).
@@ -95,13 +98,7 @@ the report (see [Operator console](#operator-console)).
 2. **Board identification** — Naomi 1 vs Naomi 2 (Elan T&L signature + VRAM
    aliasing).
 3. **BIOS EPROM (IC27)** — CRC32 self-check.
-4. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus) — then
-   audio becomes a channel.
-5. **VRAM** — 16 MB in eight 16 Mbit chips around the graphics chip, tested
-   as two 64-bit banks, TEX0 and TEX1 of four chips each. Their designators
-   are not confirmed — then the VGA report
-   screen comes up.
-6. **Main CPU RAM** (SDRAM, 16/32 MB, IC9/IC10/IC11S/IC12S) — first a data-bus
+4. **Main CPU RAM** (SDRAM, 16/32 MB, IC9/IC10/IC11S/IC12S) — first a data-bus
    walking-ones test and an address-bus test, then **three phases**, each
    reported as `pass n/3` and each driving the progress bar from 0 to 100%:
    - **1/3** — write `0x55555555` (0101…) over the whole region, then read it
@@ -117,6 +114,11 @@ the report (see [Operator console](#operator-console)).
    **all** CPU RAM is bad, the program keeps running from the SH-4 cache
    (OC-RAM) and completes every test that does not need main RAM — only the
    Maple/MIE test, which needs RAM for its DMA descriptors, is skipped.
+5. **VRAM** — 16 MB in eight 16 Mbit chips around the graphics chip, tested
+   as two 64-bit banks, TEX0 and TEX1 of four chips each, with the same
+   three phases.
+6. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus), same
+   three phases, every access paced by the G2 FIFO.
 7. **Naomi 2 only** — slave PVR VRAM (16 MB) and Elan RAM (32 MB).
 8. **Backup SRAM** — non-destructive save/restore test.
 9. **RTC** (inside the AICA, IC33) — non-destructive tick check.

@@ -2156,13 +2156,15 @@ void cmain(void)
 
     progress_phase(PH_TESTING);         /* white: the long suite starts */
 
-    /* now the exhaustive memory tests, reported live on those channels */
-    u32 aram_ok = test_aram();
-    u32 vram_ok = test_vram();
-
-    /* now the slow CPU-RAM cell test, with screen + audio already live:
-     * each result is shown/spoken as it lands, SCIF prints pass progress */
+    /* The exhaustive memory tests: CPU RAM, then video, then sound.
+     *
+     * The order is free. The quick bring-ups have already proved the small
+     * regions the screen and the speaker need, so every result is shown
+     * and spoken as it lands whichever memory is under test -- which lets
+     * the memory the rest of the board leans on go first. */
     u32 usable = test_sdram_cells();
+    u32 vram_ok = test_vram();
+    u32 aram_ok = test_aram();
 
     /* Naomi 2 extra memories (no-op on other boards) */
     test_naomi2_ram();
