@@ -34,6 +34,23 @@ off a board, is in [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md): CPU RAM is IC9,
 IC12S; the eight GPU RAM chips are IC16/18/20/22 on top and IC17S/19S/21S/23S
 underneath. Designators ending in **S** are on the underside of the PCB.
 
+### A run, with a fault
+
+![Finding a dead data line on CPU RAM](docs/fault_ic9.gif)
+
+Data line D5 held low across part of the CPU RAM, under MAME. The cell test
+fails, and the ROM names the chip: D5 is in the low half of the 64-bit word,
+so it belongs to the even-word pair — **IC9**, never the odd pair. The
+flashing border is the heartbeat, which pulses for as long as the ROM is
+alive.
+
+The full run is on the release page:
+[**NaomiDIAG_EN_v0.14_IC9_fault.mp4**](https://github.com/Guimli/NaomiDIAG/releases/download/v0.14/NaomiDIAG_EN_v0.14_IC9_fault.mp4)
+— 125 seconds, every test, **with the sound**, so you can hear the fault
+announced as well as read it. GitHub will not play a video that lives in a
+repository (it strips the `<video>` tag), hence the silent GIF above and the
+download for the real thing.
+
 ## Three simultaneous output channels
 
 Every test result is reported **at the same time on every channel that is
