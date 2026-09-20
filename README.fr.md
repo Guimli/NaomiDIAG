@@ -347,15 +347,21 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
 - **Réglez le terminal sur 115200 bauds, 8N1, sans contrôle de flux.** La ROM
   l'indique elle-même sur sa deuxième ligne, dès que la console est active.
 
-  À la rigueur, la ligne va un peu trop vite. Le diviseur du SH-4 vaut
-  `SCBRR2 = 12` avec une horloge périphérique à 50 MHz, ce qui place le débit
-  réel à **120192 bauds, soit 4,3 % au-dessus de 115200** — 115200 n'est tout
-  simplement pas atteignable exactement depuis une horloge à 50 MHz, et 12
-  est le diviseur le plus proche, celui que retient aussi KallistiOS. C'est
-  dans la tolérance d'un UART et ça fonctionne avec les adaptateurs
-  habituels, mais si une carte vous donne une sortie systématiquement
-  illisible alors que la bordure bat toujours, c'est la première chose à
-  soupçonner avant la carte.
+  À la rigueur, la ligne va un peu trop lentement. 115200 n'est pas
+  atteignable exactement depuis l'horloge périphérique à 50 MHz du SH-4 — le
+  débit vaut `Pck/(32*(SCBRR+1))`, ce qui demanderait un diviseur de 12,56 —
+  la ROM utilise donc `SCBRR2 = 13` et le débit réel est de **111607 bauds,
+  soit 3,1 % en dessous de 115200**. C'est largement dans la tolérance d'un
+  UART et ça fonctionne avec les adaptateurs habituels, mais si une carte
+  vous donne une sortie systématiquement illisible alors que la bordure bat
+  toujours, soupçonnez la liaison avant la carte.
+
+  Les débits plus bas s'atteignent bien plus précisément, le diviseur étant
+  plus grand et sa granularité plus fine : 57600 tombe à 0,47 % près, 9600 à
+  0,15 %, et 31250 — le débit MIDI — est exact. La ROM reste à 115200 parce
+  qu'une exécution complète n'émet pas 5 Ko : la vitesse n'achète rien
+  d'important. Les chiffres sont ici au cas où un adaptateur capricieux
+  rendrait un jour l'échange intéressant.
 - Un échec du test cache signifie que le SH-4 lui-même est mort : c'est
   rapporté sur SCIF puis la ROM s'arrête.
 - Une exception CPU redémarre la ROM (la bannière se réaffiche) — une

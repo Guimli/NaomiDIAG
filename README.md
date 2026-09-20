@@ -321,14 +321,20 @@ under the DRC, so fault injection into it needs `-nodrc`.
 - **Set the terminal to 115200 baud, 8N1, no flow control.** The ROM says so
   itself on its second line, once the console is up.
 
-  Strictly the line runs a little fast. The SH-4 divisor is `SCBRR2 = 12`
-  with the peripheral clock at 50 MHz, which puts the real rate at
-  **120192 baud, 4.3 % above 115200** — 115200 is simply not reachable
-  exactly from a 50 MHz clock, and 12 is the nearest divisor, the same one
-  KallistiOS picks. It is inside what a UART tolerates and works with the
-  usual adapters, but if a board gives you consistently garbled output while
-  the border still pulses, this is the first thing to suspect rather than
-  the board.
+  Strictly the line runs a little slow. 115200 is not reachable exactly from
+  the SH-4's 50 MHz peripheral clock — the rate is `Pck/(32*(SCBRR+1))`,
+  which would want a divisor of 12.56 — so the ROM uses `SCBRR2 = 13` and
+  the real rate is **111607 baud, 3.1 % below 115200**. Well inside UART
+  tolerance and fine with the usual adapters, but if a board gives you
+  consistently garbled output while the border still pulses, suspect the
+  link before the board.
+
+  Lower rates are reachable far more precisely, because the divisor gets
+  bigger and its granularity finer: 57600 lands within 0.47 %, 9600 within
+  0.15 %, and 31250 — the MIDI rate — is exact. The ROM stays at 115200
+  because a whole run emits under 5 KB, so the speed buys nothing that
+  matters; the figures are here in case a marginal adapter ever makes the
+  trade worth revisiting.
 - A failed cache test means the SH-4 itself is dead: it is reported on SCIF
   and the ROM halts.
 - A CPU exception restarts the ROM (the banner reprints) — a repeating
