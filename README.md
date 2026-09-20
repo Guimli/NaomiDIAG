@@ -318,6 +318,17 @@ under the DRC, so fault injection into it needs `-nodrc`.
   [JinGasa](https://github.com/Tchan0/JinGasa) project: it exists solely to
   talk to a Naomi over the serial port and documents the wiring, which is
   more than can be said for the pinouts circulating elsewhere.
+- **Set the terminal to 115200 baud, 8N1, no flow control.** The ROM says so
+  itself on its second line, once the console is up.
+
+  Strictly the line runs a little fast. The SH-4 divisor is `SCBRR2 = 12`
+  with the peripheral clock at 50 MHz, which puts the real rate at
+  **120192 baud, 4.3 % above 115200** — 115200 is simply not reachable
+  exactly from a 50 MHz clock, and 12 is the nearest divisor, the same one
+  KallistiOS picks. It is inside what a UART tolerates and works with the
+  usual adapters, but if a board gives you consistently garbled output while
+  the border still pulses, this is the first thing to suspect rather than
+  the board.
 - A failed cache test means the SH-4 itself is dead: it is reported on SCIF
   and the ROM halts.
 - A CPU exception restarts the ROM (the banner reprints) — a repeating

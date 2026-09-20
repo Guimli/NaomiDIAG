@@ -344,6 +344,18 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   n'existe que pour dialoguer avec une Naomi par le port série et en
   documente le câblage, ce qu'on ne peut pas dire des brochages qui circulent
   par ailleurs.
+- **Réglez le terminal sur 115200 bauds, 8N1, sans contrôle de flux.** La ROM
+  l'indique elle-même sur sa deuxième ligne, dès que la console est active.
+
+  À la rigueur, la ligne va un peu trop vite. Le diviseur du SH-4 vaut
+  `SCBRR2 = 12` avec une horloge périphérique à 50 MHz, ce qui place le débit
+  réel à **120192 bauds, soit 4,3 % au-dessus de 115200** — 115200 n'est tout
+  simplement pas atteignable exactement depuis une horloge à 50 MHz, et 12
+  est le diviseur le plus proche, celui que retient aussi KallistiOS. C'est
+  dans la tolérance d'un UART et ça fonctionne avec les adaptateurs
+  habituels, mais si une carte vous donne une sortie systématiquement
+  illisible alors que la bordure bat toujours, c'est la première chose à
+  soupçonner avant la carte.
 - Un échec du test cache signifie que le SH-4 lui-même est mort : c'est
   rapporté sur SCIF puis la ROM s'arrête.
 - Une exception CPU redémarre la ROM (la bannière se réaffiche) — une
