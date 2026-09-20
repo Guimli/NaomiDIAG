@@ -1,7 +1,7 @@
 # NaomiDiag
 
-> **En cours de développement.** Les numéros d'IC des RAM vidéo sont
-> incorrects. Le test de la Naomi 2 est incomplet. Et d'autres fonctions
+> **En cours de développement.** Les numéros d'IC des RAM vidéo sont à
+> vérifier. Le test de la Naomi 2 est incomplet. Et d'autres fonctions
 > n'ont pas encore été testées. Mais je travaille dessus aussi vite que je
 > peux :-)
 
@@ -375,17 +375,25 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   déduisait de l'ordre dans lequel le RAM TEST du BIOS d'origine affiche ses
   numéros ; cette déduction s'est trompée trois fois — dont une inversion
   complète des groupes RAM CPU et RAM GPU — et plus rien ne repose dessus.
-- **Les désignateurs des RAM GPU sont faux.** La ROM affiche TEX0 en
-  IC16/18/20/22 et TEX1 en IC17S/19S/21S/23S, d'après une table du RAM TEST
-  du BIOS d'origine à l'offset ROM `0x5C484`. Les trois premières entrées de
-  cette table — IC29 pour la NVRAM, IC35 pour la RAM son, IC9-12 pour la RAM
-  CPU — sont confirmées sur carte réelle, mais ses lignes RAM GPU ne
-  survivent pas au contact du matériel. Tant qu'elles n'auront pas été
-  relevées sur un PCB, lisez toute puce de RAM GPU que cette ROM nomme comme
-  un *groupe*, pas comme une référence de pièce. Les désignateurs de la RAM
-  CPU ne sont pas concernés. Les désignations terminées par **S** sont sous
-  la carte ; la correspondance est dans
-  [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md).
+- **Les désignateurs des RAM GPU restent à confirmer**, mais moins largement
+  qu'il n'y paraissait d'abord. Les huit puces et leur partage en deux bancs
+  de quatre ne font pas de doute : le manuel de service NAOMI 2 de Sega
+  liste le RAM TEST en IC16/18/20/22 puis IC17/19/21/23, exactement ce
+  qu'affiche cette ROM, et les désignations ont depuis été relevées sur une
+  carte.
+
+  Ce qui n'est pas établi, c'est **quelle puce d'un banc porte quelle voie
+  de 16 bits**. La ROM associe la position 1 à IC16, la 2 à IC18 et ainsi de
+  suite, et cet ordre est une hypothèse — la même qui reste ouverte pour la
+  RAM CPU. Un retour de terrain la met en jeu : une puce nommée par cette
+  ROM a été remplacée et la panne est restée. C'est compatible avec un ordre
+  de voies erroné — et tout autant avec une panne hors de la puce, une piste
+  coupée ou une bille défectueuse sous le PowerVR. Une seule carte ne permet
+  pas de trancher entre les deux. En attendant, lisez un nom de RAM GPU
+  comme *l'une de ces quatre*.
+
+  Les désignations terminées par **S** sont sous la carte ; la
+  correspondance est dans [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md).
 - Un point n'est toujours pas mesuré, et la ROM y affiche un numéro de
   position plutôt que de deviner :
   - l'**ordre des voies** à l'intérieur de chaque groupe de quatre, mais

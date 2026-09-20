@@ -1,8 +1,8 @@
 # NaomiDiag
 
-> **Work in progress.** The video RAM IC numbers are wrong. Naomi 2 testing
-> is incomplete. And other functions have not been tested yet. But I am
-> working on it as fast as I can :-)
+> **Work in progress.** The video RAM IC numbers need verifying. Naomi 2
+> testing is incomplete. And other functions have not been tested yet. But I
+> am working on it as fast as I can :-)
 
 A replacement diagnostic BIOS ROM for the **SEGA Naomi** and **Naomi 2**
 arcade boards. It replaces the stock BIOS in the IC27 socket and tests the
@@ -348,15 +348,23 @@ under the DRC, so fault injection into it needs `-nodrc`.
   them from the order the original BIOS RAM TEST prints its numbers, which
   was wrong three times over — including having the CPU RAM and GPU RAM
   groups the wrong way round — so nothing rests on that inference any more.
-- **The GPU RAM designators are wrong.** The ROM prints TEX0 as
-  IC16/18/20/22 and TEX1 as IC17S/19S/21S/23S, taken from a table in the
-  original BIOS RAM TEST at ROM offset `0x5C484`. That table's first three
-  entries — IC29 for the NVRAM, IC35 for the sound RAM, IC9-12 for the CPU
-  RAM — are confirmed on a real board, but the GPU RAM rows do not survive
-  contact with one. Until they are read off a PCB, treat any GPU RAM chip
-  this ROM names as a group, not as a part number. The CPU RAM designators
-  are not affected. Designators ending in **S** are on the underside of the
-  PCB; the map is in [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md).
+- **The GPU RAM designators still need confirming**, though less of them
+  than it first appeared. The eight chips and their split into two banks of
+  four are not in doubt: Sega's own NAOMI 2 service manual lists the RAM
+  TEST as IC16/18/20/22 and then IC17/19/21/23, which is exactly what this
+  ROM prints, and the designators have since been read off a board.
+
+  What is not established is **which chip inside a bank carries which
+  16-bit lane**. The ROM maps position 1 to IC16, position 2 to IC18 and so
+  on, and that order is an assumption, the same one still outstanding for
+  the CPU RAM. One field report bears on it: a chip this ROM named was
+  replaced and the fault stayed. That is consistent with the lane order
+  being wrong — and equally with the fault lying outside the chip, a cut
+  track or a bad ball under the PowerVR. One board cannot tell those apart.
+  Until it is settled, read a GPU RAM name as *one of these four*.
+
+  Designators ending in **S** are on the underside of the PCB; the map is in
+  [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md).
 - One thing is still not measured, and the ROM says position numbers rather
   than guessing:
   - the **lane→IC order** inside each group of four, though no longer
