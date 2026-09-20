@@ -151,7 +151,7 @@ the report (see [Operator console](#operator-console)).
     identification.
 
 RAM faults are reported per component: a bit mask, the affected data lanes,
-and the silkscreen IC designator (e.g. `CPU RAM 1 (IC16) DEFECTIVE`).
+and the silkscreen IC designator (e.g. `CPU RAM 1 (IC9) DEFECTIVE`).
 
 The progress bar retires after item 7: from there on nothing is being
 measured — the NVRAM, the RTC, the DIMM probe, Maple and the EEPROMs all
@@ -172,7 +172,7 @@ the time goes -- are copied into an 8 KB block of CPU RAM at boot and run
 from there, cached, while everything else stays in ROM.
 
 The four CPU RAM chips are interleaved by data lane rather than by address
-range -- IC16/IC18 carry the even words, IC20/IC22 the odd ones -- so every
+range -- IC9/IC10 carry the even words, IC11S/IC12S the odd ones -- so every
 block spans all four. Blocks are scanned downward from the top and the first
 sound one is taken, which gives immunity to a localized fault (a bad row or
 column inside one chip) but not to a chip dead across its range: in that case

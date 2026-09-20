@@ -1,5 +1,10 @@
 # NaomiDiag
 
+> **En cours de développement.** Les numéros d'IC des RAM vidéo sont
+> incorrects. Le test de la Naomi 2 est incomplet. Et d'autres fonctions
+> n'ont pas encore été testées. Mais je travaille dessus aussi vite que je
+> peux :-)
+
 ROM de BIOS de diagnostic pour les cartes d'arcade **SEGA Naomi** et
 **Naomi 2**. Elle remplace le BIOS d'origine dans le support IC27 et teste
 les composants de la carte un par un, en rapportant les résultats sur trois
@@ -19,21 +24,22 @@ téléchargement direct :
 
 > English: see [README.md](README.md).
 
-![NaomiDiag sur une Naomi réelle](NaomiDIAG_001.jpg)
+### Une exécution, avec une panne
 
-Le rapport à l'écran, photographié sur une Naomi 1 réelle. Cette carte n'est
-pas saine, et la ROM le dit : les tests cellule de la RAM son et de la RAM CPU
-échouent tous deux. Les tests de bus passent, donc les puces répondent ; ce
-sont leurs cellules qui ne tiennent pas. Tout le reste est au vert.
+![Détection d'une ligne de données morte sur la RAM CPU](docs/fault_ic9.gif)
 
-La photo est en v0.9, dont les désignations d'IC étaient fausses. Elles
-venaient des écrans RAM TEST du BIOS d'origine, authentiques, mais
-l'association d'un numéro à une région était déduite de leur ordre
-d'affichage — et cette déduction intervertissait les deux groupes de RAM. La
-carte correcte, relevée sur PCB, est dans [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md) : la RAM
-CPU est IC9, IC10, IC11S et IC12S ; les huit RAM du GPU sont IC16/18/20/22 au
-recto et IC17S/19S/21S/23S au verso. Les désignations terminées par **S**
-sont sous la carte.
+Ligne de données D5 maintenue à 0 sur une partie de la RAM CPU, sous MAME.
+Le test cellule échoue et la ROM nomme la puce : D5 est dans la moitié basse
+du mot de 64 bits, elle appartient donc à la paire de mot pair — **IC9**,
+jamais la paire impaire. La bordure clignotante est le battement d'activité,
+qui pulse tant que la ROM est vivante.
+
+L'exécution complète est sur la page des releases :
+[**NaomiDIAG_EN_IC9_fault.mp4**](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_EN_IC9_fault.mp4)
+— 125 secondes, tous les tests, **avec le son**, pour entendre la panne
+annoncée autant que la lire. GitHub ne lit pas une vidéo hébergée dans un
+dépôt (il supprime la balise `<video>`) : d'où le GIF muet ci-dessus et le
+téléchargement pour la version sonore.
 
 ## Trois canaux de sortie simultanés
 
@@ -62,9 +68,22 @@ progression passe par passe.
 Les rapports vocaux sont bloquants, avec au moins une seconde de silence
 entre deux messages pour éviter tout chevauchement.
 
+Les clips sont stockés en **ADPCM Yamaha 4 bits** et remis à l'AICA sous
+cette forme (`PCMS=2`), qu'elle décode en matériel. C'est un gain sec de 4:1
+sur l'EPROM, sans décompresseur, sans tampon intermédiaire et sans coût
+processeur — les octets sont copiés en RAM son exactement tels qu'ils sont
+en ROM. Le build français complet est passé de 98 % de l'EPROM à 29 %.
+
 ## Ce qui est testé
 
-Dans l'ordre :
+Dans l'ordre. L'écran et le haut-parleur sont vivants bien avant que les
+mémoires qui les portent soient intégralement testées : chaque canal est
+amorcé sur la petite région qu'il utilise réellement, si bien que les
+résultats sont rapportés au fil de l'eau. Les points **1-9 et 11-13 sont la
+suite de démarrage** et s'exécutent seuls. Les points **10 et 14-17 sont des
+actions opérateur** au menu ci-dessous : soit ils écrivent quelque part, soit
+ils durent assez pour n'avoir rien à faire devant le rapport (voir
+[Console opérateur](#console-opérateur)).
 
 1. **Cœur SH-4** — le cache est configuré en RAM interne et auto-testé ;
    il sert aussi de pile/`.bss` à toute la ROM (aucune RAM externe utilisée
@@ -72,13 +91,7 @@ Dans l'ordre :
 2. **Identification de la carte** — Naomi 1 ou Naomi 2 (signature Elan +
    aliasing VRAM).
 3. **EPROM BIOS (IC27)** — auto-contrôle CRC32.
-4. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2) — puis
-   l'audio devient un canal.
-5. **VRAM** — 16 Mo en huit puces de 16 Mbit autour du circuit graphique,
-   testées en deux bancs de 64 bits, TEX0 et TEX1 de quatre puces chacun.
-   Leurs désignations ne sont pas confirmées — puis l'écran de rapport
-   VGA s'active.
-6. **RAM CPU principale** (SDRAM, 16/32 Mo, IC9/IC10/IC11S/IC12S) — d'abord un test
+4. **RAM CPU principale** (SDRAM, 16/32 Mo, IC9/IC10/IC11S/IC12S) — d'abord un test
    bus de données (walking-ones) et un test bus d'adresses, puis **trois
    phases**, annoncées `passe n/3` et menant chacune la barre de progression
    de 0 à 100 % :
@@ -97,18 +110,28 @@ Dans l'ordre :
    cache du SH-4 (OC-RAM) et effectue tous les tests ne nécessitant pas la
    RAM principale — seul le test Maple/MIE, qui a besoin de RAM pour ses
    descripteurs DMA, est ignoré.
+5. **VRAM** — 16 Mo en huit puces de 16 Mbit autour du circuit graphique,
+   testées en deux bancs de 64 bits, TEX0 et TEX1 de quatre puces chacun,
+   avec les mêmes trois phases.
+6. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2), mêmes trois
+   phases, chaque accès cadencé par la FIFO du bus G2.
 7. **Naomi 2 uniquement** — VRAM du PVR esclave (16 Mo) et RAM Elan (32 Mo).
 8. **NVRAM de sauvegarde** — test non destructif (sauvegarde/restauration).
 9. **RTC** (interne à l'AICA, IC33) — vérification non destructive de
    l'avance de l'horloge.
-10. **Carte DIMM** (mailbox G1) — présence et cohérence de la mailbox.
+10. **Carte DIMM** — vidage de la mailbox et contrôle de stabilité en
+    lecture, puis le test destructif de la SDRAM par DMA G1. Action menu
+    `d` ; `f` identifie la flash du firmware DIMM.
 11. **Bus Maple / MIE** (Z80 315-6146) — requête de version + auto-test
     d'usine.
-12. **EEPROM des réglages** (93C46 via MIE) — base posée (nécessite un
-    upload de code Z80 ; documenté).
+12. **EEPROM des réglages** (93C46 via MIE) — lue, et ses deux copies
+    vérifiées par CRC. Nécessite d'abord le téléversement d'un programme Z80
+    dans le MIE (`src/mie_prog.z80`), qui reste ensuite résident et sert
+    aussi les boutons de la carte et les DIP switches.
 13. **EEPROM numéro de série** (93C46 sur GPIO du SH-4) — lecture + contrôle
     du contenu.
 14. **Sécurité cartouche** (X76F100) — présence par response-to-reset.
+    Action menu `g`, avec les points 15-17.
 15. **Contenu cartouche** — identifie le jeu dans une base embarquée de tous
     les jeux cartouche Naomi/Naomi 2 connus (192 jeux, 2298 IC) et vérifie
     chaque puce ROM par SHA-1, en nommant l'IC fautive par sa sérigraphie.
@@ -139,9 +162,14 @@ Dans l'ordre :
     même quand le jeu n'est pas identifiable, puisqu'une ligne morte est
     précisément ce qui empêche l'identification.
 
-Les pannes RAM sont rapportées par composant : masque de bits, lanes de
+Les pannes RAM sont rapportées par composant : masque de bits, voies de
 données concernées, et désignateur IC sérigraphié (ex.
-`RAM CPU 1 (IC16) DEFECTUEUX`).
+`RAM CPU 1 (IC9) DEFECTUEUX`).
+
+La barre de progression se retire après le point 7 : à partir de là plus rien
+ne se mesure — la NVRAM, le RTC, la sonde DIMM, Maple et les EEPROM répondent
+par oui ou par non — et les deux lignes qu'elle occupait reviennent au
+rapport.
 
 
 ### Où s'exécutent les boucles de test
@@ -160,7 +188,7 @@ de RAM CPU et exécutées depuis là, en cache, le reste du programme demeurant
 en ROM.
 
 Les quatre puces de RAM CPU sont entrelacées par voie de données et non par
-plage d'adresses — IC16/IC18 portent les mots pairs, IC20/IC22 les impairs —
+plage d'adresses — IC9/IC10 portent les mots pairs, IC11S/IC12S les impairs —
 si bien que tout bloc les traverse toutes. Les blocs sont balayés du sommet
 vers le bas et le premier sain est retenu : cela immunise contre un défaut
 localisé (ligne ou colonne défaillante dans une puce) mais pas contre une
@@ -184,6 +212,43 @@ conservée. Si aucune RAM utilisable n'est trouvée, les pointeurs continuent
 de viser les copies en ROM et le diagnostic est lent plutôt qu'absent — ce
 qui est précisément le cas d'une carte à diagnostiquer. `RELOC=0` désactive
 complètement le mécanisme.
+
+## Console opérateur
+
+La suite de démarrage n'est pas la fin. Une touche au port série, ou les
+boutons **TEST** et **SERVICE** de la carte, interrompt les tests et fait
+apparaître un menu.
+
+Les boutons exigent d'abord le téléversement d'un petit programme Z80 dans le
+MIE — le firmware d'usine du 315-6146 répond à quatre commandes Maple, et
+lire les boutons n'en fait pas partie. Ce téléversement a lieu pendant le
+test de l'EEPROM des réglages et le programme reste résident : les boutons
+fonctionnent donc à partir du rapport. Les **TEST/START** JVS d'une borne ne
+sont *pas* câblés : les atteindre suppose de piloter l'UART JVS du MIE depuis
+le Z80, ce qui est un travail à part.
+
+Touches sur la console série :
+
+| Touche | Action |
+|---|---|
+| `h` | aide — la seule touche qui n'interrompt jamais |
+| `a` | abandonner le test en cours et passer au rapport |
+| `c` / `v` / `s` | boucler le test RAM CPU / vidéo / son |
+| `d` | test complet de la SDRAM du DIMM |
+| `g` | intégrité SHA-1 des flash du jeu |
+| `f` | flash du firmware DIMM — identification, et choix d'une version |
+
+**TEST** parcourt le menu en bouclant ; **SERVICE** lance la sélection. Les
+trois boucles RAM tournent jusqu'à l'appui sur **TEST** et rien d'autre ne
+les arrête — c'est le but, une panne intermittente se montrant à la dixième
+passe et non à la première. Toute autre action affiche son rapport et attend
+un **TEST** pour ramener le menu.
+
+Deux d'entre elles sont à l'initiative de l'opérateur précisément parce
+qu'elles ne sont pas sûres sans surveillance : le test SDRAM du DIMM écrase
+le jeu qui y est chargé (pas le firmware, qui tourne depuis sa propre RAM),
+et l'action flash touche à la flash du firmware du DIMM — en lecture seule
+pour l'instant, voir plus bas.
 
 ## Compilation
 
@@ -225,6 +290,23 @@ d'établi pour construire la correspondance voie → désignation, pas une étap
 du diagnostic : elle ne se termine jamais, donc le rapport reste affiché mais
 la machine ne se stabilise pas. À activer quand vous avez une sonde en main.
 
+**`AUDIO=0`** produit une ROM muette : la table des clips vocaux est
+remplacée par un stub et l'image tombe à 6 % de l'EPROM. Cette option est née
+quand les clips étaient du PCM 16 bits et ne laissaient de place à rien
+d'autre ; depuis leur passage en ADPCM, un build bilingue complet occupe
+27-29 %, ce n'est donc plus un moyen de faire de la place — c'est pour un
+établi où la parole gêne, et ça démarre un peu plus vite. `AUDIO=1` est la
+valeur par défaut.
+
+```sh
+make LANG=FR AUDIO=0
+```
+
+Attention : le shell exporte souvent `LANG=fr_FR.UTF-8`, qui écrase le
+`LANG ?= EN` du Makefile. Passez toujours `LANG=` explicitement à **chaque**
+`make`, y compris `make mame-rom`, sinon une cible se reconstruit avec
+d'autres options.
+
 Une image de 2 Mo est produite, prête à graver sur une EPROM 27C160 (IC27).
 Le build refuse toute image dépassant 2 Mo (pas de troncature silencieuse).
 
@@ -235,7 +317,9 @@ Régénérer les sources générées (rarement nécessaire, versionnées) :
 
 ```sh
 make audio     # ré-génère les clips vocaux (nécessite le venv Piper + sox)
+               # TTS -> 22050 Hz mono -> ADPCM (tools/adpcm.py)
 make cartdb    # reconstruit la base SHA-1 cartouche depuis `mame -listxml`
+make mieprog   # reconstruit src/mie_prog.h depuis le source Z80 (z80asm)
 ```
 
 ## Test sous MAME
@@ -273,12 +357,17 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   déduisait de l'ordre dans lequel le RAM TEST du BIOS d'origine affiche ses
   numéros ; cette déduction s'est trompée trois fois — dont une inversion
   complète des groupes RAM CPU et RAM GPU — et plus rien ne repose dessus.
-- Le partage de la VRAM est tranché : **TEX0 = IC16/18/20/22**, les quatre
-  puces du dessus, et **TEX1 = IC17S/19S/21S/23S**, les quatre du dessous. Il
-  provient d'une table du RAM TEST du BIOS d'origine, à l'offset ROM
-  `0x5C484`, dont les trois premières entrées — IC29 pour la NVRAM, IC35 pour
-  la RAM son, IC9-12 pour la RAM CPU — sont confirmées indépendamment sur
-  carte réelle.
+- **Les désignateurs des RAM GPU sont faux.** La ROM affiche TEX0 en
+  IC16/18/20/22 et TEX1 en IC17S/19S/21S/23S, d'après une table du RAM TEST
+  du BIOS d'origine à l'offset ROM `0x5C484`. Les trois premières entrées de
+  cette table — IC29 pour la NVRAM, IC35 pour la RAM son, IC9-12 pour la RAM
+  CPU — sont confirmées sur carte réelle, mais ses lignes RAM GPU ne
+  survivent pas au contact du matériel. Tant qu'elles n'auront pas été
+  relevées sur un PCB, lisez toute puce de RAM GPU que cette ROM nomme comme
+  un *groupe*, pas comme une référence de pièce. Les désignateurs de la RAM
+  CPU ne sont pas concernés. Les désignations terminées par **S** sont sous
+  la carte ; la correspondance est dans
+  [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md).
 - Un point n'est toujours pas mesuré, et la ROM y affiche un numéro de
   position plutôt que de deviner :
   - l'**ordre des voies** à l'intérieur de chaque groupe de quatre, mais
@@ -290,17 +379,41 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
     tranche individuellement.
 - Les clips vocaux énoncent le numéro sans le suffixe **S** : une panne sur
   IC11S s'entend « I C onze ». L'écran et le port série font foi.
-- La lecture de l'EEPROM des réglages et le test JVS complet de la carte
-  I/O nécessitent un upload de code Z80 dans le MIE (travail futur).
+- Le test JVS complet de la carte I/O demande encore un maître JVS dans le
+  Z80 du MIE. L'EEPROM des réglages et les boutons de la carte, eux, ne le
+  demandent plus : `make mieprog` reconstruit `src/mie_prog.h` depuis le
+  source Z80 si vous le modifiez, et l'en-tête généré est versionné pour que
+  la ROM se construise avec la seule chaîne SH-4.
 
 ## Carte DIMM
 
 Le protocole de mailbox entre la Naomi et une carte DIMM n'est pas documenté
-publiquement. Ce qui a été retrouvé dans le firmware de la carte elle-même —
-base de liaison, fenêtre mailbox vue du DIMM, format de réponse et signature
-du pilote mémoire — est consigné dans
-[`docs/DIMM_FIRMWARE.md`](docs/DIMM_FIRMWARE.md), avec ce qui manque encore
-et la voie qui ne fonctionne pas.
+publiquement. Ce qui a été retrouvé dans le firmware de la carte elle-même
+est consigné dans [`docs/DIMM_FIRMWARE.md`](docs/DIMM_FIRMWARE.md) : base de
+liaison, fenêtre mailbox vue du DIMM, format de réponse, répartiteur de
+commandes, et les deux files de messages VxWorks qui sont derrière.
+
+En résumé, **la mailbox elle-même n'offre rien à une ROM de diagnostic** —
+ni identité, ni version, ni test mémoire, ni reflashage. Les trois seules
+commandes qu'elle accepte depuis la Naomi sont une sonnette pour un
+mandataire de sockets BSD, et l'une des trois ne fait rien.
+
+Ce qui marche passe à côté, par le bus G1 :
+
+- **`d` — test SDRAM du DIMM.** Le GD-DMA de Holly a un bit de sens ; avec
+  `SB_GDDIR = 1` la Naomi écrit la RAM système vers le DIMM. La ROM s'en sert
+  pour un vrai test mémoire (`0x01010101`, `0x10101010`, CRC-32, délai de
+  garde d'une seconde sur le DMA). Il écrase le jeu chargé : réservé au menu.
+- **`f` — flash du firmware DIMM.** La flash s'atteint par le PIO ROM-board
+  du G1 avec des commandes AMD. La ROM fait un read-ID, non destructeur, et
+  propose un choix entre 3.17, 4.01 et 4.03. **La gravure n'est
+  volontairement pas armée.** L'updater de SEGA a été décompilé : il procède
+  par un unique effacement de puce suivi de la reprogrammation de l'image
+  entière — le filet de secours à deux slots de la carte survit donc à un
+  flash réussi, mais pas à un flash interrompu. Cela attend une validation
+  sur matériel, pas davantage de lecture.
+
+L'analyse des images de firmware SEGA reste hors de ce dépôt, délibérément.
 
 ## Crédits
 
