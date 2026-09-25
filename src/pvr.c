@@ -115,6 +115,8 @@ void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
             chunk = 1024;
         chunk &= ~15u;
         progress_tick(done);
+        if (progress_aborted())
+            return;             /* the caller gives no verdict */
         p_ram_fill_fast((u32 *)(base + (done << 2)), chunk >> 4, pattern);
         done += chunk;
     }
@@ -129,6 +131,8 @@ void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
             chunk = 1024;
         chunk &= ~7u;
         progress_tick(n + done);
+        if (progress_aborted())
+            return;             /* the caller gives no verdict */
         u32 dodd = 0;
         diff_e |= p_ram_verify_fast((u32 *)(base + (done << 2)), chunk >> 3,
                                     pattern, &dodd);
@@ -197,6 +201,8 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         if (chunk > 1024)
             chunk = 1024;
         progress_tick(done);
+        if (progress_aborted())
+            return;             /* the caller gives no verdict */
         p_ram_prng_fill_fast((u32 *)(base + (done << 2)), chunk, &c);
         done += chunk;
     }
@@ -209,6 +215,8 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         if (!chunk)
             break;
         progress_tick(n + done);
+        if (progress_aborted())
+            return;             /* the caller gives no verdict */
         p_ram_prng_verify_fast((const u32 *)(base + (done << 2)),
                                chunk >> 1, &c);
         done += chunk;

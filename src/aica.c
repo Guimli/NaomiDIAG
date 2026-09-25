@@ -219,13 +219,19 @@ void aram_test_pattern(u32 off, u32 len, u32 pattern, ram_result *r)
     for (u32 i = 0; i < n; i++) {
         if ((i & 7) == 0 && !g2_fifo_wait())
             return;                     /* G2 stalled: reported by caller */
-        if ((i & 1023) == 0)
+        if ((i & 1023) == 0) {
             progress_tick(i);
+            if (progress_aborted())
+                return;         /* the caller gives no verdict */
+        }
         p[i] = pattern;
     }
     for (u32 i = 0; i < n; i++) {
-        if ((i & 1023) == 0)
+        if ((i & 1023) == 0) {
             progress_tick(n + i);
+            if (progress_aborted())
+                return;         /* the caller gives no verdict */
+        }
         u32 got = p[i];
         if (got != pattern)
             note_fail(r, ARAM_P2_BASE + off + (i << 2), pattern, got);
@@ -254,8 +260,11 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
         x = xorshift32(x);
         if ((i & 7) == 0 && !g2_fifo_wait())
             return;                     /* G2 stalled: reported by caller */
-        if ((i & 1023) == 0)
+        if ((i & 1023) == 0) {
             progress_tick(i);
+            if (progress_aborted())
+                return;         /* the caller gives no verdict */
+        }
         p[i] = x;
 #if CFG_RAM_CRC
         crc_w = crc32_word(crc_w, x);
@@ -264,8 +273,11 @@ void aram_test_prng(u32 off, u32 len, u32 seed, ram_result *r)
     x = seed ? seed : 1;
     for (u32 i = 0; i < n; i++) {
         x = xorshift32(x);
-        if ((i & 1023) == 0)
+        if ((i & 1023) == 0) {
             progress_tick(n + i);
+            if (progress_aborted())
+                return;         /* the caller gives no verdict */
+        }
         u32 got = p[i];
 #if CFG_RAM_CRC
         crc_r = crc32_word(crc_r, got);

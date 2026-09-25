@@ -77,7 +77,13 @@ void progress_retire(void);
  * The request carries what was asked for, because a key does more than stop
  * the test: it says which test to run instead. */
 #define ABORT_NONE      0
-#define ABORT_PLAIN     1       /* stop, no follow-up action */
+#define ABORT_PLAIN     1       /* stop, back to the report           */
+#define ABORT_MENU      2       /* stop, open the menu (TEST button)  */
+#define ABORT_ACT(n)    (0x10u + (n))   /* stop, then run menu action n */
+/* Actions used to be requested as i+1, which made the first of them -- the
+ * CPU RAM loop, key c -- the same value as ABORT_PLAIN: 'c' and 'a' were
+ * indistinguishable. Nothing read the value back until the boot suite
+ * learnt to stop, so it never showed. */
 
 void progress_request_abort(u32 what);
 u32  progress_aborted(void);    /* non-zero once a stop has been asked for */

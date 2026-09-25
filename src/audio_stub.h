@@ -55,6 +55,7 @@ enum {
     CLIP_EEPROM,
     CLIP_X76,
     CLIP_CART,
+    CLIP_CPU_EXC,
     CLIP_COUNT
 };
 

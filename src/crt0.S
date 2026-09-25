@@ -264,8 +264,11 @@ _vec_irq:                       ! VBR + 0x600
     bra     exc_common
     nop
 
-! Report and halt. No stack is used: this may run before one exists, and the
-! stack is exactly what a bad exception is likely to have destroyed.
+! Report and halt: serial first, then the screen and the speaker.
+! The serial part uses no stack: this may run before one exists, and the
+! stack is exactly what a bad exception is likely to have destroyed. Only
+! once the cause is out on serial does it take a fresh stack and hand over
+! to exc_report() in C for the screen and the speech.
 exc_common:
     mov.l   Hexc_a, r4
     mov.l   Hputs, r0
@@ -286,6 +289,34 @@ exc_common:
     mov.l   Hputs, r0
     jsr     @r0
     nop
+
+    ! Once only. A fault inside the C report comes back here; the flag says
+    ! so, and it stops at the serial report instead of recursing.
+    mov.l   Hexcflag, r1
+    mov.l   @r1, r0
+    tst     r0, r0
+    bf      exc_halt
+    mov     #1, r0
+    mov.l   r0, @r1
+
+    mov.l   Hexpevt, r0         ! arguments first, while SPC is still ours
+    mov.l   @r0, r4             ! r4 = EXPEVT, the cause
+    stc     spc, r5             ! r5 = where it happened
+
+    ! SR.BL is set on entry, and with it any further exception is a reset --
+    ! a silent restart. Clear it so a fault in the report vectors back here
+    ! and halts, and raise IMASK so nothing but a fault gets in. RB stays 1:
+    ! the C code runs on bank 1, which is fine for code that never returns.
+    stc     sr, r0
+    mov.l   Hblmask, r2
+    and     r2, r0
+    or      #0xF0, r0
+    ldc     r0, sr
+
+    mov.l   Hstack, r15         ! fresh stack: the old one may be what broke
+    mov.l   Hexcrep, r0
+    jsr     @r0                 ! screen, then speech; never returns
+    nop
 exc_halt:
     bra     exc_halt
     nop
@@ -296,6 +327,10 @@ Hexc_b:     .long exc_b_str
 Hexc_c:     .long exc_c_str
 Hputs:      .long asm_puts
 Hexpevt:    .long 0xFF000024
+Hexcflag:   .long _g_exc_active
+Hexcrep:    .long _exc_report
+Hblmask:    .long 0xEFFFFFFF        ! ~SR.BL
+Hstack:     .long 0x7C001000        ! top of OC-RAM bank 0
 
 ! ---------------------------------------------------------------------------
 ! asm_puthex: print r4 as 8 hex digits on the SCIF. Leaf, no stack, no RAM.

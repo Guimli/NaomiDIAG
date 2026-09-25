@@ -53,8 +53,8 @@ u32 crc32_rom_block(const u32 *src, u32 nquads, u32 crc);
 static u32 g_audio_ready;           /* sound RAM validated, AICA usable */
 static u32 g_ic_valid;              /* identified board: IC tables apply */
 static board_type g_board_type;     /* set by test_board() */
-static u32 g_mie_port1;
-u32 g_mie_prog;                     /* our Z80 program is resident */             /* MIE maple port + 1; 0 = none  */
+static u32 g_mie_port1;             /* MIE maple port + 1; 0 = none  */
+u32 g_mie_prog;                     /* our Z80 program is resident   */
 
 /* IC tables were extracted from the Naomi 1 BIOS; on any other board we
  * fall back to numbered positions instead of announcing wrong ICs. */
@@ -94,22 +94,31 @@ void diag_input_check(u32 in_loop)
             scif_puts(S_HELP);          /* help never interrupts */
             return;
         }
-        if (in_loop)                    /* only TEST ends a soak run */
+        /* Only TEST ends a soak run -- unless there is no TEST button to
+         * press. The buttons exist only once the Z80 program answers in the
+         * MIE; without it a loop started from the console could only be
+         * stopped by a reset. So 'a' does it then, and only then. */
+        if (in_loop) {
+            if (!g_mie_prog && (ev.key == 'a' || ev.key == 'A'))
+                progress_request_abort(ABORT_PLAIN);
             return;
+        }
         if (ev.key == 'a' || ev.key == 'A') {
             progress_request_abort(ABORT_PLAIN);
             return;
         }
         for (u32 i = 0; i < ACT_COUNT; i++) {
             if (ev.key == menu_key[i]) {
-                progress_request_abort(i + 1);
+                progress_request_abort(ABORT_ACT(i + 1));
                 return;
             }
         }
         return;                         /* unknown key: ignored */
     }
-    if (ev.kind == INPUT_SELECT)        /* TEST / PSW1 always stops */
-        progress_request_abort(ABORT_PLAIN);
+    /* TEST always stops. In a soak run that is all it does; anywhere else it
+     * is also the way into the menu, as it is once the report is up. */
+    if (ev.kind == INPUT_SELECT)
+        progress_request_abort(in_loop ? ABORT_PLAIN : ABORT_MENU);
 }
 
 /* ------------------------------------------------------------------ */
@@ -264,11 +273,11 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
  * every line -- 153,600 uncached VRAM writes to add one line, on every
  * result. Nothing about an appended line requires that: its position depends
  * only on the lines before it, and those are already correct on screen. */
-static void screen_append(void)
+static void screen_append(const log_entry *e)
 {
-    if (!g_screen_ready || !g_log_n)
+    if (!g_screen_ready)
         return;
-    g_screen_y = screen_draw_entry(&g_log[g_log_n - 1], g_screen_y);
+    g_screen_y = screen_draw_entry(e, g_screen_y);
 }
 
 /* Rebuild the whole screen. Needed exactly twice: when the display first
@@ -382,22 +391,26 @@ static void say_entry(const log_entry *e)
 static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
                          const comp_map *comps, u32 quiet_ok, u32 pre)
 {
-    if (g_log_n < LOG_MAX) {
-        g_log[g_log_n].name = name;
-        g_log[g_log_n].clip = clip;
-        g_log[g_log_n].status = st;
-        g_log[g_log_n].detail = detail;
-        g_log[g_log_n].comps = comps;
-        g_log[g_log_n].quiet_ok = quiet_ok;
-        g_log[g_log_n].pre = pre;
-        g_log_n++;
-    }
+    /* The entry is built first and shown from here, stored or not. Once the
+     * log was full the new result used to be dropped while the screen and
+     * the speaker went on with g_log[g_log_n - 1] -- the previous result,
+     * drawn and announced again in place of the real one. */
+    log_entry e;
+    e.name = name;
+    e.clip = clip;
+    e.status = st;
+    e.detail = detail;
+    e.comps = comps;
+    e.quiet_ok = quiet_ok;
+    e.pre = pre;
+    if (g_log_n < LOG_MAX)
+        g_log[g_log_n++] = e;
+
     scif_puts(name);
     scif_puts(st == T_OK ? S_SUF_OK : S_SUF_FAIL);
     /* live multi-channel report: one line added, then speech */
-    screen_append();
-    if (g_log_n)
-        say_entry(&g_log[g_log_n - 1]);
+    screen_append(&e);
+    say_entry(&e);
 }
 
 static void log_result(const char *name, u32 clip, t_status st, u32 detail,
@@ -432,9 +445,18 @@ static void report_badbits(u32 badbits)
 static void report_comps(const char *ramname, u32 compmask,
                          const comp_map *comps)
 {
+    const char *last = 0;
     for (u32 i = 0; i < 8; i++) {
         if (!(compmask & (1u << i)))
             continue;
+        /* One line per chip, not per position: the sound RAM is a single
+         * 16-bit chip answering for all four positions, and naming IC35 four
+         * times reads as four faults. */
+        if (comps && i < 4) {
+            if (comps[i].name == last)
+                continue;
+            last = comps[i].name;
+        }
         scif_puts("  -> ");
         scif_puts(ramname);
         scif_puts(" ");
@@ -446,6 +468,36 @@ static void report_comps(const char *ramname, u32 compmask,
         }
         scif_puts(S_DEFECTIVE);
     }
+}
+
+/* What a fault in one memory region is called and how it is broken down.
+ * The boot tests and the looping tests on the menu both report through
+ * this, so they cannot drift apart again: they did, and the loops ended up
+ * calling every VRAM and sound RAM fault "CPU RAM n", with no IC names, and
+ * without folding the sound RAM's two half-words onto its single chip. */
+typedef struct {
+    const char *group;              /* "CPU RAM", "VRAM TEX0", ...         */
+    const comp_map *comps;          /* position -> IC, or NULL             */
+    u32 fold16;                     /* one 16-bit chip behind a 32-bit bus */
+} region_desc;
+
+static void report_region(const region_desc *d, const ram_result *r)
+{
+    if (d->fold16)
+        report_badbits_aram(r->badbits);
+    else
+        report_badbits(r->badbits);
+    report_comps(d->group, ram_comp_mask(r), d->comps);
+}
+
+/* End of one test phase on the serial log. A phase cut short by an abort
+ * used to end in "ok" like any other, which is a verdict nobody reached. */
+static void phase_mark(const ram_result *r)
+{
+    if (progress_aborted())
+        scif_puts(S_PH_STOPPED);
+    else
+        scif_puts(r->errors ? " ERR\n" : " ok\n");
 }
 
 static void report_fails(const ram_result *r)
@@ -534,6 +586,10 @@ static void test_bios_rom(void)
         progress_tick(done << 2);
         crc = crc32_rom_block(rom + (done << 2), q, crc);
         done += q;
+        if (progress_aborted()) {       /* a checksum cut short is not a bad EPROM */
+            progress_end();
+            return;
+        }
     }
     for (u32 i = nq << 2; i < n; i++)
         crc = crc32_word(crc, rom[i]);
@@ -597,6 +653,7 @@ static void sdram_setup(void)
  * whose CPU RAM is unusable still gets a full, slow diagnostic, which is
  * exactly the board that needs one. */
 static u32 g_reloc_win;             /* P2 address of the block in use, 0 = none */
+static u32 g_maple_safe;            /* Maple DMA buffers sit in a qualified block */
 
 /* "pass n/3 <what>" on serial, and the same on the progress bar. */
 static void phase_begin(const char *label, u32 phase, const char *what,
@@ -648,6 +705,12 @@ static void relocate_try(void)
         ram_test_pattern(cand, RELOC_WINDOW, 0x55555555, &res);
         ram_test_pattern(cand, RELOC_WINDOW, 0xAAAAAAAA, &res);
         ram_test_prng(cand, RELOC_WINDOW, 0x5EED1234, &res);
+        /* Stopped mid-scan, a block would come back with no error counted
+         * and be taken as sound. Copying code into memory nobody finished
+         * testing is exactly what this scan exists to prevent: leave the
+         * loops in ROM and conclude nothing about the RAM. */
+        if (progress_aborted())
+            return;
         if (!res.errors) {
             win = cand;
             break;
@@ -663,7 +726,7 @@ static void relocate_try(void)
         scif_puts("  ");
         scif_putdec(nbad);
         scif_puts(" bad 8KB block(s) at the top of CPU RAM\n");
-        log_result(S_L_RELOC_SCAN, CLIP_SOUND_RAM, T_FAIL,
+        log_result(S_L_RELOC_SCAN, CLIP_CPU_RAM, T_FAIL,
                    ram_comp_mask(&scan), IC(work_comps));
         report_badbits(scan.badbits);
         report_comps(S_CG_CPU, ram_comp_mask(&scan), IC(work_comps));
@@ -675,6 +738,10 @@ static void relocate_try(void)
         return;
     }
     g_reloc_win = win;          /* the cell test now stops below this block */
+    /* The Maple buffers move with it. They were left in the top block, which
+     * is the one that failed whenever the scan settled on a lower one. */
+    maple_set_buffers(win + 0x1800u);
+    g_maple_safe = 1;
 
     /* the first execution of relocated code happens inside reloc_install.
      * Flag it on the border first: if this board refuses cached execution
@@ -691,14 +758,17 @@ static void relocate_try(void)
 
 /* One report, whatever happened: the address is read back from the pointer
  * that will really be called, not from a flag saying what should have been
- * arranged. 0x8C/0x8D is cached CPU RAM, 0xA0 is the boot EPROM. */
+ * arranged. Judged on the physical address, so the answer does not depend
+ * on which window the ROM was linked for: the boot EPROM is area 0, CPU RAM
+ * starts at 0x0C000000. Comparing against 0xA0000000, as this did, called a
+ * ROM copy "in RAM" in a P1-linked build. */
 static void relocate_fast_loops(void)
 {
     relocate_try();
+    u32 at = (u32)p_ram_prng_verify_fast;
     scif_puts("  loops execute at ");
-    scif_puthex((u32)p_ram_prng_verify_fast);
-    scif_puts((u32)p_ram_prng_verify_fast < 0xA0000000u
-              ? S_RELOC_IN_RAM : S_RELOC_IN_ROM);
+    scif_puthex(at);
+    scif_puts((at & 0x1FFFFFFFu) >= 0x0C000000u ? S_RELOC_IN_RAM : S_RELOC_IN_ROM);
 }
 
 
@@ -709,6 +779,7 @@ static u32 test_sdram_cells(void)
 
     /* data bus test runs at an even word address (A2=0): comps 1/2 */
     u32 bad = ram_test_databus(SDRAM_P2_BASE);
+    u32 bus_bad = bad;
     u32 comps = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
     log_result_q(S_L_SDRAM_DBUS, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
                  IC(work_comps), 1, CLIP_CPU_RAM);
@@ -718,6 +789,7 @@ static u32 test_sdram_cells(void)
     }
 
     bad = ram_test_addrbus(SDRAM_P2_BASE, size);
+    bus_bad |= bad;
     log_result_q(S_L_SDRAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1,
                  CLIP_CPU_RAM);
     if (bad) {
@@ -742,12 +814,12 @@ static u32 test_sdram_cells(void)
     phase_begin(S_P_SDRAM, 1, S_PH_0101, words);
     ram_test_pattern(SDRAM_P2_BASE, len, 0x55555555, &res);
     progress_end();
-    scif_puts(res.errors ? " ERR\n" : " ok\n");
+    phase_mark(&res);
 
     phase_begin(S_P_SDRAM, 2, S_PH_1010, words);
     ram_test_pattern(SDRAM_P2_BASE, len, 0xAAAAAAAA, &res);
     progress_end();
-    scif_puts(res.errors ? " ERR\n" : " ok\n");
+    phase_mark(&res);
 
     phase_begin(S_P_SDRAM, 3, S_PH_PRNG, words);
     ram_test_prng(SDRAM_P2_BASE, len, 0xDEADBEEF ^ 0x9E3779B9u, &res);
@@ -756,8 +828,10 @@ static u32 test_sdram_cells(void)
     scif_puts(" crc=");
     scif_puthex(res.crc_r);
 #endif
-    scif_puts(res.errors ? " ERR\n" : " ok\n");
+    phase_mark(&res);
 
+    if (progress_aborted())             /* partial run: no verdict either way */
+        return 0;
     t_status st = res.errors ? T_FAIL : T_OK;
     log_result(S_L_SDRAM_CELL, CLIP_CPU_RAM, st,
                ram_comp_mask(&res), IC(work_comps));
@@ -768,7 +842,12 @@ static u32 test_sdram_cells(void)
         report_fails(&res);
         return 0;
     }
-    return size;
+    /* Cells that hold their values say nothing about the wires that reach
+     * them: with a dead address line every pattern still reads back, just
+     * from the wrong cell. The Maple stage relies on this answer for its DMA
+     * descriptors, so a bus fault makes the RAM unusable whatever the cell
+     * test said. */
+    return bus_bad ? 0 : size;
 }
 
 /* ------------------------------------------------------------------ */
@@ -821,12 +900,12 @@ static u32 test_aram(void)
     phase_begin(S_P_ARAM, 1, S_PH_0101, words);
     aram_test_pattern(0, len, 0x55555555, &res);
     progress_end();
-    scif_puts(res.errors ? " ERR\n" : " ok\n");
+    phase_mark(&res);
 
     phase_begin(S_P_ARAM, 2, S_PH_1010, words);
     aram_test_pattern(0, len, 0xAAAAAAAA, &res);
     progress_end();
-    scif_puts(res.errors ? " ERR\n" : " ok\n");
+    phase_mark(&res);
 
     phase_begin(S_P_ARAM, 3, S_PH_PRNG, words);
     aram_test_prng(0, len, 0xC0FFEE42 ^ 0x9E3779B9u, &res);
@@ -835,12 +914,15 @@ static u32 test_aram(void)
     scif_puts(" crc=");
     scif_puthex(res.crc_r);
 #endif
-    scif_puts(res.errors ? " ERR\n" : " ok\n");
+    phase_mark(&res);
+
+    if (progress_aborted())             /* partial run: no verdict either way */
+        return 0;
 
     /* a G2 bus that never drains aborts the write loops: the cell results
      * are meaningless then, and the bus is the actual fault to report */
     if (aica_g2_stalled()) {
-        scif_puts("  G2 bus never went idle: sound RAM result is void\n");
+        scif_puts(S_G2_STALL);
         log_result(S_L_ARAM_CELL, CLIP_SOUND_RAM, T_FAIL, 0, IC(aram_comps));
         return 0;
     }
@@ -929,7 +1011,7 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
     scif_puts(" crc=");
     scif_puthex(res.crc_r);
 #endif
-    scif_puts(res.errors ? " ERR\n" : " ok\n");
+    phase_mark(&res);
 
     /* this test scribbles over the framebuffer: repaint once it is done so
      * the screen is readable again */
@@ -937,6 +1019,10 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
     progress_screen_enable(1);
     scif_putc('\n');
 
+    if (progress_aborted()) {           /* partial run: no verdict either way */
+        *ok_flag = 0;
+        return;
+    }
     t_status st = res.errors ? T_FAIL : T_OK;
     log_result(name, name_clip, st, ram_comp_mask(&res), comps);
     if (res.errors) {
@@ -1106,7 +1192,7 @@ static void test_dimm(void)
     const u32 mspan = 0x00400000;       /* 4 MB, abortable at each block */
 #endif
     static const u32 patterns[2] = { 0x01010101u, 0x10101010u };
-    u32 mem_fail = 0, mem_ran = 0;
+    u32 mem_fail = 0, mem_ran = 0, aborted = 0;
 
     scif_puts(S_DIMM_MEM_HDR);
     for (u32 p = 0; p < 2; p++) {
@@ -1114,6 +1200,18 @@ static void test_dimm(void)
         progress_begin(S_P_DIMM, mspan);
         dimm_mem_test(mspan, patterns[p], &mr);
         progress_end();
+
+        /* An operator abort stops dimm_mem_test between blocks, and what it
+         * leaves behind looks like other things: no block at all reads as
+         * "scratch RAM unusable", a partial run as a clean pass. Neither is
+         * true, so say what happened and draw no conclusion from it. */
+        if (progress_aborted()) {
+            scif_puts(S_DIMM_MEM_ABORT);
+            aborted = 1;
+            if (mr.errors)              /* a fault found before the abort stands */
+                mem_fail = 1;
+            break;
+        }
 
         scif_puts(S_DIMM_MEM_PAT);
         scif_puthex(patterns[p]);
@@ -1156,7 +1254,7 @@ static void test_dimm(void)
             mem_fail = 1;
         }
     }
-    if (mem_ran || mem_fail)
+    if (mem_fail || (mem_ran && !aborted))
         log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, mem_fail ? T_FAIL : T_OK, 0, 0);
 }
 
@@ -1326,8 +1424,21 @@ static void test_settings_eeprom(void)
      * The DIP switches and the two front buttons sit on the MIE port the
      * EEPROM's data line shares, so this probe is also the report. */
     {
+        /* Asked more than once. The program reads the whole EEPROM before it
+         * starts answering -- about 13 ms at 16 MHz by its instruction
+         * count, against the 20 ms the upload waits -- and a question that
+         * arrives during that read goes unanswered. One try would turn a
+         * slow MIE into "does not answer" and switch the buttons off for the
+         * whole session. */
         u8 in5;
-        if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0) {
+        u32 up = 0;
+        for (u32 t = 0; t < 10 && !up; t++) {
+            if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0)
+                up = 1;
+            else
+                delay_ms(10);
+        }
+        if (up) {
             g_mie_prog = 1;
             report_mie_inputs(in5);
         } else {
@@ -1733,11 +1844,20 @@ static void quick_audio_bringup(void)
 
     ram_result res;
     ram_result_clear(&res);
+    u32 stalls = aica_g2_stalled();
     u32 bad = aram_test_databus();
     if (!bad) {
         aram_test_pattern(AUDIO_ZONE_OFF, AUDIO_ZONE_LEN, 0x55555555, &res);
         aram_test_pattern(AUDIO_ZONE_OFF, AUDIO_ZONE_LEN, 0xAAAAAAAA, &res);
         aram_test_prng(AUDIO_ZONE_OFF, AUDIO_ZONE_LEN, 0xA1CA5EED, &res);
+    }
+    /* The pattern tests give up without counting an error when the G2 FIFO
+     * never drains -- they leave the verdict to their caller. Taking a
+     * zero error count at face value here declared audio ready on a bus that
+     * moves nothing. */
+    if (aica_g2_stalled() != stalls) {
+        bad = 1;
+        scif_puts(S_G2_STALL);
     }
     t_status st = (bad || res.errors) ? T_FAIL : T_OK;
     log_result(S_L_AUDIO_QUICK, CLIP_NONE, st, 0, 0);
@@ -1932,46 +2052,71 @@ static void jvs_map_aid(void)
 
 /* ---- looping memory tests -------------------------------------------- */
 
-/* One region, over and over, counting passes and accumulated errors. Runs
- * until the TEST button; a stray byte on the console must not end a soak. */
-static void loop_region(u32 base, u32 len, const char *what)
+/* One or two regions, over and over, counting passes and accumulated
+ * errors. Runs until the TEST button (or a when the buttons are not
+ * available -- see diag_input_check): a stray byte on the console must not
+ * end a soak.
+ *
+ * Every part is reported as itself: the video loop covers TEX0 and TEX1,
+ * both banks, where it used to stop at TEX0 -- half the VRAM. */
+typedef struct {
+    u32 base, len;
+    region_desc d;
+} loop_part;
+
+static void loop_regions(const loop_part *parts, u32 nparts, const char *what)
 {
     u32 pass = 0, errors = 0;
     progress_set_loop(1);
     while (!progress_aborted()) {
-        ram_result res;
-        ram_result_clear(&res);
         pass++;
-
         scif_puts(S_LOOP_PASS);
         scif_putdec(pass);
         scif_puts(": ");
-        progress_begin(what, (len >> 2) * 2);
-        if (base == ARAM_P2_BASE) {
-            aram_test_pattern(0, len, 0x55555555, &res);
-            aram_test_pattern(0, len, 0xAAAAAAAA, &res);
-            aram_test_prng(0, len, 0xC0FFEE42 ^ pass, &res);
-        } else if (base == SDRAM_P2_BASE) {
-            ram_test_pattern(base, len, 0x55555555, &res);
-            ram_test_pattern(base, len, 0xAAAAAAAA, &res);
-            ram_test_prng(base, len, 0xDEADBEEF ^ pass, &res);
-        } else {
-            vram_test_pattern(base, len, 0x55555555, &res);
-            vram_test_pattern(base, len, 0xAAAAAAAA, &res);
-            vram_test_prng(base, len, 0x7E0CBEEF ^ pass, &res);
-        }
-        progress_end();
+        for (u32 k = 0; k < nparts && !progress_aborted(); k++) {
+            const loop_part *lp = &parts[k];
+            ram_result res;
+            ram_result_clear(&res);
+            u32 stalls = aica_g2_stalled();
+            /* The framebuffer lives in TEX0. Drawing the bar into it while
+             * TEX0 is under test would write into the pattern being verified
+             * and report a fault that does not exist -- the boot test guards
+             * against this, the loop did not. */
+            u32 fbaddr = VRAM_TEX0_BASE + FB_VRAM_OFFSET;
+            progress_screen_enable(!(lp->base <= fbaddr && fbaddr < lp->base + lp->len));
+            progress_begin(what, (lp->len >> 2) * 2);
+            if (lp->base == ARAM_P2_BASE) {
+                aram_test_pattern(0, lp->len, 0x55555555, &res);
+                aram_test_pattern(0, lp->len, 0xAAAAAAAA, &res);
+                aram_test_prng(0, lp->len, 0xC0FFEE42 ^ pass, &res);
+            } else if (lp->base == SDRAM_P2_BASE) {
+                ram_test_pattern(lp->base, lp->len, 0x55555555, &res);
+                ram_test_pattern(lp->base, lp->len, 0xAAAAAAAA, &res);
+                ram_test_prng(lp->base, lp->len, 0xDEADBEEF ^ pass, &res);
+            } else {
+                vram_test_pattern(lp->base, lp->len, 0x55555555, &res);
+                vram_test_pattern(lp->base, lp->len, 0xAAAAAAAA, &res);
+                vram_test_prng(lp->base, lp->len, 0x7E0CBEEF ^ pass ^ lp->base, &res);
+            }
+            progress_end();
 
-        errors += res.errors;
+            /* A stalled G2 bus makes the sound RAM loops give up without
+             * counting anything; a pass of "0 errors" would be a lie. */
+            if (aica_g2_stalled() != stalls) {
+                scif_puts(S_G2_STALL);
+                res.errors++;
+            }
+            errors += res.errors;
+            if (res.errors) {
+                scif_puts("\n");       /* off the progress line */
+                report_region(&lp->d, &res);
+            }
+        }
         scif_puts(S_LOOP_ERR);
         scif_putdec(errors);
         scif_puts("\n");
-        if (res.errors) {
-            report_badbits(res.badbits);
-            report_comps(S_CG_CPU, ram_comp_mask(&res),
-                         IC(base == SDRAM_P2_BASE ? work_comps : 0));
-        }
     }
+    progress_screen_enable(1);
     progress_set_loop(0);
     progress_clear_abort();
     scif_puts(S_ABORTED);
@@ -2033,31 +2178,54 @@ static void menu_run(void)
     }
 }
 
+/* A menu action that reports gets a report of its own: the menu replaces the
+ * boot report rather than piling onto it. Without this every press of g or
+ * d appended five or six entries to the boot suite's two dozen, and a few
+ * presses filled the log. The looping tests write nothing to the log and
+ * leave the boot report where it is. */
+static void report_restart(void)
+{
+    g_log_n = 0;
+    screen_render();
+}
+
 static void run_action(u32 act)
 {
     progress_clear_abort();
     switch (act) {
-    case ACT_CPU:
-        loop_region(SDRAM_P2_BASE,
-                    g_reloc_win ? g_reloc_win - SDRAM_P2_BASE : g_ram_size,
-                    S_M_CPU);
+    case ACT_CPU: {
+        loop_part p = { SDRAM_P2_BASE,
+                        g_reloc_win ? g_reloc_win - SDRAM_P2_BASE : g_ram_size,
+                        { S_CG_CPU, IC(work_comps), 0 } };
+        loop_regions(&p, 1, S_M_CPU);
         break;
-    case ACT_VRAM:
-        loop_region(VRAM_TEX0_BASE, VRAM_TEX0_SIZE, S_M_VRAM);
+    }
+    case ACT_VRAM: {
+        loop_part p[2] = {
+            { VRAM_TEX0_BASE, VRAM_TEX0_SIZE, { S_L_VRAM_TEX0, IC(tex0_comps), 0 } },
+            { VRAM_TEX1_BASE, VRAM_TEX1_SIZE, { S_L_VRAM_TEX1, IC(tex1_comps), 0 } },
+        };
+        loop_regions(p, 2, S_M_VRAM);
         break;
-    case ACT_ARAM:
-        aica_arm_halt();
-        loop_region(ARAM_P2_BASE, ARAM_SIZE, S_M_ARAM);
+    }
+    case ACT_ARAM: {
+        loop_part p = { ARAM_P2_BASE, ARAM_SIZE, { S_CG_SOUND, IC(aram_comps), 1 } };
+        aica_arm_halt();                /* the loop writes offset 0: issue #1 */
+        loop_regions(&p, 1, S_M_ARAM);
         aica_arm_park();
         break;
+    }
     case ACT_DIMM:
+        report_restart();
         test_dimm();
         break;
     case ACT_GAME:
+        report_restart();
         test_x76();
         test_cartridge();
         break;
     case ACT_FLASH:
+        report_restart();
         test_dimm_flash();
         break;
     default:
@@ -2094,6 +2262,95 @@ static void console_idle(void)
         progress_heartbeat();
         delay_ms(20);
     }
+}
+
+/* ------------------------------------------------------------------ */
+/* CPU exception report.
+ *
+ * crt0.S has already printed the cause and the faulting address on serial --
+ * it needs nothing, not even a stack, so it goes first. It then switches to
+ * a fresh stack at the top of OC-RAM and calls this, which adds the screen
+ * and then the speaker, each only if it had been brought up, and halts.
+ *
+ * The README used to say an exception restarted the ROM and reprinted the
+ * banner. That was true before VBR was installed; since then the handler
+ * reported on serial and stopped, and the screen and speaker said nothing.
+ *
+ * Nothing here may rely on state the exception could have broken beyond
+ * what it has to: the report is a line of text and one clip. A fault inside
+ * it vectors back into the handler, which sees g_exc_active and stops at the
+ * serial report rather than recursing. */
+u32 g_exc_active;                       /* read by crt0.S, set there too */
+
+static void hex_into(char *d, u32 v, u32 ndigits)
+{
+    static const char hx[] = "0123456789ABCDEF";
+    for (u32 i = 0; i < ndigits; i++)
+        d[i] = hx[(v >> ((ndigits - 1 - i) * 4)) & 0xF];
+}
+
+void exc_report(u32 expevt, u32 spc)
+{
+    if (g_screen_ready) {
+        char line[40];
+        u32 n = 0;
+        for (const char *t = S_EXC_SCREEN; *t && n < 20; t++)
+            line[n++] = *t;
+        hex_into(&line[n], expevt, 3);
+        n += 3;
+        line[n++] = ' ';
+        line[n++] = 'P';
+        line[n++] = 'C';
+        line[n++] = ' ';
+        hex_into(&line[n], spc, 8);
+        n += 8;
+        line[n] = 0;
+        u32 ymax = fb_report_ymax();
+        u32 y = g_screen_y + 20 <= ymax ? g_screen_y : ymax - 20;
+        fb_text(16, y, line, COL_RED, FB_W);
+    }
+    pvr_border(0x00FF0000u);            /* solid red: halted, not pulsing */
+
+    if (g_audio_ready)
+        say(CLIP_CPU_EXC, 250);
+
+    pvr_border(0x00FF0000u);            /* the speech wait pulses the border */
+    for (;;)
+        ;
+}
+
+/* The boot suite looks here between tests.
+ *
+ * A key or the TEST button is noticed in progress_tick, which only records a
+ * request; the test running at the time stops at its next block and draws no
+ * conclusion from the part it did, and the suite comes here instead of going
+ * on to the next test. It does not resume -- the operator asked for something
+ * else. 'a' goes to the report, TEST opens the menu, a menu key runs its
+ * action.
+ *
+ * This did not exist. The request was recorded and nobody in the boot suite
+ * ever read it: only the DIMM test and the soak loops looked, so neither a
+ * key nor a button interrupted the tests the README said they did. */
+static void suite_check_abort(void)
+{
+    u32 a = progress_aborted();
+    if (!a)
+        return;
+    progress_clear_abort();
+    progress_end();
+    progress_screen_enable(1);
+    progress_retire();                  /* nothing is being measured any more */
+    progress_phase(PH_DONE);
+    scif_puts(S_SUITE_STOPPED);
+    screen_render();
+    if (a >= ABORT_ACT(1) && a <= ABORT_ACT(ACT_COUNT)) {
+        run_action(a - ABORT_ACT(0));
+        screen_render();
+    } else if (a == ABORT_MENU) {
+        menu_run();
+        screen_render();
+    }
+    console_idle();                     /* never returns */
 }
 
 void cmain(void)
@@ -2135,6 +2392,7 @@ void cmain(void)
      * only the region each one needs (see quick_*_bringup above) */
     quick_video_bringup();   /* screen first: richest channel, no replay */
     quick_audio_bringup();   /* then audio, which replays the history */
+    suite_check_abort();
 
     /* Board identification, before the ROM checksum for two reasons.
      *
@@ -2153,14 +2411,30 @@ void cmain(void)
      * than plain memory, so it must run with screen and audio already up --
      * which the two bring-ups above have just done. */
     test_board();
+    suite_check_abort();
     progress_phase(PH_BOARD_ID);        /* magenta */
 
     /* Only now the 2 MB ROM checksum: it is the single longest test in the
      * whole suite (4.2 M table steps) and it must never run while the
      * operator is still staring at a black screen. */
     test_bios_rom();
+    suite_check_abort();
 
     relocate_fast_loops();
+    suite_check_abort();
+
+    /* The MIE stage, as early as it can run. Its DMA buffers need RAM, and
+     * the block that holds them has just been qualified with the full
+     * pattern suite; that is all the Maple bus needs. Running it here uploads
+     * the Z80 program before the memory tests instead of after them, so the
+     * board's TEST and SERVICE buttons can interrupt the long part of the
+     * suite -- which is when an operator wants to. Without a qualified block
+     * it stays where it was, behind the CPU RAM verdict. */
+    if (g_maple_safe) {
+        test_maple_mie(1);
+        test_settings_eeprom();
+    }
+    suite_check_abort();
 
     progress_phase(PH_TESTING);         /* white: the long suite starts */
 
@@ -2171,11 +2445,15 @@ void cmain(void)
      * and spoken as it lands whichever memory is under test -- which lets
      * the memory the rest of the board leans on go first. */
     u32 usable = test_sdram_cells();
+    suite_check_abort();
     u32 vram_ok = test_vram();
+    suite_check_abort();
     u32 aram_ok = test_aram();
+    suite_check_abort();
 
     /* Naomi 2 extra memories (no-op on other boards) */
     test_naomi2_ram();
+    suite_check_abort();
 
     /* peripheral stage: backup SRAM (non-destructive), RTC, DIMM, MIE */
     /* From here on nothing measures anything: the NVRAM, the RTC, the DIMM
@@ -2185,9 +2463,14 @@ void cmain(void)
     progress_retire();
 
     test_sram_rtc();
-    test_maple_mie(usable);
-    test_settings_eeprom();
+    suite_check_abort();
+    if (!g_maple_safe) {
+        test_maple_mie(usable);
+        test_settings_eeprom();
+    }
+    suite_check_abort();
     test_serial_eeprom();
+    suite_check_abort();
 
     /* The loops have been executing out of CPU RAM on a board whose CPU RAM
      * is what we just spent the whole suite testing. A cell that passed the

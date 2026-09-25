@@ -74,6 +74,8 @@ CLIPS = {
     "eeprom":     {"fr": "Mémoire des réglages.",            "en": "Settings memory."},
     "x76":        {"fr": "Puce de sécurité cartouche.",      "en": "Cartridge security chip."},
     "cart":       {"fr": "Cartouche de jeu.",                 "en": "Game cartridge."},
+    # appended, never inserted: the enum order is shared by both languages
+    "cpu_exc":    {"fr": "Exception du processeur.",          "en": "C P U exception."},
 }
 
 RATE = 22050

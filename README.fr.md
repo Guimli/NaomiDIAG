@@ -215,15 +215,21 @@ complètement le mécanisme.
 
 ## Console opérateur
 
-La suite de démarrage n'est pas la fin. Une touche au port série, ou les
-boutons **TEST** et **SERVICE** de la carte, interrompt les tests et fait
-apparaître un menu.
+La suite de démarrage n'est pas la fin. Une touche au port série, ou le
+bouton **TEST** de la carte, arrête la suite : le test en cours s'arrête au
+bloc suivant et **ne rend aucun verdict** sur la partie effectuée — ses
+phases se terminent par `interrompue`, pas par `ok` — et la suite ne reprend
+pas. `a` mène au rapport, **TEST** ouvre le menu, et une touche du menu
+(`c`, `v`, `s`, `d`, `g`, `f`) lance directement son action.
 
 Les boutons exigent d'abord le téléversement d'un petit programme Z80 dans le
 MIE — le firmware d'usine du 315-6146 répond à quatre commandes Maple, et
-lire les boutons n'en fait pas partie. Ce téléversement a lieu pendant le
-test de l'EEPROM des réglages et le programme reste résident : les boutons
-fonctionnent donc à partir du rapport. Les **TEST/START** JVS d'une borne ne
+lire les boutons n'en fait pas partie. Ce téléversement a lieu juste après la
+relocalisation des boucles de test, avant les tests mémoire, dès qu'un bloc
+de RAM CPU a été qualifié pour accueillir les tampons DMA du Maple ; le
+programme reste ensuite résident. Les boutons peuvent donc interrompre la
+partie longue de la suite. Sur une carte sans bloc utilisable, l'étape MIE
+revient à son ancienne place, après le test de la RAM CPU. Les **TEST/START** JVS d'une borne ne
 sont *pas* câblés : les atteindre suppose de piloter l'UART JVS du MIE depuis
 le Z80, ce qui est un travail à part.
 
@@ -241,7 +247,13 @@ Touches sur la console série :
 **TEST** parcourt le menu en bouclant ; **SERVICE** lance la sélection. Les
 trois boucles RAM tournent jusqu'à l'appui sur **TEST** et rien d'autre ne
 les arrête — c'est le but, une panne intermittente se montrant à la dixième
-passe et non à la première. Toute autre action affiche son rapport et attend
+passe et non à la première. Une seule exception : quand les boutons de la
+carte sont indisponibles (le MIE n'a jamais répondu au programme
+téléversé), `a` arrête aussi une boucle, sinon seul un reset le pourrait. La
+boucle vidéo couvre les deux bancs, TEX0 et TEX1, et chaque boucle nomme une
+puce défaillante comme le fait la suite de démarrage.
+
+Toute autre action ouvre un rapport qui lui est propre, l'affiche, et attend
 un **TEST** pour ramener le menu.
 
 Deux d'entre elles sont à l'initiative de l'opérateur précisément parce
@@ -364,8 +376,14 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   rendrait un jour l'échange intéressant.
 - Un échec du test cache signifie que le SH-4 lui-même est mort : c'est
   rapporté sur SCIF puis la ROM s'arrête.
-- Une exception CPU redémarre la ROM (la bannière se réaffiche) — une
-  bannière qui se répète est en soi un signal de diagnostic.
+- Une exception CPU est signalée puis la ROM s'arrête, sur chaque canal
+  disponible et dans cet ordre : d'abord le **port série** (code de cause
+  `EXPEVT` et adresse fautive — il n'a besoin d'aucune pile, il sort donc
+  même quand c'est la pile qui a lâché), puis une ligne rouge à l'**écran**,
+  puis les mots *« Exception du processeur »* au **haut-parleur**. La
+  bordure passe au rouge fixe : la machine est arrêtée. Seule une exception
+  dans les toutes premières instructions, avant l'installation de la table
+  des vecteurs, redémarre la ROM.
 - Le ventilateur de la carte DIMM n'est surveillé que par le firmware DIMM.
 
 ## État et limites

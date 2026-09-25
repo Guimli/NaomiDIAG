@@ -24,6 +24,7 @@
  * for what is still unmeasured. */
 #ifndef CFG_LANE_BEACON
 #define CFG_LANE_BEACON 0
+#endif
 
 /* Let the AICA's ARM7 run (0 = hold it in reset, 1 = let it spin).
  *
@@ -37,9 +38,14 @@
  * With this on, a four-byte ARM program that branches to itself is written at
  * sound RAM offset 0, the ARM's reset vector, and the reset is released. The
  * ARM spins in place, touching nothing, and the AICA sits in the same state
- * as on a booting Naomi. Set to 0 to go back to holding it in reset. */
+ * as on a booting Naomi. Set to 0 to go back to holding it in reset.
+ *
+ * The release happens once, at the end of the sound RAM test -- never before
+ * it (issue #1): the tests write offset 0, and a running ARM would execute
+ * whatever they wrote there. */
 #ifndef CFG_AICA_ARM_RUN
 #define CFG_AICA_ARM_RUN 1
+#endif
 
 /* Keep the CRC32 comparison in the RAM cell tests (0 = off, 1 = on).
  *
@@ -63,6 +69,7 @@
  * comparison logic itself, which is the one thing it can still catch. */
 #ifndef CFG_RAM_CRC
 #define CFG_RAM_CRC 0
+#endif
 
 /* JVS button mapping aid (0 = off, 1 = on).
  *
@@ -75,15 +82,13 @@
  * With this on, the ROM polls those words after the report and prints them
  * whenever any bit changes, with the changed bits called out. Press TEST,
  * press START, read which bit moved. That is the measurement; once it is
- * known the menu can be wired to it and this comes back out. */
+ * known the menu can be wired to it and this comes back out.
+ *
+ * Known not to work as things stand: the request is Maple command 0x86, and
+ * the MIE's factory firmware does not implement 0x86 at all. It needs a JVS
+ * master in the uploaded Z80 program first. */
 #ifndef CFG_JVS_MAP
 #define CFG_JVS_MAP 0
 #endif
 
-#endif
-
-#endif
-
-#endif
-
-#endif
+#endif /* CONFIG_H */

@@ -197,12 +197,20 @@ that needs diagnosing. Build with `RELOC=0` to disable it entirely.
 ## Operator console
 
 The boot suite is not the end of it. A key on the serial port, or the board's
-**TEST** and **SERVICE** buttons, interrupts the tests and brings up a menu.
+**TEST** button, stops the suite: the test running at the time stops at its
+next block and draws **no** verdict from the part it did — its phases end in
+`interrupted`, not `ok` — and the suite does not resume. `a` goes to the
+report, **TEST** opens the menu, and a menu key (`c`, `v`, `s`, `d`, `g`,
+`f`) runs that action straight away.
 
 The buttons need a small Z80 program uploaded into the MIE first — the
 315-6146's factory firmware answers four Maple commands and reading the
-buttons is not one of them. That upload happens during the settings-EEPROM
-test and the program stays resident, so buttons work from the report onward.
+buttons is not one of them. The upload happens right after the test loops
+are relocated, before the memory tests, as soon as a block of CPU RAM has
+been qualified to hold the Maple DMA buffers; the program then stays
+resident. So the buttons can interrupt the long part of the suite. On a
+board with no usable block the MIE stage falls back to its old place, after
+the CPU RAM test.
 A cabinet's JVS **TEST/START** are *not* wired up: reaching those means
 driving the MIE's JVS UART from the Z80 side, which is separate work.
 
@@ -220,8 +228,13 @@ Keys on the serial console:
 **TEST** steps through the menu and wraps; **SERVICE** runs the selection. The
 three RAM loops run until **TEST** is pressed and nothing else stops them —
 that is the point, since an intermittent fault shows up on the tenth pass,
-not the first. Every other action prints its report and waits for **TEST** to
-bring the menu back.
+not the first. The one exception: when the board buttons are unavailable
+(the MIE never answered the uploaded program), `a` stops a loop too, or it
+could only be stopped by a reset. The video loop covers both banks, TEX0 and
+TEX1, and every loop names a failing chip the way the boot suite does.
+
+Every other action starts a report of its own, prints it, and waits for
+**TEST** to bring the menu back.
 
 Two of these are operator-initiated precisely because they are not safe to
 run unattended: the DIMM SDRAM test overwrites whatever game is loaded in the
@@ -337,8 +350,13 @@ under the DRC, so fault injection into it needs `-nodrc`.
   trade worth revisiting.
 - A failed cache test means the SH-4 itself is dead: it is reported on SCIF
   and the ROM halts.
-- A CPU exception restarts the ROM (the banner reprints) — a repeating
-  banner is itself a diagnostic signal.
+- A CPU exception is reported and the ROM halts, on every channel that is up
+  and in this order: **serial** first (cause code `EXPEVT` and the faulting
+  address — it needs no stack, so it comes out even when the stack is what
+  broke), then a red line on the **screen**, then the words *"CPU
+  exception"* on the **speaker**. The border turns solid red: the machine
+  has stopped. Only an exception in the very first instructions, before the
+  vector table is installed, restarts the ROM instead.
 - The DIMM-board fan is monitored only by the DIMM firmware.
 
 ## Status and limitations

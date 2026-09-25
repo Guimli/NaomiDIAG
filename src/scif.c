@@ -17,7 +17,7 @@ static void scif_raw(char c)
     SCFSR2 &= (u16)~(SCFSR2_TDFE | SCFSR2_TEND);
 }
 
-/* Every line is stamped with the time since reset, [MM:SS.mmm].
+/* Every line is stamped with the time since reset, [HH:MM:SS.mmm].
  *
  * It goes in here rather than at each call site because the report is
  * built from fragments -- a label, then a status, then a newline -- and a
@@ -25,7 +25,7 @@ static void scif_raw(char c)
  * the only place that knows where a message really begins.
  *
  * Blank lines are left bare: they separate sections, and a timestamp on
- * nothing is just noise. The stamp costs 13 characters, about a
+ * nothing is just noise. The stamp costs 16 characters, about a
  * millisecond of serial time at 115200 baud, a tenth of a second over a
  * whole run.
  *
@@ -41,14 +41,30 @@ static u32 g_stamping;
 
 static void scif_stamp(void)
 {
+    /* [HH:MM:SS.mmm]. Hours were missing at first, and the minutes wrapped
+     * to 00 after 99 -- which the looping tests reach, since they are meant
+     * to run for an afternoon. Hours take as many digits as they need. */
     u32 ms = timer_ms();
-    u32 min = 0, sec = 0;
-    while (ms >= 60000u) { ms -= 60000u; min++; }
-    while (ms >= 1000u)  { ms -= 1000u;  sec++; }
+    u32 h = 0, min = 0, sec = 0;
+    while (ms >= 3600000u) { ms -= 3600000u; h++; }
+    while (ms >= 60000u)   { ms -= 60000u;   min++; }
+    while (ms >= 1000u)    { ms -= 1000u;    sec++; }
+
+    char hd[10];
+    u32 n = 0;
+    do {
+        hd[n++] = (char)('0' + h % 10u);
+        h /= 10u;
+    } while (h);
+    if (n < 2)
+        hd[n++] = '0';
 
     g_stamping = 1;
     scif_raw('[');
-    scif_raw((char)('0' + (min / 10u) % 10u));
+    while (n)
+        scif_raw(hd[--n]);
+    scif_raw(':');
+    scif_raw((char)('0' + min / 10u));
     scif_raw((char)('0' + min % 10u));
     scif_raw(':');
     scif_raw((char)('0' + sec / 10u));

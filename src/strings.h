@@ -54,6 +54,10 @@
 #define S_L_SDRAM_CELL      "SDRAM test cellules"
 #define S_L_ARAM_DBUS       "RAM son bus de donnees"
 #define S_L_ARAM_ABUS       "RAM son bus d'adresses"
+#define S_G2_STALL          "  le bus G2 ne se vide jamais : resultat RAM son nul\n"
+#define S_DIMM_MEM_ABORT    "  test SDRAM DIMM interrompu : aucun verdict\n"
+#define S_SUITE_STOPPED     "\nSerie de tests interrompue.\n"
+#define S_PH_STOPPED        " interrompue\n"
 #define S_MIE_UP_OK         "  programme Z80 charge dans le MIE\n"
 #define S_MIE_NO_ANSWER     "  le MIE ne repond pas au programme : boutons inactifs\n"
 #define S_MIE_UP_FAIL       "  echec du chargement Z80 dans le MIE, paquet "
@@ -121,6 +125,7 @@
 #define S_EXC_A             "\r\n*** EXCEPTION CPU : EXPEVT="
 #define S_EXC_B             "  PC="
 #define S_EXC_C             "  -- arret ***\r\n"
+#define S_EXC_SCREEN        "EXCEPTION CPU "
 
 /* status suffixes / words */
 #define S_SUF_OK            " ........ OK\n"
@@ -174,13 +179,14 @@
 #define S_WAIT_TEST         "\nAppuyez sur TEST (carte) pour le menu.\n"
 #define S_HELP              "\nTouches :\n"\
                             "  h  cette aide (n'interrompt pas)\n"\
-                            "  a  interrompre le test en cours\n"\
+                            "  a  interrompre le test en cours (et une boucle, si les\n"\
+                            "     boutons de la carte ne repondent pas)\n"\
                             "  c  test RAM CPU en boucle\n"\
                             "  v  test RAM video en boucle\n"\
                             "  s  test RAM son en boucle\n"\
                             "  d  test complet de la carte DIMM\n"\
                             "  g  integrite des flash du jeu (SHA1)\n"\
-                            "  f  reflasher le DIMM (non implemente)\n"
+                            "  f  identifier la flash du DIMM (ecriture non armee)\n"
 #define S_JVS_MAP_HDR       "\nReleve JVS : appuyez sur TEST puis START, les bits changes sont listes.\n"
 #define S_JVS_NO_MIE        "\nReleve JVS impossible : aucun MIE detecte.\n"
 #define S_CG_SOUND          "RAM son"
@@ -277,6 +283,10 @@
 #define S_L_SDRAM_CELL      "SDRAM cell test"
 #define S_L_ARAM_DBUS       "Sound RAM data bus"
 #define S_L_ARAM_ABUS       "Sound RAM address bus"
+#define S_G2_STALL          "  G2 bus never went idle: sound RAM result is void\n"
+#define S_DIMM_MEM_ABORT    "  DIMM SDRAM test aborted: no verdict\n"
+#define S_SUITE_STOPPED     "\nTest suite interrupted.\n"
+#define S_PH_STOPPED        " interrupted\n"
 #define S_MIE_UP_OK         "  Z80 program loaded into the MIE\n"
 #define S_MIE_NO_ANSWER     "  the MIE does not answer it: buttons stay inactive\n"
 #define S_MIE_UP_FAIL       "  MIE Z80 upload failed at packet "
@@ -344,6 +354,7 @@
 #define S_EXC_A             "\r\n*** CPU EXCEPTION: EXPEVT="
 #define S_EXC_B             "  PC="
 #define S_EXC_C             "  -- halted ***\r\n"
+#define S_EXC_SCREEN        "CPU EXCEPTION "
 
 #define S_SUF_OK            " ........ OK\n"
 #define S_SUF_FAIL          " ........ FAIL\n"
@@ -395,13 +406,14 @@
 #define S_WAIT_TEST         "\nPress TEST (on the board) for the menu.\n"
 #define S_HELP              "\nKeys:\n"\
                             "  h  this help (does not interrupt)\n"\
-                            "  a  abort the running test\n"\
+                            "  a  abort the running test (and a loop, when the board\n"\
+                            "     buttons do not answer)\n"\
                             "  c  CPU RAM test, looping\n"\
                             "  v  video RAM test, looping\n"\
                             "  s  sound RAM test, looping\n"\
                             "  d  full DIMM board test\n"\
                             "  g  game flash integrity (SHA1)\n"\
-                            "  f  reflash the DIMM (not implemented)\n"
+                            "  f  identify the DIMM flash (writing not armed)\n"
 #define S_JVS_MAP_HDR       "\nJVS survey: press TEST then START; changed bits are listed.\n"
 #define S_JVS_NO_MIE        "\nJVS survey impossible: no MIE detected.\n"
 #define S_CG_SOUND          "SOUND RAM"
