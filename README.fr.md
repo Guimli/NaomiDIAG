@@ -88,8 +88,12 @@ ils durent assez pour n'avoir rien à faire devant le rapport (voir
 1. **Cœur SH-4** — le cache est configuré en RAM interne et auto-testé ;
    il sert aussi de pile/`.bss` à toute la ROM (aucune RAM externe utilisée
    avant d'être validée).
-2. **Identification de la carte** — Naomi 1 ou Naomi 2 (signature Elan +
-   aliasing VRAM).
+2. **Identification de la carte** — Naomi 1 ou Naomi 2 (identifiant Elan ou
+   sélection explicite par `CFG_BOARD_MODEL`). L'accès au PVR-B est vérifié
+   séparément, avant tout test destructif. `CFG_BOARD_MODEL=1` évite la lecture
+   de l'Elan absent sur une Naomi 1 ; `=2` sélectionne une Naomi 2 connue.
+   En mode automatique (`=0`), la lecture suppose que le bus répond même
+   sans Elan ; elle ne récupère pas une exception matérielle.
 3. **EPROM BIOS (IC27)** — auto-contrôle CRC32.
 4. **RAM CPU principale** (SDRAM, 16/32 Mo, IC9/IC10/IC11S/IC12S) — d'abord un test
    bus de données (walking-ones) et un test bus d'adresses, puis **trois
@@ -212,6 +216,75 @@ conservée. Si aucune RAM utilisable n'est trouvée, les pointeurs continuent
 de viser les copies en ROM et le diagnostic est lent plutôt qu'absent — ce
 qui est précisément le cas d'une carte à diagnostiquer. `RELOC=0` désactive
 complètement le mécanisme.
+
+## Diagnostic TEX et PVR-A/B
+
+Les erreurs VRAM sont associées aux voies IC selon le calcul du BIOS
+EPR-23608C : moitié de **4 Mio** et bits **D0–D15 / D16–D31**, et non parité
+du mot. Les tables, preuves de désassemblage, limites et brochages sont
+regroupés dans [ADDRESS_MAP.md](docs/ADDRESS_MAP.md).
+Un IC nommé désigne une **voie suspecte : puce, connexions ou contrôleur**,
+pas une preuve de panne interne de la RAM.
+
+### Lire les erreurs
+
+- Le masque de données est le XOR attendu/lu. `00000200` désigne D9 ;
+  `00000300` désigne D8 et D9. À `A5C00000`–`A5FFFFFC`, ces bits sont
+  associés à **IC21** par le BIOS. Les essais réels avec DQ9, puis DQ8/DQ9
+  coupées ont reproduit ces erreurs. Le pinout fourni donne DQ8 = 39 et
+  DQ9 = 40 ; il ne prouve pas à lui seul le câblage CPU vers DQ.
+- Le masque du test d'adresses indique les **étapes en échec**, pas des
+  broches d'adresse défectueuses. Des erreurs de données peuvent produire
+  `007FFFFC`. Un test du bus de données à une adresse peut aussi réussir
+  alors que des cellules ailleurs dans la région échouent.
+- Après un échec du bus de données ou d'adresses, le diagnostic teste des
+  cellules isolées (motifs alternés, bits marchants à 1 et à 0, deux lectures),
+  puis des paires d'adresses avec deux ordres d'écriture, deux polarités et
+  deux répétitions. Les adresses couvrent le début, la fin et des offsets
+  puissances de deux ; ce sondage ne remplace pas le test complet.
+- `VRAM readback failure` conserve les valeurs lues et relues des deux
+  cellules. Un XOR initial nul peut donc accompagner une erreur à la
+  relecture. `VRAM coupling candidate` exige que les cellules réussissent
+  isolément puis reproduisent le motif de l'autre dans les huit essais.
+  Les bits indiqués sont des **bits d'adresse CPU en octets**, pas des
+  broches physiques A0–A11. Un masque de couplage nul signifie qu'aucun
+  couplage n'a été confirmé par ces essais.
+
+Les 32 premiers événements du diagnostic sont affichés ; les compteurs et
+masques incluent les suivants. Les passes complètes conservent huit détails
+mais comptent et associent aussi les erreurs suivantes aux IC. Une erreur
+non retrouvée à la relecture laisse plusieurs IC candidats dans la plage
+concernée ; un sondage sans erreur n'annule pas un échec intermittent.
+
+### Relecture après 90 %
+
+Après une différence dans la vérification rapide, une relecture complète
+localise les erreurs. Cette boucle C s'exécute depuis la ROM et peut prendre
+plusieurs minutes. Elle affiche « Erreur detectee, localisation VRAM » avec
+sa propre progression et vérifie l'arrêt tous les 1024 mots. Les essais
+réels avec DQ9 coupée atteignent désormais le rapport final. Cette progression
+ne raccourcit pas la relecture et ne récupère pas un accès matériel bloqué.
+
+### PVR-B et Elan non testés : code 5
+
+Le contrôle préalable vérifie l'indépendance des fenêtres A/B. Si A échoue
+alors que les lectures sondées de B réussissent, il renvoie le **code 5** et
+saute les tests complets de **PVR-B et d'Elan**. Le diagnostic supplémentaire
+de A ne les relance pas. Une erreur sur B produit le code 4 ; aucun de ces
+codes ne prouve à lui seul un miroir ni une RAM défectueuse.
+
+Avec DQ9 coupée, `A5FFFFFC` renvoie `2468AEE0` au lieu de `2468ACE0`
+(XOR `00000200`), alors que `A77FFFFC` et `A7FFFFFC` réussissent les deux
+passes. La référence A échoue donc malgré les sondes B correctes.
+Le contrôle actuel ne distingue pas un défaut local de A d'une écriture B
+qui modifie A. **Non testé ne signifie ni sain ni défectueux.**
+
+L'amélioration envisagée, non implémentée, caractériserait A avant les
+écritures B pour distinguer les défauts préexistants des modifications
+provoquées par B. La détection des miroirs, diffusions dans un seul sens et
+lectures intermittentes doit être conservée. La règle conservatrice reste
+active ; ignorer le code 5 ou masquer les bits fautifs ne suffit pas.
+Voir [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) pour la séquence et tous les codes.
 
 ## Console opérateur
 
@@ -356,24 +429,14 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   n'existe que pour dialoguer avec une Naomi par le port série et en
   documente le câblage, ce qu'on ne peut pas dire des brochages qui circulent
   par ailleurs.
-- **Réglez le terminal sur 115200 bauds, 8N1, sans contrôle de flux.** La ROM
+- **Réglez le terminal sur 57600 bauds, 8N1, sans contrôle de flux.** La ROM
   l'indique elle-même sur sa deuxième ligne, dès que la console est active.
 
-  À la rigueur, la ligne va un peu trop lentement. 115200 n'est pas
-  atteignable exactement depuis l'horloge périphérique à 50 MHz du SH-4 — le
-  débit vaut `Pck/(32*(SCBRR+1))`, ce qui demanderait un diviseur de 12,56 —
-  la ROM utilise donc `SCBRR2 = 13` et le débit réel est de **111607 bauds,
-  soit 3,1 % en dessous de 115200**. C'est largement dans la tolérance d'un
-  UART et ça fonctionne avec les adaptateurs habituels, mais si une carte
-  vous donne une sortie systématiquement illisible alors que la bordure bat
-  toujours, soupçonnez la liaison avant la carte.
-
-  Les débits plus bas s'atteignent bien plus précisément, le diviseur étant
-  plus grand et sa granularité plus fine : 57600 tombe à 0,47 % près, 9600 à
-  0,15 %, et 31250 — le débit MIDI — est exact. La ROM reste à 115200 parce
-  qu'une exécution complète n'émet pas 5 Ko : la vitesse n'achète rien
-  d'important. Les chiffres sont ici au cas où un adaptateur capricieux
-  rendrait un jour l'échange intéressant.
+  Avec l'horloge périphérique à 50 MHz du SH-4, le débit vaut
+  `Pck/(32*(SCBRR+1))`. La ROM utilise `SCBRR2 = 26`, soit un débit réel
+  d'environ **57870 bauds, 0,47 % au-dessus de 57600**. Ce réglage réduit
+  l'écart par rapport aux 3,1 % de l'ancien réglage à 115200 bauds et
+  améliore ainsi la marge de tolérance de la liaison série.
 - Un échec du test cache signifie que le SH-4 lui-même est mort : c'est
   rapporté sur SCIF puis la ROM s'arrête.
 - Une exception CPU est signalée puis la ROM s'arrête, sur chaque canal
@@ -393,34 +456,12 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   déduisait de l'ordre dans lequel le RAM TEST du BIOS d'origine affiche ses
   numéros ; cette déduction s'est trompée trois fois — dont une inversion
   complète des groupes RAM CPU et RAM GPU — et plus rien ne repose dessus.
-- **Les désignateurs des RAM GPU restent à confirmer**, mais moins largement
-  qu'il n'y paraissait d'abord. Les huit puces et leur partage en deux bancs
-  de quatre ne font pas de doute : le manuel de service NAOMI 2 de Sega
-  liste le RAM TEST en IC16/18/20/22 puis IC17/19/21/23, exactement ce
-  qu'affiche cette ROM, et les désignations ont depuis été relevées sur une
-  carte.
-
-  Ce qui n'est pas établi, c'est **quelle puce d'un banc porte quelle voie
-  de 16 bits**. La ROM associe la position 1 à IC16, la 2 à IC18 et ainsi de
-  suite, et cet ordre est une hypothèse — la même qui reste ouverte pour la
-  RAM CPU. Un retour de terrain la met en jeu : une puce nommée par cette
-  ROM a été remplacée et la panne est restée. C'est compatible avec un ordre
-  de voies erroné — et tout autant avec une panne hors de la puce, une piste
-  coupée ou une bille défectueuse sous le PowerVR. Une seule carte ne permet
-  pas de trancher entre les deux. En attendant, lisez un nom de RAM GPU
-  comme *l'une de ces quatre*.
-
-  Les désignations terminées par **S** sont sous la carte ; la
-  correspondance est dans [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md).
-- Un point n'est toujours pas mesuré, et la ROM y affiche un numéro de
-  position plutôt que de deviner :
-  - l'**ordre des voies** à l'intérieur de chaque groupe de quatre, mais
-    plus entièrement. Une carte que cette ROM a désignée **IC10** a été
-    réparée en ne remplaçant qu'IC10, ce qui confirme IC10 sur D16-D31 du mot
-    pair et écarte les deux alternatives plausibles — ordre inversé, et
-    moitiés paire/impaire interverties. IC9, IC11S et IC12S découlent de la
-    numérotation croissante, pas d'une mesure propre. La balise de voies les
-    tranche individuellement.
+- Les voies VRAM suivent désormais le calcul du BIOS EPR-23608C détaillé
+  dans [ADDRESS_MAP.md](docs/ADDRESS_MAP.md). Les connexions physiques et
+  broches d'adresse restent à vérifier. Le suffixe **S** désigne le verso.
+- Pour WORK, IC10 sur D16–D31 du mot pair a été validé par réparation.
+  IC9, IC11S et IC12S restent déduits de l'ordre des voies, sans mesure
+  individuelle ; la balise de voies permet de les vérifier.
 - Les clips vocaux énoncent le numéro sans le suffixe **S** : une panne sur
   IC11S s'entend « I C onze ». L'écran et le port série font foi.
 - Le test JVS complet de la carte I/O demande encore un maître JVS dans le

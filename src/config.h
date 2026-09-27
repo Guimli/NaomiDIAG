@@ -1,6 +1,16 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+/* 0: identify by Elan ID (open-bus read on Naomi 1); 1: Naomi 1 without
+ * probing Elan; 2: known Naomi 2, even if its Elan ID is unreadable.
+ * Use a fixed model when the board cannot safely answer the ID probe. */
+#ifndef CFG_BOARD_MODEL
+#define CFG_BOARD_MODEL 0
+#endif
+#if CFG_BOARD_MODEL < 0 || CFG_BOARD_MODEL > 2
+#error "CFG_BOARD_MODEL must be 0, 1, or 2"
+#endif
+
 /* -------------------------------------------------------------------------
  * Build-time options that are a decision about the ROM rather than a
  * per-build variation.

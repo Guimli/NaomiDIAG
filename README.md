@@ -84,8 +84,9 @@ the report (see [Operator console](#operator-console)).
 1. **SH-4 core** — the operand cache is configured as on-chip RAM and
    self-tested; this is also the stack/`.bss` for the whole ROM (no external
    RAM used until proven).
-2. **Board identification** — Naomi 1 vs Naomi 2 (Elan T&L signature + VRAM
-   aliasing).
+2. **Board identification** — Naomi 1 vs Naomi 2 (Elan ID, or explicit
+   `CFG_BOARD_MODEL` selection). PVR-B access is qualified separately;
+   see [PVR-B access checks and build options](docs/PVR_B_ACCESS.md).
 3. **BIOS EPROM (IC27)** — CRC32 self-check.
 4. **Main CPU RAM** (SDRAM, 16/32 MB, IC9/IC10/IC11S/IC12S) — first a data-bus
    walking-ones test and an address-bus test, then **three phases**, each
@@ -193,6 +194,72 @@ through P2, so the data path stays uncached and the test keeps its coverage.
 If no usable RAM is found the pointers keep addressing the ROM copies and the
 diagnostic runs slowly rather than not at all -- which is exactly the board
 that needs diagnosing. Build with `RELOC=0` to disable it entirely.
+
+## TEX and PVR-A/B diagnostics
+
+VRAM failures use the EPR-23608C BIOS lane mapping: the **4 MiB half** and
+**D0–D15 / D16–D31**, rather than word parity. Tables, disassembly evidence,
+limits and pinouts are consolidated in [ADDRESS_MAP.md](docs/ADDRESS_MAP.md)
+(in French). A named IC identifies a **suspect lane: chip, connections or
+controller**, not proof of an internal RAM failure.
+
+### Interpreting failures
+
+- The data mask is expected XOR observed. `00000200` identifies D9;
+  `00000300` identifies D8 and D9. At `A5C00000`–`A5FFFFFC`, the BIOS assigns
+  these bits to **IC21**. Real-board tests with DQ9 and DQ8/DQ9
+  disconnected reproduced these errors. The supplied pinout assigns DQ8
+  to pin 39 and DQ9 to pin 40; it does not itself prove CPU-to-DQ wiring.
+- The address-test mask identifies **failed steps**, not defective address
+  pins. Data faults can produce `007FFFFC`. A single-address data-bus test
+  can pass while cells elsewhere in the region fail.
+- After a data- or address-bus failure, additional diagnosis checks isolated
+  cells (alternating patterns, walking ones and zeros, two reads), then
+  address pairs in two write orders, two polarities and two repetitions.
+  Samples cover the start, end and power-of-two offsets; they do not replace
+  a full memory test.
+- `VRAM readback failure` preserves reads and rereads of both cells. A zero
+  initial XOR can therefore accompany a reread failure.
+  `VRAM coupling candidate` requires isolated cells to pass and then reproduce
+  the other cell's pattern in all eight trials. Reported address bits are
+  **CPU byte-address bits**, not physical A0–A11 pins. A zero coupling mask
+  means that these trials confirmed no coupling.
+
+The first 32 diagnostic events are printed; counters and masks include later
+ones. Full passes retain eight failure details but continue counting and
+mapping subsequent failures. A mismatch that cannot be located again leaves
+multiple IC candidates across the tested range. A clean sample does not
+cancel an earlier intermittent failure.
+
+### Rescanning after 90%
+
+After a fast verifier detects a mismatch, a complete rescan locates failures.
+This C loop executes from ROM and can take several minutes. It now prints
+“Error detected, locating VRAM failures” with its own progress and checks
+abort input every 1024 words. Real-board DQ9-disconnection tests now reach
+the final report. Progress reporting does not shorten the scan or recover
+a stalled hardware access.
+
+### PVR-B and Elan skipped: code 5
+
+Access qualification checks that A/B windows are independent. If A fails
+while sampled B reads match, it returns **code 5** and skips the full
+**PVR-B and Elan** memory tests. Additional diagnosis of A does not resume
+them. A B mismatch produces code 4; neither code alone proves mirroring
+or defective RAM.
+
+With DQ9 disconnected, `A5FFFFFC` reads `2468AEE0` instead of `2468ACE0`
+(XOR `00000200`), while `A77FFFFC` and `A7FFFFFC` match in both passes.
+The A reference therefore fails despite matching B samples. The current
+probe cannot distinguish a local A fault from a B write that changes A.
+**Untested means neither healthy nor defective.**
+
+The proposed improvement, not implemented, would characterize A before B
+writes to distinguish existing faults from changes caused by B. It must
+retain detection of mirrors, one-way broadcast and intermittent readback.
+The conservative skip remains active; ignoring code 5 or masking faulty bits
+would not suffice. See [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) for the setup
+sequence and all access codes.
 
 ## Operator console
 
@@ -331,23 +398,13 @@ under the DRC, so fault injection into it needs `-nodrc`.
   [JinGasa](https://github.com/Tchan0/JinGasa) project: it exists solely to
   talk to a Naomi over the serial port and documents the wiring, which is
   more than can be said for the pinouts circulating elsewhere.
-- **Set the terminal to 115200 baud, 8N1, no flow control.** The ROM says so
+- **Set the terminal to 57600 baud, 8N1, no flow control.** The ROM says so
   itself on its second line, once the console is up.
 
-  Strictly the line runs a little slow. 115200 is not reachable exactly from
-  the SH-4's 50 MHz peripheral clock — the rate is `Pck/(32*(SCBRR+1))`,
-  which would want a divisor of 12.56 — so the ROM uses `SCBRR2 = 13` and
-  the real rate is **111607 baud, 3.1 % below 115200**. Well inside UART
-  tolerance and fine with the usual adapters, but if a board gives you
-  consistently garbled output while the border still pulses, suspect the
-  link before the board.
-
-  Lower rates are reachable far more precisely, because the divisor gets
-  bigger and its granularity finer: 57600 lands within 0.47 %, 9600 within
-  0.15 %, and 31250 — the MIDI rate — is exact. The ROM stays at 115200
-  because a whole run emits under 5 KB, so the speed buys nothing that
-  matters; the figures are here in case a marginal adapter ever makes the
-  trade worth revisiting.
+  With the SH-4's 50 MHz peripheral clock, the rate is
+  `Pck/(32*(SCBRR+1))`. The ROM uses `SCBRR2 = 26`, giving approximately
+  **57870 baud, 0.47 % above 57600**. This reduces the mismatch from the
+  former 115200 setting's 3.1 % and improves the serial link's timing margin.
 - A failed cache test means the SH-4 itself is dead: it is reported on SCIF
   and the ROM halts.
 - A CPU exception is reported and the ROM halts, on every channel that is up
@@ -366,31 +423,12 @@ under the DRC, so fault injection into it needs `-nodrc`.
   them from the order the original BIOS RAM TEST prints its numbers, which
   was wrong three times over — including having the CPU RAM and GPU RAM
   groups the wrong way round — so nothing rests on that inference any more.
-- **The GPU RAM designators still need confirming**, though less of them
-  than it first appeared. The eight chips and their split into two banks of
-  four are not in doubt: Sega's own NAOMI 2 service manual lists the RAM
-  TEST as IC16/18/20/22 and then IC17/19/21/23, which is exactly what this
-  ROM prints, and the designators have since been read off a board.
-
-  What is not established is **which chip inside a bank carries which
-  16-bit lane**. The ROM maps position 1 to IC16, position 2 to IC18 and so
-  on, and that order is an assumption, the same one still outstanding for
-  the CPU RAM. One field report bears on it: a chip this ROM named was
-  replaced and the fault stayed. That is consistent with the lane order
-  being wrong — and equally with the fault lying outside the chip, a cut
-  track or a bad ball under the PowerVR. One board cannot tell those apart.
-  Until it is settled, read a GPU RAM name as *one of these four*.
-
-  Designators ending in **S** are on the underside of the PCB; the map is in
-  [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md).
-- One thing is still not measured, and the ROM says position numbers rather
-  than guessing:
-  - the **lane→IC order** inside each group of four, though no longer
-    entirely. A board this ROM reported as **IC10** was repaired by replacing
-    IC10 alone, which confirms IC10 on D16-D31 of the even word and rules out
-    both plausible alternatives — reversed order, and the even/odd halves
-    swapped. IC9, IC11S and IC12S follow from ascending numbering rather than
-    from their own measurement. The lane beacon settles them individually.
+- VRAM lanes now follow the EPR-23608C BIOS calculation documented in
+  [ADDRESS_MAP.md](docs/ADDRESS_MAP.md). Physical wiring and address pins
+  still need verification. The **S** suffix denotes the PCB underside.
+- For WORK, IC10 on D16–D31 of the even word was validated by repair.
+  IC9, IC11S and IC12S still follow the inferred lane order without
+  individual measurements; the lane beacon can verify them.
 - The spoken clips say the number without the **S** suffix, so a fault on
   IC11S is heard as "I C eleven". The screen and the serial console are
   authoritative.

@@ -63,7 +63,7 @@ _start:
 p1_entry:
 
 ! ---------------------------------------------------------------------------
-! SCIF init: 115200 8N1, FIFOs on. Registers only, no memory involved.
+! SCIF init: 57600 8N1, FIFOs on. Registers only, no memory involved.
 ! ---------------------------------------------------------------------------
 scif_setup:
     mov.l   Lscif, r1           ! r1 = 0xFFE80000
@@ -73,13 +73,11 @@ scif_setup:
     mov.w   r0, @(24, r1)       ! SCFCR2  = TFRST|RFRST (reset both FIFOs)
     mov     #0, r0
     mov.w   r0, @(0, r1)        ! SCSMR2  = 0      (8N1, Pck/1)
-    ! Baud divisor. 115200 is not reachable exactly from a 50 MHz peripheral
-    ! clock: the rate is Pck/(32*(SCBRR+1)), so it would want SCBRR 12.56.
-    ! 13 gives 111607 baud, -3.1 %; 12 gives 120192, +4.3 %. 13 is the
-    ! nearer of the two and costs nothing. KallistiOS picks 12 because it
-    ! truncates where it should round, and this file inherited that.
-    mov     #13, r0
-    mov.b   r0, @(4, r1)        ! SCBRR2  = 13     (Pck 50MHz -> 111607 baud)
+    ! Baud rate = Pck/(32*(SCBRR+1)). With Pck = 50 MHz, SCBRR = 26
+    ! gives 57870 baud, +0.47 % from 57600, reducing the clock mismatch
+    ! compared with the former 115200 setting (111607 baud, -3.1 %).
+    mov     #26, r0
+    mov.b   r0, @(4, r1)        ! SCBRR2  = 26     (Pck 50MHz -> 57870 baud)
     mov.l   Ldelay, r2          ! wait > 1 bit time
 1:  dt      r2
     bf      1b

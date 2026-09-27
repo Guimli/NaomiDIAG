@@ -185,10 +185,10 @@ static const comp_map bios_comps[4] = {
  *
  * TEX0 is the four chips on top of the board, TEX1 the four underneath. */
 static const comp_map tex0_comps[4] = {
-    { CLIP_IC_16, "IC16" },         /* D0-D15,  even word */
-    { CLIP_IC_18, "IC18" },         /* D16-D31, even word */
-    { CLIP_IC_20, "IC20" },         /* D0-D15,  odd word  */
-    { CLIP_IC_22, "IC22" },         /* D16-D31, odd word  */
+    { CLIP_IC_16, "IC16" },         /* first 4 MiB, D0-D15 */
+    { CLIP_IC_18, "IC18" },         /* first 4 MiB, D16-D31 */
+    { CLIP_IC_20, "IC20" },         /* last 4 MiB, D0-D15 */
+    { CLIP_IC_22, "IC22" },         /* last 4 MiB, D16-D31 */
 };
 /* No spoken clips exist for these four: the voice falls back to the position
  * number rather than announcing a chip it cannot name. */
@@ -197,6 +197,14 @@ static const comp_map tex1_comps[4] = {
     { CLIP_NONE, "IC19S" },
     { CLIP_NONE, "IC21S" },
     { CLIP_NONE, "IC23S" },
+};
+
+/* EPR-23608C Naomi 2 TXB0/TXB1 tables, in BIOS result-bit order. */
+static const comp_map pvrb_comps[8] = {
+    { CLIP_NONE, "IC111" }, { CLIP_NONE, "IC113" },
+    { CLIP_NONE, "IC115" }, { CLIP_NONE, "IC117" },
+    { CLIP_NONE, "IC112" }, { CLIP_NONE, "IC114" },
+    { CLIP_NONE, "IC116" }, { CLIP_NONE, "IC118" },
 };
 
 
@@ -256,7 +264,7 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
             y += 20;
             u32 x = 32;
             const char *last = 0;
-            for (u32 b = 0; b < 4 && x < FB_W - 80; b++) {
+            for (u32 b = 0; b < (e->comps == pvrb_comps ? 8u : 4u) && x < FB_W - 80; b++) {
                 if (!(e->detail & (1u << b)) || e->comps[b].name == last)
                     continue;
                 last = e->comps[b].name;
@@ -373,7 +381,7 @@ static void say_entry(const log_entry *e)
     for (u32 i = 0; i < 8; i++) {
         if (!(e->detail & (1u << i)))
             continue;
-        u32 c = (e->comps && i < 4) ? e->comps[i].clip : CLIP_NUM_1 + i;
+        u32 c = (e->comps && i < (e->comps == pvrb_comps ? 8u : 4u)) ? e->comps[i].clip : CLIP_NUM_1 + i;
         if (c == CLIP_NONE)
             c = CLIP_NUM_1 + i;   /* no clip for this chip: say the position */
         if (c == spoken)
@@ -453,7 +461,7 @@ static void report_comps(const char *ramname, u32 compmask,
         /* One line per chip, not per position: the sound RAM is a single
          * 16-bit chip answering for all four positions, and naming IC35 four
          * times reads as four faults. */
-        if (comps && i < 4) {
+        if (comps && i < (comps == pvrb_comps ? 8u : 4u)) {
             if (comps[i].name == last)
                 continue;
             last = comps[i].name;
@@ -462,12 +470,13 @@ static void report_comps(const char *ramname, u32 compmask,
         scif_puts(ramname);
         scif_puts(" ");
         scif_putdec(i + 1);
-        if (comps && i < 4) {
+        if (comps && i < (comps == pvrb_comps ? 8u : 4u)) {
             scif_puts(" (");
             scif_puts(comps[i].name);
             scif_puts(")");
         }
-        scif_puts(S_DEFECTIVE);
+        scif_puts((comps == tex0_comps || comps == tex1_comps || comps == pvrb_comps)
+                  ? S_VRAM_SUSPECT : S_DEFECTIVE);
     }
 }
 
@@ -488,7 +497,8 @@ static void report_region(const region_desc *d, const ram_result *r)
         report_badbits_aram(r->badbits);
     else
         report_badbits(r->badbits);
-    report_comps(d->group, ram_comp_mask(r), d->comps);
+    u32 is_vram = r->vram_chips || d->comps == tex0_comps || d->comps == tex1_comps;
+    report_comps(d->group, is_vram ? r->vram_chips : ram_comp_mask(r), d->comps);
 }
 
 /* End of one test phase on the serial log. A phase cut short by an abort
@@ -535,8 +545,8 @@ static void test_board(void)
     scif_puthex(b.holly_rev);
     scif_puts(", Elan id ");
     scif_puthex(b.elan_id);
-    scif_puts(", dual PVR ");
-    scif_putdec(b.dual_pvr);
+    scif_puts(", model override ");
+    scif_putdec(CFG_BOARD_MODEL);
     scif_puts("\n");
 
     switch (b.type) {
@@ -944,6 +954,66 @@ static u32 test_aram(void)
 }
 
 /* ------------------------------------------------------------------ */
+static u32 vram_diag_lines;
+static u32 vram_diag_cpu_bits, vram_diag_data_bits;
+static void report_vram_ic(u32 addr, u32 diff)
+{
+    if (!g_ic_valid || !vram_is_mapped(addr) || !diff) return;
+    scif_puts(S_VRAM_BIOS_IC);
+    for (u32 half = 0; half < 2; half++) {
+        u32 bits = (diff >> (half * 16)) & 0xFFFFu;
+        if (!bits) continue;
+        scif_puts(" IC"); scif_putdec(vram_ic(addr, half * 16));
+        scif_puts(" CPU D:");
+        for (u32 bit = 0; bit < 16; bit++)
+            if (bits & (1u << bit)) { scif_putc(' '); scif_putdec(half * 16 + bit); }
+    }
+    scif_puts("\n");
+}
+static void report_vram_address(const vram_address_event *e)
+{
+    /* Serial only: a diagnostic callback must never modify either GPU RAM. */
+    if (e->alias) vram_diag_cpu_bits |= e->cpu_bits;
+    else vram_diag_data_bits |= (e->expected ^ e->observed) |
+                               (e->expected ^ e->reread) |
+                               (e->peer_expected ^ e->peer_observed);
+    if (vram_diag_lines++ >= 32) return;
+    scif_puts(e->alias ? "  VRAM coupling candidate" : "  VRAM readback failure");
+    scif_puts(" addr="); scif_puthex(e->first);
+    scif_puts(" peer="); scif_puthex(e->second);
+    scif_puts(" expected="); scif_puthex(e->expected);
+    scif_puts(" observed="); scif_puthex(e->observed);
+    scif_puts(" reread="); scif_puthex(e->reread);
+    scif_puts(" peer_expected="); scif_puthex(e->peer_expected);
+    scif_puts(" peer_observed="); scif_puthex(e->peer_observed);
+    scif_puts(" xor="); scif_puthex(e->expected ^ e->observed);
+    if (e->alias) {
+        scif_puts(" CPU byte-address bits:");
+        for (u32 bit = 2; bit < 32; bit++)
+            if (e->cpu_bits & (1u << bit)) {
+                scif_puts(" A"); scif_putdec(bit);
+            }
+    }
+    scif_puts("\n");
+    if (e->first == e->second)
+        report_vram_ic(e->first, (e->expected ^ e->observed) |
+                                (e->expected ^ e->reread));
+}
+
+static void diagnose_vram(u32 base, u32 size)
+{
+    vram_diag_lines = 0;
+    vram_diag_cpu_bits = vram_diag_data_bits = 0;
+    scif_puts(S_VRAM_DIAG);
+    u32 failed = vram_address_diagnose(base, size, report_vram_address);
+    scif_puts("  VRAM diagnostic failed pairs="); scif_putdec(failed);
+    scif_puts(" events="); scif_putdec(vram_diag_lines);
+    scif_puts(" (first 32 events printed)\n");
+    scif_puts("  VRAM coupling CPU mask="); scif_puthex(vram_diag_cpu_bits);
+    scif_puts(" readback data mask="); scif_puthex(vram_diag_data_bits);
+    scif_puts("\n");
+}
+
 static void test_vram_region(const char *name, const char *dbus, const char *abus,
                              u32 base, u32 size,
                              const comp_map *comps, u32 name_clip,
@@ -958,11 +1028,13 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
      * tested at all -- the one memory whose bus said nothing either way. */
     u32 bad = vram_test_databus(base);
     u32 c = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
+    if (vram_is_mapped(base)) c = vram_chip_mask(base, bad);
     log_result_q(dbus, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, c, comps, 1, name_clip);
     if (bad) {
         report_badbits(bad);
         report_comps(name, c, comps);
         *ok_flag = 0;
+        diagnose_vram(base, size);
         return;
     }
 
@@ -976,6 +1048,7 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
         scif_puthex(bad);
         scif_puts("\n");
         *ok_flag = 0;
+        diagnose_vram(base, size);
         return;
     }
 
@@ -992,7 +1065,8 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
      * the bar must not be drawn into it -- it would overwrite the pattern
      * being verified and report a fault that does not exist. */
     u32 fbaddr = VRAM_TEX0_BASE + FB_VRAM_OFFSET;
-    progress_screen_enable(!(base <= fbaddr && fbaddr < base + len));
+    progress_screen_enable(base != VRAM_PVRB_BASE &&
+                           !(base <= fbaddr && fbaddr < base + len));
 
     u32 words = len >> 2;
     phase_begin(S_P_VRAM, 1, S_PH_0101, words);
@@ -1025,11 +1099,13 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
         return;
     }
     t_status st = res.errors ? T_FAIL : T_OK;
-    log_result(name, name_clip, st, ram_comp_mask(&res), comps);
+    u32 chips = vram_is_mapped(base) ? res.vram_chips : ram_comp_mask(&res);
+    log_result(name, name_clip, st, chips, comps);
     if (res.errors) {
-        report_intermittent(&res);
+        if (res.unpinned && vram_is_mapped(base)) scif_puts(S_VRAM_UNLOCATED);
+        else report_intermittent(&res);
         report_badbits(res.badbits);
-        report_comps(name, ram_comp_mask(&res), comps);
+        report_comps(name, chips, comps);
         report_fails(&res);
         *ok_flag = 0;
     }
@@ -1057,21 +1133,60 @@ static u32 test_vram(void)
 static void test_naomi2_ram(void)
 {
     if (g_board_type != BOARD_NAOMI2) {
-        /* Saying nothing is the worst answer for an operator holding a
-         * Naomi 2: two whole memories vanish from the report and it reads
-         * as a test that was never written. Name the reason instead, and
-         * point at the probe result that decided it -- if the board really
-         * is a Naomi 2, that line is where the fault is, not here. */
+        /* Explicitly report why these regions were not tested. */
         scif_puts(S_N2_SKIP);
         return;
     }
     scif_puts(S_N2_HDR);
     u32 ok = 1;
-    pvr2_vram_enable();
+    pvr2_access access = pvr2_prepare();
+    if (access != PVR2_READY) {
+        log_result(access == PVR2_A_REFERENCE ? S_L_PVRA_REFERENCE : S_L_PVRB_ACCESS,
+                   CLIP_NONE, T_FAIL, 0, 0);
+        scif_puts(S_PVRB_SKIP);
+        scif_putdec((u32)access);
+        scif_puts("\n");
+        if (access == PVR2_MAPPING || access == PVR2_A_REFERENCE) {
+            u32 count;
+            const pvr2_probe_sample *samples = pvr2_probe_samples(&count);
+            /* Print captured reads after restoration, without rerunning MMIO. */
+            for (u32 i = 0; i < count; i++) {
+                scif_puts("  PVR probe pass=");
+                scif_putdec(i / 4);
+                scif_puts(" addr=");
+                scif_puthex(samples[i].addr);
+                scif_puts(" expected=");
+                scif_puthex(samples[i].expected);
+                scif_puts(" observed=");
+                scif_puthex(samples[i].observed);
+                scif_puts(" xor=");
+                scif_puthex(samples[i].expected ^ samples[i].observed);
+                scif_puts("\n");
+                report_vram_ic(samples[i].addr, samples[i].expected ^ samples[i].observed);
+            }
+            if (access == PVR2_A_REFERENCE) {
+                /* Diagnose the failing A half without assigning its fault to B. */
+                for (u32 i = 0; i < count; i++)
+                    if (samples[i].expected != samples[i].observed) {
+                        diagnose_vram(samples[i].addr & ~0x007FFFFFu, 0x00800000u);
+                        break;
+                    }
+            } else {
+                diagnose_vram(VRAM_PVRB_BASE, VRAM_PVRB_SIZE);
+            }
+            screen_render();
+        }
+        return;
+    }
+    /* No framebuffer writes while exercising B, even after the sampled
+     * independence check. An untested alias must not corrupt our patterns. */
+    u32 screen_ready = g_screen_ready;
+    g_screen_ready = 0;
     test_vram_region(S_L_VRAM_B, S_L_VRAM_B_DBUS, S_L_VRAM_B_ABUS,
                      VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
-                     0, CLIP_VRAM_B, &ok);
-    elan_init();
+                     IC(pvrb_comps), CLIP_VRAM_B, &ok);
+    g_screen_ready = screen_ready;
+    screen_render();
     test_vram_region(S_L_ELAN, S_L_ELAN_DBUS, S_L_ELAN_ABUS,
                      ELAN_RAM_BASE, ELAN_RAM_SIZE,
                      0, CLIP_ELAN, &ok);
@@ -1914,7 +2029,8 @@ static void audio_replay_log(void)
 /* ------------------------------------------------------------------------
  * Lane beacon: which silkscreen chip carries which 16-bit slice of the bus.
  *
- * The test suite knows a fault is on, say, D0-D15 of the even word. Turning
+ * CPU RAM uses word parity; VRAM uses 4 MiB halves in its 32-bit window.
+ * The test suite knows a fault is on, say, D0-D15 of the even CPU word. Turning
  * that into a designator needs a link between an electrical lane and a
  * physical package, and that link cannot be inferred -- inferring it from
  * the order the original BIOS prints IC numbers is exactly what got the map
@@ -1997,9 +2113,9 @@ static void lane_beacon(void)
         for (u32 k = 0; k < 4; k++)
             lane_beacon_phase(SDRAM_P2_BASE, k * 2, cpu_names[k], 1);
         for (u32 k = 0; k < 4; k++)
-            lane_beacon_phase(VRAM_TEX0_BASE, k * 2, vram0_names[k], 0);
+            lane_beacon_phase(VRAM_TEX0_BASE, (k / 2) * 0x400000u + (k % 2) * 2, vram0_names[k], 0);
         for (u32 k = 0; k < 4; k++)
-            lane_beacon_phase(VRAM_TEX1_BASE, k * 2, vram1_names[k], 0);
+            lane_beacon_phase(VRAM_TEX1_BASE, (k / 2) * 0x400000u + (k % 2) * 2, vram1_names[k], 0);
     }
 }
 #endif  /* CFG_LANE_BEACON */

@@ -7,8 +7,9 @@
  * - HOLLY ID/revision (0xA05F8000/04): 0x17FD11DB / 0x11 on Naomi 1
  * - Elan T&L chip (Naomi 2 only) ID at 0x08800000: 0xE1AD0000, rev 0x12;
  *   that area is unpopulated on Naomi 1 (open bus).
- * The silkscreen IC tables embedded in this ROM were extracted from the
- * Naomi 1 BIOS: they are only announced when a Naomi 1 is identified. */
+ * CFG_BOARD_MODEL=1 avoids the Elan probe on a known Naomi 1; =2 selects
+ * a known Naomi 2 without requiring a working Elan ID. Auto mode cannot
+ * distinguish an absent Elan from one that fails to return its ID. */
 
 typedef enum { BOARD_NAOMI1, BOARD_NAOMI2, BOARD_UNKNOWN } board_type;
 
@@ -17,7 +18,6 @@ typedef struct {
     u32 sh4_ver;
     u32 holly_id, holly_rev;
     u32 elan_id, elan_rev;
-    u32 dual_pvr;               /* 1 = two physical PVRs (Naomi 2) */
 } board_info;
 
 void board_detect(board_info *b);

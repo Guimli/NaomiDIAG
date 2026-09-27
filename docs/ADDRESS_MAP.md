@@ -23,20 +23,7 @@ PCB 837-13544 dans l'en-tête MAME.
 
 > Les désignations terminées par **S** sont au **verso** du PCB.
 
-> **Relevé physique (2026-09-09).** Ce tableau vient de la carte, plus d'une
-> déduction. La version précédente inversait les deux groupes de RAM : elle
-> donnait IC9-12 à la VRAM et IC16/18/20/22 à la RAM CPU, alors que c'est
-> exactement l'inverse. Ces numéros venaient bien des écrans RAM TEST du BIOS,
-> mais leur association à une région était déduite de l'ordre d'affichage —
-> déduction fausse, comme l'étaient déjà IC29 et IC35.
-
-> **Correction (relevé sur carte réelle).** IC35 est la RAM son et IC29 la
-> NVRAM ; ce tableau affirmait l'inverse. Les *numéros* sont authentiques —
-> ils viennent des écrans RAM TEST du BIOS d'origine — mais l'association
-> d'un numéro à une région était déduite de leur ordre d'affichage, et cette
-> déduction était fausse. Tout ce qui repose encore sur elle (TEX0 = IC9-12,
-> WORK = IC16/18/20/22) partage la même origine et n'est donc pas plus sûr
-> tant qu'un relevé physique ne l'a pas confirmé.
+Les groupes WORK et TEX ainsi que les rôles IC29/IC35 ont été corrigés après relevé physique. Les anciennes déductions fondées sur le seul ordre d'affichage ne sont plus utilisées.
 
 - Le test RAM du BIOS affiche ces numéros via le format `IC%02d GOOD/BAD`
   (chaînes ROM 0x59508-0x59530, régions nommées ROM 0x59550+ : AICA, WORK,
@@ -59,61 +46,20 @@ mesure elle-même :
 64 bits, soit TEX0 et TEX1 — **TEX1 est donc quatre puces, pas une seule**,
 ce que ce document affirmait à tort.
 
-## Ordre des lanes dans WORK (hypothèse à confirmer)
+## Voies de RAM CPU (WORK)
 
-Bus SDRAM SH4 = 64 bits, 4 puces ×16 bits. Ordre d'affichage BIOS
-IC16→IC18→IC20→IC22 = très probablement ordre électrique croissant :
+Le bus SDRAM SH-4 est large de 64 bits. Il utilise la parité du mot de
+32 bits, contrairement à la fenêtre VRAM 32 bits décrite plus bas.
 
-| naomi-diag | Lanes | Hypothèse IC |
-|---|---|---|
-| CPU RAM 1 | D0-D15, mot pair | IC16 |
-| CPU RAM 2 | D16-D31, mot pair | IC18 |
-| CPU RAM 3 | D0-D15, mot impair | IC20 |
-| CPU RAM 4 | D16-D31, mot impair | IC22 |
+| Position | Voie CPU | IC | Validation |
+| --- | --- | --- | --- |
+| 1 | D0–D15, mot pair | IC9 | Ordre déduit, mesure individuelle manquante |
+| 2 | D16–D31, mot pair | IC10 | Réparation réussie par remplacement d'IC10 seul |
+| 3 | D0–D15, mot impair | IC11S | Ordre déduit, mesure individuelle manquante |
+| 4 | D16–D31, mot impair | IC12S | Ordre déduit, mesure individuelle manquante |
 
-Confirmation prévue : panne forcée sur une puce identifiée d'une vraie
-Naomi (plan utilisateur). Les masques de bits par puce existent aussi dans
-le code BIOS (pool 0xA00251E6 : 0x33333333/0xCCCCCCCC, 0x000F/0x00F0/
-0x0F00/0xF000…) — désassemblage à approfondir si besoin.
-
-## Désignateurs IC — ce qui reste inconnu
-
-Tout ce qui figure dans le tableau ci-dessus a été relevé sur la carte. Il
-reste deux points, et aucun ne se devine :
-
-1. ~~Quel groupe de quatre RAM GPU répond à TEX0~~ — **résolu**. Le RAM TEST
-   du BIOS d'origine porte à l'offset ROM `0x5C484` une table donnant, pour
-   chaque région, un compteur suivi des numéros d'IC qu'il affiche, dans
-   l'ordre des noms de régions situés à `0x59548` :
-
-   | Région | Puces |
-   |---|---|
-   | BACK | IC29 |
-   | AICA | IC35 |
-   | WORK | IC9, IC10, IC11, IC12 |
-   | TEX0 | IC16, IC18, IC20, IC22 |
-   | TEX1 | IC17, IC19, IC21, IC23 |
-
-   Les trois premières lignes sont confirmées indépendamment sur carte réelle,
-   ce qui est précisément ce qui rend les deux dernières fiables : lire cette
-   table seule est ce qui avait produit la carte fausse, quand la région de
-   chaque entrée était déduite de l'ordre d'affichage au lieu de la structure
-   de la table elle-même.
-2. **L'ordre des voies** à l'intérieur de chaque groupe de quatre — en
-   partie seulement désormais. **IC10 = position 2 (D16-D31, mot pair) est
-   validé physiquement** : une carte que NaomiDiag a désignée IC10 a été
-   réparée en ne remplaçant qu'IC10, et la panne a disparu. Cela écarte les
-   deux alternatives plausibles — ordre inversé, et moitiés paire/impaire
-   interverties — et ne laisse debout que la numérotation croissante. IC9,
-   IC11S et IC12S en découlent, sans mesure qui leur soit propre ; la balise
-   de voies en fin d'exécution est là pour les trancher une à une.
-
-Les tests concernés affichent le **numéro de position** dans le banc, qui est
-exact, plutôt qu'une désignation devinée.
-
-Les anciennes déductions tirées du plan d'implantation de `naomi.cpp` (MAME)
-sont retirées : elles décrivaient six RAM vidéo et deux 62256, là où la carte
-en porte huit et une seule NVRAM.
+La balise de voies permet de vérifier chaque attribution sur la carte.
+La validation d'IC10 ne remplace pas une mesure propre aux trois autres IC.
 
 ## Fait notable
 
@@ -137,3 +83,182 @@ croisées — le nôtre est plus exigeant.
 | VRAM accès 32 bits | 0x05000000 | 8+8 Mo (TEX0/TEX1) |
 | RAM principale | 0x0C000000-0x0DFFFFFF | 32 Mo |
 | Cartouche/ROM board (G1) | 0x10000000 zone DMA | via registres G1 5F74xx |
+
+## Mapping des erreurs VRAM extrait du BIOS EPR-23608C
+
+### Image et méthode
+
+Image fournie par l'utilisateur : `epr-23608c.ic27`, 2 097 152 octets.
+SHA-1 : `25ef957ec1c58fdaff5e89102002bca6c38832c5`.
+Analyse statique SH-4 little-endian, incluant la production du masque,
+sa réduction et l'indexation des noms affichés. Aucun test dynamique de ce
+BIOS dans MAME n'a été effectué pour cette analyse.
+
+Les offsets ci-dessous sont des offsets **dans le fichier ROM**. Dans le
+second bloc, les pointeurs internes se résolvent avec
+`offset_ROM = pointeur - 0x0C000000 + 0x188000`.
+Le premier bloc contient cinq régions, le second huit dont POLY et TXB0/1.
+
+### Tables du bloc Naomi 2
+
+| Descripteur ROM | Nom SEGA | Début | Fin exclusive | Table IC ROM | IC, dans l'ordre des bits de résultat |
+| --- | --- | --- | --- | --- | --- |
+| 1F4790 | BACK | A0200000 | A0208000 | 1F4708 | 29 |
+| 1F47B0 | AICA | A0800000 | A1000000 | 1F4710 | 35 |
+| 1F47D0 | WORK | AC010000 | AE000000 | 1F4718 | 9, 10, 11, 12 |
+| 1F47F0 | TEX0 | A5000000 | A5800000 | 1F472C | 16, 18, 20, 22 |
+| 1F4810 | TEX1 | A5800000 | A6000000 | 1F4740 | 17, 19, 21, 23 |
+| 1F4830 | POLY | AA000000 | ABFF0000 | 1F4754 | 106, 107, 108, 109 |
+| 1F4850 | TXB0 | A7000000 | A7800000 | 1F4768 | 111, 113, 115, 117 |
+| 1F4870 | TXB1 | A7800000 | A8000000 | 1F477C | 112, 114, 116, 118 |
+
+Chaque table commence par un compteur 32 bits, puis les numéros d'IC.
+Chaque descripteur occupe 32 octets : nom, début, fin, champ nul, taille
+de bloc, deux paramètres, pointeur vers la table IC. Les blocs TEX font
+0x1000 octets. La fonction d'affichage à 1AD234 sélectionne BAD/GOOD
+en testant les bits successifs du résultat et parcourt la table IC.
+
+### Chaîne de calcul démontrée pour TEX0/1 et TXB0/1
+
+1. La boucle à 1AD5BE appelle la fonction interne 0C0281BC, soit ROM
+   **1B01BC**, avec l'adresse du bloc et sa taille.
+2. Cette fonction écrit des rotations de 01010101, lit et calcule le XOR.
+   À **1B0228–1B024A**, elle réduit les quatre octets du XOR en quatre
+   bits. La table **1B0298** contient `{4, 000000FF, 8}`. Le poids de
+   ces quatre bits tourne de quatre positions à chaque mot de 32 bits.
+3. Le résultat passe par **1AD1C8**, appelé à **1AD5D4**. Cette routine
+   compare la position du bloc au milieu de la région de 8 Mio.
+4. **1AD120** réduit les bits avec `33333333` et `CCCCCCCC` : ces masques
+   réunissent respectivement les deux octets bas et les deux octets hauts
+   de chaque mot. Le déplacement circulaire par mot ne change pas cette
+   distinction.
+5. Dans la seconde moitié de la région, **1AD1F4** décale le résultat de
+   deux bits. Les valeurs 1, 2, 4, 8 sélectionnent donc quatre IC distincts.
+
+Il ne faut pas confondre le masque intermédiaire du BIOS avec un XOR de
+données brut. La règle équivalente pour nos lectures directes est :
+
+```text
+slot = (offset_dans_region_8_Mio >= 0x400000 ? 2 : 0)
+     + (bit_donnee_CPU >= 16 ? 1 : 0)
+IC = table_IC[slot]
+```
+
+### Correspondance exploitable
+
+| Plage de mots 32 bits | D0–D15 | D16–D31 |
+| --- | --- | --- |
+| A5000000–A53FFFFC | IC16 | IC18 |
+| A5400000–A57FFFFC | IC20 | IC22 |
+| A5800000–A5BFFFFC | IC17 | IC19 |
+| A5C00000–A5FFFFFC | IC21 | IC23 |
+| A7000000–A73FFFFC | IC111 | IC113 |
+| A7400000–A77FFFFC | IC115 | IC117 |
+| A7800000–A7BFFFFC | IC112 | IC114 |
+| A7C00000–A7FFFFFC | IC116 | IC118 |
+
+**Le cas A5FFFFFC / XOR 00000300 correspond à IC21 selon le BIOS SEGA.**
+C'est une attribution de voie, pas une preuve que le silicium de la RAM
+est responsable plutôt que ses connexions ou le contrôleur.
+La table n'identifie pas les broches physiques d'adresse et ne démontre
+pas l'absence de permutation entre bits CPU et broches DQ.
+
+### Intégration et vérification
+
+`vram_mapping.h` remplace la parité du mot par la moitié de 4 Mio et la
+moitié du mot de données. Les erreurs localisées de toutes les passes
+accumulent les IC concernés, même au-delà des huit détails conservés.
+Une erreur non relocalisée conserve plusieurs candidats couvrant la plage
+testée. Les diagnostics TEX et les traces PVR annoncent l'association BIOS.
+La balise VRAM utilise désormais des offsets séparés de 4 Mio pour ses
+voies 3/4. La RAM CPU garde son propre mécanisme.
+
+Les codes d'accès 1–5 de NaomiDIAG sont nos codes de qualification ; ils
+ne sont pas des codes SEGA. Le BIOS utilise ici des bits de résultat par
+IC et des textes BAD/GOOD. POLY est documenté mais son mapping de données
+n'a pas été intégré : la table seule ne justifie pas une attribution.
+
+Reproduction, avec le BIOS utilisateur conservé dans un dossier ignoré :
+
+```sh
+python3 tools/inspect_bios_mapping.py roms/epr-23608c.ic27
+sh tools/test_pvr2.sh
+```
+
+Le script valide le SHA-1, extrait les huit descripteurs et vérifie que
+l'accumulateur d'erreurs et le sélecteur de moitié sont identiques dans
+les deux blocs. Les tests comparent la règle intégrée au calcul du masque
+reconstitué pour les 32 bits, les huit positions de mot et les quatre
+régions vidéo. Le BIOS et son désassemblage restent exclus de Git.
+
+## Brochage fourni : TSOP-II à 50 broches
+
+Ces correspondances sont transcrites de l'image fournie par l'utilisateur.
+La référence exacte de la RAM et le câblage de la carte restent à confirmer.
+
+| Signal RAM | Broche |
+| --- | --- |
+| A0, A1, A2, A3 | 21, 22, 23, 24 |
+| A4, A5, A6, A7 | 27, 28, 29, 30 |
+| A8, A9, A10 | 31, 32, 20 |
+| A11 (sélection de banque) | 19 |
+| DQ0, DQ1, DQ2, DQ3 | 2, 3, 5, 6 |
+| DQ4, DQ5, DQ6, DQ7 | 8, 9, 11, 12 |
+| DQ8, DQ9, DQ10, DQ11 | 39, 40, 42, 43 |
+| DQ12, DQ13, DQ14, DQ15 | 45, 46, 48, 49 |
+| LDQM, UDQM | 14, 36 |
+| /WE, /CAS, /RAS, /CS | 15, 16, 17, 18 |
+| CLK, CKE | 35, 34 |
+
+Selon ce pinout, A0–A10 servent à l'adresse de ligne, A0–A7 à celle de
+colonne et A11 à la banque. Un bit d'adresse CPU ne peut donc pas être
+converti directement en une broche A de cette RAM sans connaître le
+décodage du contrôleur et l'organisation des puces.
+
+L'ancien XOR `00000300` désigne les bits de données CPU D8 et D9.
+Si le câblage de la voie concernée les relie à DQ8/DQ9, les broches à
+examiner sont 39 et 40. Cette correspondance de voie n'est pas prouvée
+par le pinout seul. Le numéro d'IC annoncé vient du calcul du BIOS SEGA,
+et ne constitue pas une preuve de panne interne de cette puce.
+
+## Sources complémentaires et mesures physiques restantes
+
+Le [relevé MAME de la Naomi 2](https://github.com/mamedev/mame/blob/master/src/mame/sega/naomi.cpp)
+décrit la carte 837-14009-01 / 171-8082C et des RAM Hynix HY57V161610DTC-8
+(16 Mbit, deux banques de 512 K mots ×16, TSOP-II 50).
+Le [relevé RetroSix](https://retrosix.wiki/wiki/hardware-overview-sega-naomi-2)
+associe cette famille aux groupes IC16–IC23 et IC111–IC118, sans établir
+l'ordre électrique des voies. Vérifier la référence montée et la révision du PCB.
+La [fiche Hynix, page 2](https://pdf.dzsc.com/HY5/HY57V161610DTC-6.pdf)
+documente le composant, pas les connexions du PCB ; A10 sert aussi à
+l'auto-précharge selon la commande.
+
+Les fenêtres VRAM 32 et 64 bits sont deux vues de la même mémoire.
+La [description Dreamcast de Marcus Comstedt](https://mc.pp.se/dc/pvr.html)
+explique leur organisation différente, mais ses 8 Mio ne prouvent pas à eux
+seuls le câblage Naomi 2. Le modèle
+[Flycast `pvr_map32`](https://github.com/flyinghead/flycast/blob/master/core/hw/pvr/pvr_mem.cpp)
+donne, pour 16 Mio :
+
+```text
+offset64 = (offset32 & 0x800003)
+         | ((offset32 & 0x3FFFFC) << 1)
+         | ((offset32 & 0x400000) >> 20)
+```
+
+Ce modèle est une piste pour les mesures croisées, pas une netlist vérifiée.
+Il associe par exemple A5000004 à A4000008 et A5400000 à A4000004.
+Pour compléter le mapping physique, il reste à :
+
+- vérifier les vues 32/64 bits sur plusieurs offsets faisant varier les bits
+  2, 22 et 23, en sauvegardant les cellules et en suspendant l'affichage ;
+- observer les sélections et masquages des voies de chaque quart de 4 Mio,
+  sans conclure à partir de CLK ou de commandes partagées seules ;
+- relever les connexions entre bits CPU et DQ pour chaque IC ;
+- capturer ACTIVE et READ/WRITE en faisant varier un bit CPU à la fois,
+  pour distinguer ligne, colonne et banque sur les broches A0–A11.
+
+Consigner les résultats séparément pour PVR-A, PVR-B et chaque révision de carte.
+Les instructions d'interprétation des résultats TEX figurent dans le
+[README français](../README.fr.md#diagnostic-tex-et-pvr-ab) et le
+[README anglais](../README.md#tex-and-pvr-ab-diagnostics).
