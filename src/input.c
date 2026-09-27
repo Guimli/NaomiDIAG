@@ -21,9 +21,8 @@ extern u32 g_mie_prog;
  * LOW, which is why each is inverted before use. Wiring confirmed in MAME's
  * mie.cpp and in the blob the original BIOS uploads.
  *
- * The cabinet's JVS TEST/START are NOT here. Reaching them means driving
- * the MIE's JVS UART from the Z80 -- a JVS master in 2 KB -- which is a
- * separate piece of work. The board buttons carry the console for now. */
+ * The cabinet's TEST and START come from the JVS master in the same
+ * program, which polls the I/O board by itself (see buttons_poll). */
 #define MIE_TEST_BIT    4
 #define MIE_SERVICE_BIT 5
 
@@ -39,10 +38,12 @@ void input_set_mie_port(u32 port_plus_1)
     g_last_poll = timer_ticks();
 }
 
-/* The cabinet's TEST and START, from the JVS packet the MIE relays. Unlike
- * the board's own buttons these are active HIGH, and they only exist if a
- * JVS I/O board is attached and answered the request sent on the previous
- * poll. Absent one, both stay 0 and the board buttons carry the menu. */
+/* The board's buttons, and the cabinet's TEST and START from the JVS I/O
+ * board when one answers. The JVS master in the MIE keeps the switches up
+ * to date on its own; reading them is one more Maple round trip. JVS
+ * switches are active HIGH: system byte bit 7 is TEST, player 1's first
+ * byte bit 7 is START. Cabinet TEST acts as the board's TEST (next entry),
+ * START as SERVICE (run it). */
 static u32 buttons_poll(input_event *ev)
 {
     u8 in5;
@@ -51,6 +52,14 @@ static u32 buttons_poll(input_event *ev)
 
     u32 psw1 = (~(in5 >> MIE_TEST_BIT)) & 1u;
     u32 psw2 = (~(in5 >> MIE_SERVICE_BIT)) & 1u;
+
+    u8 jvs[28];
+    if (maple_jvs_info(g_mie_port1 - 1, 0, jvs) == 0 &&
+        jvs[JVSI_STATE] == JVS_READY) {
+        psw1 |= (jvs[JVSI_SW] >> 7) & 1u;
+        if (jvs[JVSI_PLAYERS])
+            psw2 |= (jvs[JVSI_SW + 1] >> 7) & 1u;
+    }
 
     /* Report the press, not the hold: a finger rests on a button for far
      * longer than the poll interval, and a held button must not scroll the

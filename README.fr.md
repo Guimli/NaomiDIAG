@@ -132,6 +132,11 @@ ils durent assez pour n'avoir rien à faire devant le rapport (voir
     vérifiées par CRC. Nécessite d'abord le téléversement d'un programme Z80
     dans le MIE (`src/mie_prog.z80`), qui reste ensuite résident et sert
     aussi les boutons de la carte et les DIP switches.
+    **Carte I/O JVS** — le même programme est un maître JVS : il
+    réinitialise le bus, donne l'adresse 1 à la carte, et rapporte son
+    identifiant, ses révisions et ses entrées (joueurs, contacts,
+    monnayeurs, voies analogiques). Si aucune carte ne répond, elle est
+    rapportée *absente*, pas en panne.
 13. **EEPROM numéro de série** (93C46 sur GPIO du SH-4) — lecture + contrôle
     du contenu.
 14. **Sécurité cartouche** (X76F100) — présence par response-to-reset.
@@ -294,7 +299,7 @@ des deux boutons de la carte (**TEST** ou **SERVICE**), arrête la suite : le te
 bloc suivant et **ne rend aucun verdict** sur la partie effectuée — ses
 phases se terminent par `interrompue`, pas par `ok` — et la suite ne reprend
 pas. `a` mène au rapport, un bouton de la carte ouvre le menu, et une touche du menu
-(`c`, `v`, `s`, `d`, `g`, `f`) lance directement son action.
+(`c`, `v`, `s`, `d`, `g`, `f`, `j`) lance directement son action.
 
 Les boutons exigent d'abord le téléversement d'un petit programme Z80 dans le
 MIE — le firmware d'usine du 315-6146 répond à quatre commandes Maple, et
@@ -303,9 +308,18 @@ relocalisation des boucles de test, avant les tests mémoire, dès qu'un bloc
 de RAM CPU a été qualifié pour accueillir les tampons DMA du Maple ; le
 programme reste ensuite résident. Les boutons peuvent donc interrompre la
 partie longue de la suite. Sur une carte sans bloc utilisable, l'étape MIE
-revient à son ancienne place, après le test de la RAM CPU. Les **TEST/START** JVS d'une borne ne
-sont *pas* câblés : les atteindre suppose de piloter l'UART JVS du MIE depuis
-le Z80, ce qui est un travail à part.
+revient à son ancienne place, après le test de la RAM CPU. 
+
+Le **TEST** de la borne et le **START** du joueur 1, lus sur la carte I/O
+JVS, jouent le rôle du **TEST** et du **SERVICE** de la carte dès que la
+carte I/O a répondu.
+
+Le maître JVS vit dans le même programme Z80. Il pilote l'UART de type
+16550 du MIE à 115200 bauds (diviseur 8, le réglage du BIOS d'origine),
+commute l'émetteur RS-485 autour de chaque trame comme le fait ce
+programme, et interroge la carte I/O de lui-même entre deux paquets Maple,
+un octet à la fois : une requête Maple reçoit toujours sa réponse aussitôt.
+Le SH-4 ne fait que lire le résultat, 28 octets par requête.
 
 Touches sur la console série :
 
@@ -317,6 +331,7 @@ Touches sur la console série :
 | `d` | test complet de la SDRAM du DIMM |
 | `g` | intégrité SHA-1 des flash du jeu |
 | `f` | flash du firmware DIMM — identification, et choix d'une version |
+| `j` | test des entrées JVS — chaque contact, monnayeur et voie analogique, en direct |
 
 **TEST** parcourt le menu en bouclant ; **SERVICE** lance la sélection. Les
 trois boucles RAM tournent jusqu'à l'appui sur un bouton de la carte et rien d'autre ne
@@ -329,6 +344,15 @@ puce défaillante comme le fait la suite de démarrage.
 
 Toute autre action ouvre un rapport qui lui est propre, l'affiche, et attend
 **TEST** ou **SERVICE** pour ramener le menu.
+
+Le test des entrées JVS montre chaque entrée que la carte I/O a déclarée :
+les contacts système (TEST, TILT1-3), le START, le SERVICE, les quatre
+directions et les boutons de chaque joueur, allumés tant qu'ils sont
+appuyés ; les compteurs des monnayeurs ; les voies analogiques en
+hexadécimal ; et les octets bruts des contacts, pour une carte dont la
+disposition diffère. Le port série imprime une ligne dès qu'un contact ou
+un compteur change. Le TEST de la borne fait partie des entrées testées :
+on sort donc par un bouton de la carte ou une touche série.
 
 Deux d'entre elles sont à l'initiative de l'opérateur précisément parce
 qu'elles ne sont pas sûres sans surveillance : le test SDRAM du DIMM écrase
@@ -469,11 +493,14 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   comprises (TEX1, PVR-B, RAM Elan), et le suffixe **S** est prononcé : une
   panne sur IC11S s'entend « I C onze S ». La voix est une synthèse Piper :
   l'écran et le port série font foi.
-- Le test JVS complet de la carte I/O demande encore un maître JVS dans le
-  Z80 du MIE. L'EEPROM des réglages et les boutons de la carte, eux, ne le
-  demandent plus : `make mieprog` reconstruit `src/mie_prog.h` depuis le
-  source Z80 si vous le modifiez, et l'en-tête généré est versionné pour que
-  la ROM se construise avec la seule chaîne SH-4.
+- Le maître JVS a été vérifié face à la carte I/O 837-13551 émulée par
+  MAME. MAME ne modélise ni la temporisation de l'UART ni le sens de la
+  ligne RS-485 : ceux-ci suivent le programme du BIOS d'origine et
+  demandent encore une vraie borne. Une seule carte I/O est adressée
+  (adresse 1) ; une chaîne de plusieurs cartes n'est pas énumérée.
+  `make mieprog` reconstruit `src/mie_prog.h` depuis le source Z80 si vous
+  le modifiez ; l'en-tête généré est versionné pour que la ROM se construise
+  avec la seule chaîne SH-4.
 
 ## Carte DIMM
 

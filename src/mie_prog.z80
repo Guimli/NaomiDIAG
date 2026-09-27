@@ -18,6 +18,19 @@
 ; map from MAME's mie.cpp, the 93C46 wiring from the same file, and the
 ; command framing and 93C46 opcodes from the blob the original BIOS
 ; uploads, captured out of the MIE's own RAM while it ran.
+;
+; It is also the JVS master. The MIE's JVS port is a 16550-style UART at
+; I/O 10h-17h behind an RS-485 transceiver whose driver is port 90h bit 0;
+; port 91h reads the SENSE lines. The UART set-up (divisor 8 from a
+; 14.7456 MHz clock = 115200 baud, 8N1, FIFO reset), the "driver on, send,
+; wait for the shifter to empty, driver off" discipline and the byte
+; timeouts follow the original BIOS's own program; the protocol itself is
+; the public JVS one (sync E0, address, length, data, sum; D0 escapes).
+;
+; The bus is driven from the idle side of the Maple loop, one byte at a
+; time, never blocking: a Maple packet is answered at once whatever state
+; the JVS exchange is in. The results live in a 196-byte block the host
+; reads 28 bytes at a time (command E4h), see JVS INFO BLOCK below.
 ; -----------------------------------------------------------------------
 
 CTRL0:       equ 07000h      ; TXB bit0, CTXB bit1, ENDP bit2
@@ -35,6 +48,59 @@ EE_CLK:      equ 040h
 
 EEBUF:       equ 09000h      ; 128 bytes, clear of this code
 STACK:       equ 0fff0h
+
+; ---- JVS UART (16550-style) and transceiver ---------------------------
+J_DATA:      equ 010h        ; RBR / THR, DLL when LCR bit 7 is set
+J_IER:       equ 011h        ; IER, DLM when LCR bit 7 is set
+J_FCR:       equ 012h
+J_LCR:       equ 013h
+J_MCR:       equ 014h
+J_LSR:       equ 015h        ; bit 0 byte received, 5 THR empty, 6 all sent
+J_DIR:       equ 090h        ; bit 0: RS-485 driver on (we are talking)
+J_SENSE:     equ 091h        ; SENSE lines, raw
+
+; ---- JVS master state (RAM) ---------------------------------------------
+JSTATE:      equ 0a000h      ; 0 build next frame, 1 sending, 2 receiving, 3 wait
+JSTEP:       equ 0a001h      ; position in the sequence, see jvs_build
+TXLEN:       equ 0a002h
+TXPOS:       equ 0a003h
+RXPHASE:     equ 0a004h      ; 0 hunt for E0, 1 address, 2 length, 3 data
+RXESC:       equ 0a005h      ; previous byte was the D0 escape
+RXLEN:       equ 0a006h      ; length byte: data bytes + the sum
+RXCNT:       equ 0a007h
+RXSUM:       equ 0a008h
+EXPECT:      equ 0a009h      ; 1 = this frame is answered
+TIMER:       equ 0a00ah      ; 16-bit countdown, receive timeout or wait
+POLLFAIL:    equ 0a00ch      ; consecutive failed polls
+REQSW:       equ 0a00dh      ; switch bytes asked for: 1 + players * bytes
+FSUM:        equ 0a00eh      ; sum of the frame being built
+TXBUF:       equ 0a020h      ; 64 bytes, escaped, ready to send
+RXBUF:       equ 0a080h      ; 128 bytes, unescaped payload after the length
+
+; ---- JVS INFO BLOCK, read by the host 28 bytes at a time (E4h) -----------
+INFO:        equ 0a100h
+I_STATE:     equ INFO+0      ; 0 not started, 1 starting, 2 ready, 3 no answer, 4 error
+I_SENSE:     equ INFO+1      ; port 91h
+I_ERR:       equ INFO+2      ; last error: 1 timeout, 2 sum, 3 status, 4 report
+I_ERRCNT:    equ INFO+3
+I_SEQ:       equ INFO+4      ; 16-bit count of successful polls
+I_CMDREV:    equ INFO+6
+I_JVSREV:    equ INFO+7
+I_COMMVER:   equ INFO+8
+I_PLAYERS:   equ INFO+9
+I_SWBYTES:   equ INFO+10     ; switch bytes per player
+I_COINS:     equ INFO+11
+I_ANACH:     equ INFO+12
+I_ANABITS:   equ INFO+13
+I_FSTEP:     equ INFO+14     ; step that failed last
+I_SW:        equ INFO+16     ; 16: system byte, then the players' bytes
+I_COIN:      equ INFO+32     ; 4 slots x 2 bytes, big-endian as sent
+I_ANA:       equ INFO+40     ; 8 channels x 2 bytes, big-endian as sent
+I_FEAT:      equ INFO+56     ; 32: the feature list, raw
+I_ID:        equ INFO+88     ; 64: identification string, 0-terminated
+INFO_LEN:    equ 196         ; 7 slices of 28
+
+ST_POLL:     equ 8           ; the step that repeats once the board is known
 
             org 08010h
 
@@ -58,11 +124,17 @@ fill:       call ee_read            ; E = address -> C = byte
             cp 080h
             jr nz,fill
 
+            call jvs_init
+
 ; ---- Maple service loop ----------------------------------------------
-main:       ld hl,CTRL1
-waitrx:     bit 5,(hl)              ; RFB: a packet has been received
-            jr z,waitrx
-            ld a,(TBUF+1)           ; destination must be this device
+; Between packets the JVS master takes one small step; a received packet
+; is always served first.
+main:       ld a,(CTRL1)
+            bit 5,a                 ; RFB: a packet has been received
+            jr nz,maple_rx
+            call jvs_step
+            jr main
+maple_rx:   ld a,(TBUF+1)           ; destination must be this device
             cp 020h
             jr nz,main
             ld a,(TBUF)
@@ -70,6 +142,8 @@ waitrx:     bit 5,(hl)              ; RFB: a packet has been received
             jr z,cmd_eeprom
             cp 0e2h
             jr z,cmd_input
+            cp 0e4h
+            jr z,cmd_jvs
             ; Anything else gets a short refusal rather than silence: a
             ; host left waiting for a reply that never comes would spin
             ; until its own timeout on every poll.
@@ -116,6 +190,31 @@ cmd_input:  in a,(IN5)
             ld (TBUF+7),a
             ld a,0e3h
             ld c,001h               ; 1 payload word
+            jr reply
+
+; ---- 0xE4: one 28-byte slice of the JVS info block ---------------------
+cmd_jvs:    ld a,(TBUF+4)           ; slice index 0..6
+            cp 007h
+            jr nc,bad_index
+            ld l,a
+            ld h,000h
+            add hl,hl               ; index * 28, as 32x minus 4x
+            add hl,hl
+            ld d,h
+            ld e,l
+            add hl,hl
+            add hl,hl
+            add hl,hl
+            or a
+            sbc hl,de
+            ld de,INFO
+            add hl,de
+            ld de,TBUF+4
+            ld bc,001ch
+            ldir
+            ld a,0e5h
+            ld c,007h
+            jr reply
 
 ; ---- reply: A = command byte, C = payload words ----------------------
 reply:      ld (TBUF),a
@@ -187,4 +286,581 @@ eeskip:     djnz eedata
             out (GPIO3),a
             ld a,EE_CLK
             out (GPIO3),a
+            ret
+
+; =======================================================================
+; JVS master
+; =======================================================================
+
+; UART set-up, in the order the original BIOS programs it: divisor latch
+; 8 (115200 baud from 14.7456 MHz), no modem control, FIFO enabled, reset,
+; enabled again, 8N1, and one read to drop anything stale. Interrupts stay
+; off: this program polls. The driver is left off without ever being
+; switched on here -- its falling edge ends a frame.
+jvs_init:   xor a
+            out (J_DIR),a
+            out (J_IER),a
+            ld a,083h
+            out (J_LCR),a
+            ld a,008h
+            out (J_DATA),a          ; DLL
+            xor a
+            out (J_IER),a           ; DLM
+            out (J_MCR),a
+            ld a,001h
+            out (J_FCR),a
+            xor a
+            out (J_FCR),a
+            ld a,001h
+            out (J_FCR),a
+            ld a,003h
+            out (J_LCR),a
+            in a,(J_DATA)
+
+            ld hl,JSTATE            ; state, then the info block
+            ld de,JSTATE+1
+            ld (hl),000h
+            ld bc,00ffh
+            ldir
+            ld hl,INFO
+            ld de,INFO+1
+            ld (hl),000h
+            ld bc,INFO_LEN-1
+            ldir
+            ld a,001h
+            ld (I_STATE),a          ; starting
+            ret
+
+; One step of the exchange. Returns quickly whatever happens.
+jvs_step:   in a,(J_SENSE)
+            ld (I_SENSE),a
+            ld a,(JSTATE)
+            or a
+            jp z,jvs_build
+            dec a
+            jr z,jvs_tx
+            dec a
+            jr z,jvs_rx
+            ; 3: waiting
+            ld hl,(TIMER)
+            dec hl
+            ld (TIMER),hl
+            ld a,h
+            or l
+            ret nz
+            xor a
+            ld (JSTATE),a
+            ret
+
+; ---- sending: one byte per step, then release the line -----------------
+jvs_tx:     ld a,(TXPOS)
+            ld hl,TXLEN
+            cp (hl)
+            jr nc,tx_done
+            in a,(J_LSR)
+            bit 5,a                 ; THR empty
+            ret z
+            ld a,(TXPOS)
+            ld e,a
+            inc a
+            ld (TXPOS),a
+            ld d,000h
+            ld hl,TXBUF
+            add hl,de
+            ld a,(hl)
+            out (J_DATA),a
+            ret
+tx_done:    in a,(J_LSR)
+            bit 6,a                 ; the last stop bit has left
+            ret z
+            xor a
+            out (J_DIR),a           ; driver off: the frame is complete
+            ld a,(EXPECT)
+            or a
+            jr z,tx_noreply
+            xor a
+            ld (RXPHASE),a
+            ld (RXESC),a
+            ld hl,10000             ; about 0.1 s of empty polls
+            ld (TIMER),hl
+            ld a,002h
+            ld (JSTATE),a
+            ret
+tx_noreply: ld hl,(TIMER)           ; the build step set the pause
+            ld a,003h
+            ld (JSTATE),a
+            jp next_step
+
+; ---- receiving: one byte per step ---------------------------------------
+jvs_rx:     in a,(J_LSR)
+            bit 0,a
+            jr nz,rx_byte
+            ld hl,(TIMER)
+            dec hl
+            ld (TIMER),hl
+            ld a,h
+            or l
+            ret nz
+            ld a,001h               ; timeout
+            jp jvs_fail
+
+rx_byte:    in a,(J_DATA)
+            cp 0e0h
+            jr nz,rx_notsync
+            ld a,001h               ; a sync byte always starts a frame
+            ld (RXPHASE),a
+            xor a
+            ld (RXESC),a
+            ld (RXSUM),a
+            ret
+rx_notsync: ld c,a
+            ld a,(RXPHASE)
+            or a
+            ret z                   ; outside a frame
+            ld a,c
+            cp 0d0h
+            jr nz,rx_plain
+            ld a,001h
+            ld (RXESC),a
+            ret
+rx_plain:   ld a,(RXESC)
+            or a
+            jr z,rx_have
+            inc c                   ; D0 x stands for x + 1
+            xor a
+            ld (RXESC),a
+rx_have:    ld a,(RXPHASE)
+            cp 001h
+            jr nz,rx_len
+            ld a,c                  ; address: only frames for the master
+            or a
+            jr z,rx_addr_ok
+            xor a                   ; our own echo, or another node's
+            ld (RXPHASE),a
+            ret
+rx_addr_ok: ld (RXSUM),a
+            ld a,002h
+            ld (RXPHASE),a
+            ret
+rx_len:     cp 002h
+            jr nz,rx_data
+            ld a,c
+            ld (RXLEN),a
+            ld hl,RXSUM
+            add a,(hl)
+            ld (hl),a
+            xor a
+            ld (RXCNT),a
+            ld a,003h
+            ld (RXPHASE),a
+            ld a,(RXLEN)
+            or a
+            ret nz
+            ld a,002h               ; a length of 0 cannot even hold the sum
+            jp jvs_fail
+rx_data:    ld a,(RXLEN)
+            dec a
+            ld b,a                  ; B = data bytes before the sum
+            ld a,(RXCNT)
+            cp b
+            jr z,rx_sum
+            cp 080h
+            jr nc,rx_skip           ; longer than our buffer: keep summing
+            ld e,a
+            ld d,000h
+            ld hl,RXBUF
+            add hl,de
+            ld (hl),c
+rx_skip:    ld hl,RXCNT
+            inc (hl)
+            ld a,c
+            ld hl,RXSUM
+            add a,(hl)
+            ld (hl),a
+            ret
+rx_sum:     ld a,(RXSUM)
+            cp c
+            jr z,rx_good
+            ld a,002h               ; checksum
+            jp jvs_fail
+rx_good:    xor a
+            ld (RXPHASE),a
+            ld a,(RXBUF)            ; status: 1 = normal
+            cp 001h
+            jr z,rx_parse
+            ld a,003h
+            jp jvs_fail
+
+; ---- a whole frame arrived: take what this step asked for ---------------
+rx_parse:   ld a,(JSTEP)
+            cp 002h
+            jp z,step_ok            ; set address: the status is the answer
+            ld a,(RXBUF+1)          ; every later command carries a report
+            cp 001h
+            jr z,rx_report_ok
+            ld a,004h
+            jp jvs_fail
+rx_report_ok:
+            ld a,(JSTEP)
+            cp 003h
+            jr z,got_id
+            cp 004h
+            jr z,got_cmdrev
+            cp 005h
+            jr z,got_jvsrev
+            cp 006h
+            jr z,got_commver
+            cp 007h
+            jr z,got_feat
+            jp got_poll
+
+got_id:     ld hl,RXBUF+2
+            ld de,I_ID
+            ld b,63
+id_copy:    ld a,(hl)
+            ld (de),a
+            or a
+            jp z,step_ok
+            inc hl
+            inc de
+            djnz id_copy
+            xor a
+            ld (de),a
+            jp step_ok
+got_cmdrev: ld a,(RXBUF+2)
+            ld (I_CMDREV),a
+            jp step_ok
+got_jvsrev: ld a,(RXBUF+2)
+            ld (I_JVSREV),a
+            jp step_ok
+got_commver:
+            ld a,(RXBUF+2)
+            ld (I_COMMVER),a
+            jp step_ok
+
+; The feature list: 4-byte entries, 00 ends it. 01 switches (players,
+; buttons), 02 coin slots, 03 analog inputs (channels, bits). Counts are
+; capped to what the info block can hold.
+got_feat:   ld hl,RXBUF+2
+            ld de,I_FEAT
+            ld bc,32
+            ldir
+            ld hl,RXBUF+2
+            ld b,8
+feat_next:  ld a,(hl)
+            or a
+            jr z,feat_end
+            cp 001h
+            jr nz,feat_2
+            inc hl
+            ld a,(hl)
+            call cap4
+            ld (I_PLAYERS),a
+            inc hl
+            ld a,(hl)               ; buttons -> bytes, rounded up
+            add a,7
+            srl a
+            srl a
+            srl a
+            call cap4
+            ld (I_SWBYTES),a
+            dec hl
+            dec hl
+            jr feat_skip
+feat_2:     cp 002h
+            jr nz,feat_3
+            inc hl
+            ld a,(hl)
+            call cap4
+            ld (I_COINS),a
+            dec hl
+            jr feat_skip
+feat_3:     cp 003h
+            jr nz,feat_skip
+            inc hl
+            ld a,(hl)
+            cp 009h
+            jr c,feat_3ok
+            ld a,008h
+feat_3ok:   ld (I_ANACH),a
+            inc hl
+            ld a,(hl)
+            ld (I_ANABITS),a
+            dec hl
+            dec hl
+feat_skip:  inc hl
+            inc hl
+            inc hl
+            inc hl
+            djnz feat_next
+feat_end:   ld a,(I_PLAYERS)        ; REQSW = 1 + players * bytes, max 16
+            ld b,a
+            ld a,(I_SWBYTES)
+            ld c,a
+            ld a,001h
+            inc b
+feat_mul:   dec b
+            jr z,feat_mulend
+            add a,c
+            jr feat_mul
+feat_mulend:
+            cp 011h
+            jr c,feat_swok
+            ld a,010h
+            ld (REQSW),a
+            ld a,003h               ; too wide for us: one player, 3 bytes
+            ld (I_SWBYTES),a
+            ld a,001h
+            ld (I_PLAYERS),a
+            ld a,004h
+feat_swok:  ld (REQSW),a
+            ld a,002h
+            ld (I_STATE),a          ; the board is known: ready
+            jr step_ok
+
+cap4:       cp 005h
+            ret c
+            ld a,004h
+            ret
+
+; Poll answer: report + switches, then report + coins, report + analog.
+got_poll:   ld hl,RXBUF+2
+            ld de,I_SW
+            ld a,(REQSW)
+            ld c,a
+            ld b,000h
+            ldir
+            ld a,(I_COINS)
+            or a
+            jr z,poll_ana
+            ld a,(hl)               ; report
+            inc hl
+            cp 001h
+            jr nz,poll_bad
+            ld de,I_COIN
+            ld a,(I_COINS)
+            add a,a
+            ld c,a
+            ld b,000h
+            ldir
+poll_ana:   ld a,(I_ANACH)
+            or a
+            jr z,poll_done
+            ld a,(hl)
+            inc hl
+            cp 001h
+            jr nz,poll_bad
+            ld de,I_ANA
+            ld a,(I_ANACH)
+            add a,a
+            ld c,a
+            ld b,000h
+            ldir
+poll_done:  ld hl,(I_SEQ)
+            inc hl
+            ld (I_SEQ),hl
+            xor a
+            ld (POLLFAIL),a
+            ld a,002h
+            ld (I_STATE),a
+            jr step_ok
+poll_bad:   ld a,004h
+            jp jvs_fail
+
+; ---- sequencing ----------------------------------------------------------
+; A step that succeeded moves on; the poll step repeats after a short
+; pause so the bus is not saturated.
+step_ok:    ld a,(JSTEP)
+            cp ST_POLL
+            jr nz,next_now
+            ld hl,1000              ; about 10 ms between polls
+            ld (TIMER),hl
+            ld a,003h
+            ld (JSTATE),a
+            ret
+next_now:   xor a
+            ld (JSTATE),a
+next_step:  ld hl,JSTEP
+            ld a,(hl)
+            cp ST_POLL
+            ret z
+            inc (hl)
+            ret
+
+; A = error code. Polls get three more chances; anything else restarts
+; the whole sequence, after a pause, from the bus reset.
+jvs_fail:   ld (I_ERR),a
+            ld a,(JSTEP)
+            ld (I_FSTEP),a
+            ld hl,I_ERRCNT
+            ld a,(hl)
+            inc a
+            jr z,fail_sat
+            ld (hl),a
+fail_sat:   xor a
+            ld (RXPHASE),a
+            ld a,(JSTEP)
+            cp ST_POLL
+            jr nz,fail_restart
+            ld hl,POLLFAIL
+            inc (hl)
+            ld a,(hl)
+            cp 004h
+            jr nc,fail_restart
+            ld hl,1000
+            ld (TIMER),hl
+            ld a,003h
+            ld (JSTATE),a
+            ret
+fail_restart:
+            ld a,(JSTEP)            ; no answer to the address: nobody there
+            cp 003h
+            ld a,003h
+            jr c,fail_state
+            ld a,004h
+fail_state: ld (I_STATE),a
+            xor a
+            ld (JSTEP),a
+            ld (POLLFAIL),a
+            ld hl,0ffffh            ; about 0.6 s before trying again
+            ld (TIMER),hl
+            ld a,003h
+            ld (JSTATE),a
+            ret
+
+; ---- building the next frame ---------------------------------------------
+; Steps: 0-1 bus reset (twice, as the BIOS does), 2 set address 1,
+; 3 identify, 4-6 revisions, 7 features, 8 poll inputs (repeats).
+jvs_build:  ld a,(JSTEP)
+            cp 002h
+            jr c,b_reset
+            jr z,b_addr
+            cp ST_POLL
+            jr z,b_poll
+            add a,00dh              ; 3..7 -> 10h..14h
+            ld c,a
+            ld b,001h
+            ld a,002h
+            call fr_begin
+            ld a,c
+            call tx_esc
+            jr b_send
+b_reset:    ld b,0ffh
+            ld a,003h
+            call fr_begin
+            ld a,0f0h
+            call tx_esc
+            ld a,0d9h
+            call tx_esc
+            call fr_end
+            xor a
+            ld (EXPECT),a
+            ld hl,30000             ; let the boards come out of reset
+            ld (TIMER),hl
+            jr b_go
+b_addr:     ld b,0ffh
+            ld a,003h
+            call fr_begin
+            ld a,0f1h
+            call tx_esc
+            ld a,001h
+            call tx_esc
+            jr b_send
+b_poll:     ld a,(I_COINS)          ; length: 1 + 3 + 2 + 2 as present
+            or a
+            ld a,004h
+            jr z,bp_1
+            add a,2
+bp_1:       ld c,a
+            ld a,(I_ANACH)
+            or a
+            ld a,c
+            jr z,bp_2
+            add a,2
+bp_2:       ld b,001h
+            call fr_begin
+            ld a,020h
+            call tx_esc
+            ld a,(I_PLAYERS)
+            call tx_esc
+            ld a,(I_SWBYTES)
+            call tx_esc
+            ld a,(I_COINS)
+            or a
+            jr z,bp_3
+            ld a,021h
+            call tx_esc
+            ld a,(I_COINS)
+            call tx_esc
+bp_3:       ld a,(I_ANACH)
+            or a
+            jr z,b_send
+            ld a,022h
+            call tx_esc
+            ld a,(I_ANACH)
+            call tx_esc
+b_send:     call fr_end
+            ld a,001h
+            ld (EXPECT),a
+b_go:       xor a
+            ld (TXPOS),a
+            ld a,002h
+            out (J_FCR),a           ; as the BIOS does before every frame
+            ld a,001h
+            out (J_DIR),a           ; driver on
+            ld (JSTATE),a           ; 1: sending
+            ret
+
+; B = destination, A = length byte (data bytes + 1). Starts the sum.
+fr_begin:   push af
+            xor a
+            ld (TXLEN),a
+            ld (FSUM),a
+            ld a,0e0h
+            call tx_raw
+            ld a,b
+            call tx_esc
+            pop af
+            jp tx_esc
+
+; Appends the sum, escaped but not summed.
+fr_end:     ld a,(FSUM)
+            push af
+            call tx_esc
+            pop af
+            ld (FSUM),a
+            ret
+
+; A -> frame, summed, with D0 escaping of E0 and D0.
+tx_esc:     push hl
+            ld hl,FSUM
+            push af
+            add a,(hl)
+            ld (hl),a
+            pop af
+            pop hl
+            cp 0e0h
+            jr z,tx_escape
+            cp 0d0h
+            jr nz,tx_raw
+tx_escape:  push af
+            ld a,0d0h
+            call tx_raw
+            pop af
+            dec a
+tx_raw:     push hl
+            push de
+            push af
+            ld a,(TXLEN)
+            ld e,a
+            inc a
+            and 03fh
+            ld (TXLEN),a
+            ld d,000h
+            ld hl,TXBUF
+            add hl,de
+            pop af
+            ld (hl),a
+            pop de
+            pop hl
             ret

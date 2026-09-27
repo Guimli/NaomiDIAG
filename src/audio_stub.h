@@ -72,6 +72,7 @@ enum {
     CLIP_IC_107,
     CLIP_IC_108S,
     CLIP_IC_109S,
+    CLIP_JVS_IO,
     CLIP_COUNT
 };
 

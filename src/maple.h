@@ -17,10 +17,9 @@ typedef struct {
 
 void maple_scan(maple_result *mr);
 
-/* Read the 128-byte settings EEPROM (93C46 behind the MIE) using the
- * proprietary MIE protocol: 0x86/{0x01} starts the read, 0x86/{0x03}
- * fetches the result (0x87 response, 33 payload words: status + data).
- * Returns 0 on success. */
+/* Read the 128-byte settings EEPROM (93C46 behind the MIE) through the
+ * uploaded program: command 0xE0 with a slice index, 28 bytes per 0xE1
+ * reply. Returns 0 on success. */
 u32 maple_eeprom_read(u32 port, u8 *out128);
 
 /* Upload and start the MIE program (src/mie_prog.z80). Everything below
@@ -33,15 +32,36 @@ u32 maple_mie_inputs(u32 port, u8 *state);
  * with the raw status in *status. */
 u32 maple_mie_selftest(u32 port, u32 *status);
 
-/* Raw JVS control words from the MIE (0x86/0x15 -> 0x87/0x16, 14 words).
- * The bit positions of TEST, SERVICE and START are not documented anywhere
- * and are established by watching these words while pressing the buttons --
- * see CFG_JVS_MAP in config.h. Returns 0 on success. */
-u32 maple_jvs_read(u32 port, u32 out[14]);
+/* One 28-byte slice (idx 0..6) of the JVS info block kept by the JVS
+ * master in the uploaded MIE program: command 0xE4 -> 0xE5. The layout is
+ * documented in src/mie_prog.z80 (JVS INFO BLOCK) and mirrored by the
+ * JVSI_* offsets below. Returns 0 on success. */
+u32 maple_jvs_info(u32 port, u32 idx, u8 *out28);
 
-/* Ask the JVS I/O at `addr` (1 = first board) for its switches. The answer
- * arrives in the NEXT maple_jvs_read, inside the packet its words carry. */
-u32 maple_jvs_request(u32 port, u32 addr);
+#define JVSI_LEN        196
+#define JVSI_STATE      0       /* 0 idle, 1 starting, 2 ready, 3 none, 4 error */
+#define JVSI_SENSE      1
+#define JVSI_ERR        2       /* 1 timeout, 2 sum, 3 status, 4 report */
+#define JVSI_ERRCNT     3
+#define JVSI_SEQ        4       /* 16-bit little-endian poll count */
+#define JVSI_CMDREV     6
+#define JVSI_JVSREV     7
+#define JVSI_COMMVER    8
+#define JVSI_PLAYERS    9
+#define JVSI_SWBYTES    10
+#define JVSI_COINS      11
+#define JVSI_ANACH      12
+#define JVSI_ANABITS    13
+#define JVSI_FSTEP      14
+#define JVSI_SW         16      /* system byte, then players' bytes (16) */
+#define JVSI_COIN       32      /* 4 x 2 bytes, big-endian */
+#define JVSI_ANA        40      /* 8 x 2 bytes, big-endian */
+#define JVSI_FEAT       56      /* 32 bytes, raw feature list */
+#define JVSI_ID         88      /* 64 bytes, 0-terminated */
+
+#define JVS_READY       2
+#define JVS_NONE        3
+#define JVS_ERROR       4
 
 /* Put the DMA descriptors and receive buffer at p2_base (needs 0x200 bytes).
  * They must NOT sit in memory a running test is writing patterns over. */

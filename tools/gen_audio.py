@@ -93,6 +93,7 @@ CLIPS = {
     "ic_107":     {"fr": "I C cent sept,",                   "en": "I C one hundred seven,"},
     "ic_108s":    {"fr": "I C cent huit S,",                 "en": "I C one hundred eight S,"},
     "ic_109s":    {"fr": "I C cent neuf S,",                 "en": "I C one hundred nine S,"},
+    "jvs_io":     {"fr": "Carte d'entrées sorties J V S.",   "en": "J V S I O board."},
 }
 
 RATE = 22050

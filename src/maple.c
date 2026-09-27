@@ -210,41 +210,19 @@ u32 maple_mie_inputs(u32 port, u8 *state)
     return 0;
 }
 
-/* Read the JVS control state through the MIE: command 0x86 with subcommand
- * 0x15, answered by 0x87 with subresponse 0x16 and 0x0E payload words.
- *
- * The protocol shape is documented (DragonMinded/netboot, docs/naomi.md);
- * the BIT POSITIONS of TEST, SERVICE and the per-player buttons inside those
- * words are NOT -- that document says outright that they were never mapped
- * and that the way to find them is to print the response and press things.
- * So this returns the raw words and the mapping is established by
- * measurement, not by assumption. Returns 0 on success. */
-u32 maple_jvs_read(u32 port, u32 out[14])
+/* One 28-byte slice of the JVS info block: command 0xE4, payload byte 0 =
+ * slice index, answered by 0xE5 with seven words. The JVS master in the
+ * MIE fills the block on its own; this only reads it, so it never waits
+ * on the JVS bus. */
+u32 maple_jvs_info(u32 port, u32 idx, u8 *out28)
 {
     volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
-    u32 pay = 0x00000015;
-    u32 hdr = maple_txn(port, 0x86, 1, &pay);
-
-    if ((hdr & 0xFF) != 0x87)
+    u32 pay = idx;
+    u32 hdr = maple_txn(port, 0xE4, 1, &pay);
+    if ((hdr & 0xFF) != 0xE5)
         return 1;
-    for (u32 i = 0; i < 14; i++)
-        out[i] = rx[1 + i];
+    const volatile u8 *src = (const volatile u8 *)&rx[1];
+    for (u32 i = 0; i < 28; i++)
+        out28[i] = src[i];
     return 0;
-}
-
-/* Ask the JVS I/O board at `addr` for its switch state. The MIE relays it on
- * the JVS bus and holds the reply until the next 0x15 read, so this is sent
- * one poll ahead of the read that collects it.
- *
- * Subcommand 0x27 with a twelve-byte body, the shape libnaomi uses. The 0x77
- * in the second byte is described there as a GPIO direction that these
- * packets carry "for some reason"; it is reproduced rather than reasoned
- * about. Returns 0 if the MIE accepted it. */
-u32 maple_jvs_request(u32 port, u32 addr)
-{
-    u32 pay[3];
-    pay[0] = 0x00007727u;                       /* 0x27, 0x77, 0, 0 */
-    pay[1] = (addr & 0xFFu) << 16 | 0x01000000u;/* 0, 0, addr, 1    */
-    pay[2] = 0x00000000u;
-    return (maple_txn(port, 0x86, 3, pay) & 0xFF) == 0x87 ? 0 : 1;
 }

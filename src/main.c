@@ -73,12 +73,13 @@ u32 g_mie_prog;                     /* our Z80 program is resident   */
 #define ACT_DIMM    4
 #define ACT_GAME    5
 #define ACT_FLASH   6
-#define ACT_COUNT   6
+#define ACT_JVS     7
+#define ACT_COUNT   7
 
 static const char *const menu_label[ACT_COUNT] = {
-    S_M_CPU, S_M_VRAM, S_M_ARAM, S_M_DIMM, S_M_GAME, S_M_FLASH
+    S_M_CPU, S_M_VRAM, S_M_ARAM, S_M_DIMM, S_M_GAME, S_M_FLASH, S_M_JVS
 };
-static const char menu_key[ACT_COUNT] = { 'c', 'v', 's', 'd', 'g', 'f' };
+static const char menu_key[ACT_COUNT] = { 'c', 'v', 's', 'd', 'g', 'f', 'j' };
 
 
 /* Called from progress_tick, once per test block. Decides whether what the
@@ -2155,50 +2156,6 @@ static void lane_beacon(void)
 #endif  /* CFG_LANE_BEACON */
 
 
-#if CFG_JVS_MAP
-/* Print the MIE's control words whenever any bit changes, and say which bits
- * moved. Press TEST, press START, read the answer off the serial console --
- * this is how the mapping gets established, since no public source carries
- * it. Runs after the report, forever. */
-static void jvs_map_aid(void)
-{
-    u32 prev[14], cur[14];
-    for (u32 i = 0; i < 14; i++)
-        prev[i] = 0;
-    if (!g_mie_port1) {
-        scif_puts(S_JVS_NO_MIE);
-        return;
-    }
-    scif_puts(S_JVS_MAP_HDR);
-    for (;;) {
-        if (maple_jvs_read(g_mie_port1 - 1, cur) == 0) {
-            u32 changed = 0;
-            for (u32 i = 0; i < 14; i++)
-                if (cur[i] != prev[i])
-                    changed = 1;
-            if (changed) {
-                for (u32 i = 0; i < 14; i++) {
-                    scif_puthex(cur[i]);
-                    scif_putc(i == 13 ? '\n' : ' ');
-                }
-                for (u32 i = 0; i < 14; i++) {
-                    u32 d = cur[i] ^ prev[i];
-                    if (!d)
-                        continue;
-                    scif_puts("  mot ");
-                    scif_putdec(i);
-                    scif_puts(" bits ");
-                    scif_puthex(d);
-                    scif_puts("\n");
-                    prev[i] = cur[i];
-                }
-            }
-        }
-        delay_ms(30);
-        progress_heartbeat();
-    }
-}
-#endif
 
 
 /* ---- looping memory tests -------------------------------------------- */
@@ -2343,6 +2300,351 @@ static void report_restart(void)
     screen_render();
 }
 
+/* ---- JVS I/O board --------------------------------------------------
+ *
+ * The JVS master runs in the MIE, inside the uploaded Z80 program: it
+ * resets the bus, gives the board address 1, asks who it is and what it
+ * has, then polls its inputs on its own. This side only reads the result,
+ * 28 bytes at a time, so nothing here ever waits on the JVS bus. */
+
+static void hex_into(char *d, u32 v, u32 ndigits);
+
+/* Switches per player as the board declares them (feature 01, third
+ * byte): START, SERVICE, four directions, then the buttons. Falls back
+ * to the bytes it asked for when the list says nothing. */
+static u32 jvs_switches(const u8 *info)
+{
+    for (u32 f = 0; f < 32 && info[JVSI_FEAT + f]; f += 4)
+        if (info[JVSI_FEAT + f] == 1)
+            return info[JVSI_FEAT + f + 2];
+    return info[JVSI_SWBYTES] * 8u;
+}
+
+static u32 jvs_read(u8 *info, u32 nslices)
+{
+    for (u32 i = 0; i < nslices; i++)
+        if (maple_jvs_info(g_mie_port1 - 1, i, info + i * 28))
+            return 1;
+    return 0;
+}
+
+/* JVS revisions are BCD: 0x13 is 1.3. */
+static void put_bcd_rev(u32 v)
+{
+    scif_putdec((v >> 4) & 0xF);
+    scif_putc('.');
+    scif_putdec(v & 0xF);
+}
+
+static void test_jvs_io(void)
+{
+    if (!g_mie_prog) {
+        scif_puts(S_JVS_SKIP);
+        return;
+    }
+    scif_puts(S_JVS_HDR);
+
+    /* The first answer takes two bus resets and their settling time, or a
+     * timeout on the address when nobody is there: well under two seconds
+     * either way. Three is the patience before calling the master stuck. */
+    u8 info[JVSI_LEN];
+    u32 state = 0;
+    for (u32 t = 0; t < 60; t++) {
+        if (maple_jvs_info(g_mie_port1 - 1, 0, info) == 0) {
+            state = info[JVSI_STATE];
+            if (state >= JVS_READY)
+                break;
+        }
+        delay_ms(50);
+        progress_heartbeat();
+    }
+
+    if (state == JVS_READY && jvs_read(info, 7) == 0) {
+        info[JVSI_ID + 63] = 0;
+        scif_puts(S_JVS_ID);
+        scif_puts((const char *)&info[JVSI_ID]);
+        scif_puts("\n");
+        scif_puts(S_JVS_REV);
+        put_bcd_rev(info[JVSI_CMDREV]);
+        scif_puts(" / ");
+        put_bcd_rev(info[JVSI_JVSREV]);
+        scif_puts(" / ");
+        put_bcd_rev(info[JVSI_COMMVER]);
+        scif_puts("\n");
+        scif_puts(S_JVS_FEAT);
+        scif_putdec(info[JVSI_PLAYERS]);
+        scif_puts(S_JVS_PLAYERS);
+        scif_putdec(jvs_switches(info));
+        scif_puts(S_JVS_BUTTONS);
+        scif_putdec(info[JVSI_COINS]);
+        scif_puts(S_JVS_COINS);
+        scif_putdec(info[JVSI_ANACH]);
+        scif_puts(S_JVS_ANALOG);
+        scif_putdec(info[JVSI_ANABITS]);
+        scif_puts(S_JVS_BITS);
+        scif_puts(S_JVS_SENSE);
+        scif_puthex(info[JVSI_SENSE]);
+        scif_puts("\n");
+        log_result(S_L_JVS_READY, CLIP_JVS_IO, T_OK, 0, 0);
+        return;
+    }
+
+    scif_puts(S_JVS_SENSE);
+    scif_puthex(info[JVSI_SENSE]);
+    scif_puts("\n");
+    if (state == JVS_NONE) {
+        /* Nobody answered the address. A bench board with no I/O board
+         * plugged in is the ordinary case, not a fault. */
+        log_result(S_L_JVS_ABSENT, CLIP_NONE, T_OK, 0, 0);
+        say(CLIP_JVS_IO, 250);
+        say(CLIP_ABSENT, REPORT_GAP_MS);
+        return;
+    }
+    if (state == JVS_ERROR) {
+        scif_puts(S_JVS_ERRINFO);
+        scif_putdec(info[JVSI_ERR]);
+        scif_puts(S_JVS_ERRSTEP);
+        scif_putdec(info[JVSI_FSTEP]);
+        scif_puts("\n");
+        scif_puts(S_JVS_ERRCODES);
+        log_result(S_L_JVS_ERROR, CLIP_JVS_IO, T_FAIL, 0, 0);
+        return;
+    }
+    log_result(S_L_JVS_STUCK, CLIP_JVS, T_FAIL, 0, 0);
+}
+
+/* ---- JVS input test screen ---------------------------------------------
+ * Every input the board declared, live: pressed in green, released in grey.
+ * The cabinet's own TEST is one of the inputs under test, so it cannot be
+ * the way out; the board's push buttons and the serial console are. */
+
+#define COL_DIM     RGB565(10, 20, 10)
+
+static void jt_line_clear(u32 y)
+{
+    fb_fill_rows(y, y + 18, 0);
+}
+
+/* Draws a token and returns the next x. */
+static u32 jt_tok(u32 x, u32 y, const char *s, u32 on)
+{
+    fb_text(x, y, s, on ? COL_GREEN : COL_DIM, FB_W);
+    u32 n = 0;
+    while (s[n])
+        n++;
+    return x + (n + 1) * 16;
+}
+
+static void jt_draw(const u8 *info, u32 full)
+{
+    static const char *const btn[16] = {
+        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+        "11", "12", "13", "14", "15", "16"
+    };
+    char buf[8];
+
+    if (full) {
+        fb_clear(0);
+        fb_text(16, 8, S_JT_TITLE, COL_TITLE, FB_W);
+        fb_text(16, 456, S_JT_QUIT, COL_WHITE, FB_W);
+    }
+    u32 state = info[JVSI_STATE];
+    if (full || state != JVS_READY)
+        jt_line_clear(40);
+    if (state != JVS_READY) {
+        fb_text(16, 40, state == JVS_NONE ? S_JT_NONE :
+                        state == JVS_ERROR ? S_JT_ERR : S_JT_WAIT,
+                state == JVS_ERROR ? COL_RED : COL_WHITE, FB_W);
+        return;
+    }
+    if (full) {
+        /* JVS names read "maker;board;version;comment" and often run past
+         * one line: break at the last ';' that fits, two lines at most. */
+        char id[2][37];
+        const u8 *src = &info[JVSI_ID];
+        jt_line_clear(58);
+        for (u32 line = 0; line < 2 && *src; line++) {
+            u32 n = 0, cut = 0;
+            while (n < 36 && src[n]) {
+                if (src[n] == ';')
+                    cut = n + 1;
+                n++;
+            }
+            if (src[n] && cut)
+                n = cut;
+            for (u32 i = 0; i < n; i++)
+                id[line][i] = (char)src[i];
+            id[line][n] = 0;
+            fb_text(16, 40 + line * 18, id[line], COL_WHITE, FB_W);
+            src += n;
+        }
+    }
+
+    const u8 *sw = &info[JVSI_SW];
+    u32 y = 88;
+    jt_line_clear(y);
+    u32 x = jt_tok(16, y, S_JT_SYS, 1);
+    x = jt_tok(x, y, "TEST", sw[0] & 0x80);
+    x = jt_tok(x, y, "TILT1", sw[0] & 0x40);
+    x = jt_tok(x, y, "TILT2", sw[0] & 0x20);
+    x = jt_tok(x, y, "TILT3", sw[0] & 0x10);
+
+    /* Player byte 0: START SERVICE UP DOWN LEFT RIGHT B1 B2, then byte 1:
+     * B3..B10, and B11 onwards in a third byte where a board has one. */
+    u32 nbytes = info[JVSI_SWBYTES];
+    u32 nsw = jvs_switches(info);
+    if (nsw > nbytes * 8)
+        nsw = nbytes * 8;
+    u32 nbtn = nsw > 6 ? nsw - 6 : 0;
+    if (nbtn > 16)
+        nbtn = 16;
+    for (u32 p = 0; p < info[JVSI_PLAYERS] && p < 4; p++) {
+        const u8 *pb = &sw[1 + p * nbytes];
+        y = 120 + p * 26;
+        jt_line_clear(y);
+        buf[0] = S_JT_PLAYER[0];
+        buf[1] = (char)('1' + p);
+        buf[2] = 0;
+        x = jt_tok(16, y, buf, 1);
+        x = jt_tok(x, y, "ST", pb[0] & 0x80);
+        x = jt_tok(x, y, "SV", pb[0] & 0x40);
+        x = jt_tok(x, y, S_JT_DIR_U, pb[0] & 0x20);
+        x = jt_tok(x, y, S_JT_DIR_D, pb[0] & 0x10);
+        x = jt_tok(x, y, S_JT_DIR_L, pb[0] & 0x08);
+        x = jt_tok(x, y, S_JT_DIR_R, pb[0] & 0x04);
+        for (u32 b = 0; b < nbtn && x < FB_W - 32; b++) {
+            u32 bit = b + 6;                /* bit index from byte 0, MSB first */
+            u32 on = pb[bit >> 3] & (0x80u >> (bit & 7));
+            x = jt_tok(x, y, btn[b], on);
+        }
+    }
+
+    y = 248;
+    jt_line_clear(y);
+    x = jt_tok(16, y, S_JT_COINS, 1);
+    for (u32 c = 0; c < info[JVSI_COINS] && c < 4; c++) {
+        const u8 *cb = &info[JVSI_COIN + c * 2];
+        u32 v = ((u32)(cb[0] & 0x3F) << 8) | cb[1];
+        buf[0] = (char)('1' + c);
+        buf[1] = ':';
+        buf[2] = (char)('0' + (v / 1000) % 10);
+        buf[3] = (char)('0' + (v / 100) % 10);
+        buf[4] = (char)('0' + (v / 10) % 10);
+        buf[5] = (char)('0' + v % 10);
+        buf[6] = (cb[0] & 0xC0) ? '!' : 0;  /* slot condition not normal */
+        buf[7] = 0;
+        x = jt_tok(x, y, buf, v != 0);
+    }
+
+    for (u32 row = 0; row < 2; row++) {
+        y = 288 + row * 28;
+        jt_line_clear(y);
+        if (row * 4 >= info[JVSI_ANACH])
+            continue;
+        x = jt_tok(16, y, S_JT_ANA, 1);
+        for (u32 c = row * 4; c < info[JVSI_ANACH] && c < row * 4 + 4; c++) {
+            const u8 *ab = &info[JVSI_ANA + c * 2];
+            buf[0] = (char)('1' + c);
+            buf[1] = ':';
+            hex_into(buf + 2, ((u32)ab[0] << 8) | ab[1], 4);
+            buf[6] = 0;
+            x = jt_tok(x, y, buf, 1);
+        }
+    }
+
+    /* the raw switch bytes, for a board whose layout differs */
+    y = 368;
+    jt_line_clear(y);
+    x = 16;
+    for (u32 i = 0; i < 1 + info[JVSI_PLAYERS] * nbytes && i < 12; i++) {
+        hex_into(buf, sw[i], 2);
+        buf[2] = 0;
+        x = jt_tok(x, y, buf, sw[i] != 0);
+    }
+}
+
+static void jvs_input_test(void)
+{
+    if (!g_mie_prog) {
+        scif_puts(S_JVS_SKIP);
+        return;
+    }
+    scif_puts(S_JT_SERIAL);
+
+    u8 info[JVSI_LEN], shown[56];
+    for (u32 i = 0; i < JVSI_LEN; i++)
+        info[i] = 0;
+    for (u32 i = 0; i < sizeof shown; i++)
+        shown[i] = 0xFF;
+    u32 have_id = 0, drawn_state = 0xFF;
+    u8 in5, prev_btn = 0x30;            /* both board buttons released */
+
+    for (;;) {
+        /* Way out: any serial key, or a press of either board button. */
+        if (scif_getc() >= 0)
+            break;
+        if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0) {
+            u8 btn = in5 & 0x30;
+            u8 pressed = prev_btn & ~btn;   /* active low: 1 -> 0 */
+            prev_btn = btn;
+            if (pressed)
+                break;
+        }
+
+        if (jvs_read(info, 2) == 0) {
+            u32 state = info[JVSI_STATE];
+            if (state == JVS_READY && !have_id) {
+                have_id = jvs_read(info, 7) == 0;
+                drawn_state = 0xFF;
+            }
+            if (state != JVS_READY)
+                have_id = 0;
+            u32 full = state != drawn_state;
+            drawn_state = state;
+            if (g_screen_ready)
+                jt_draw(info, full);
+
+            /* Serial: one line whenever a switch or a coin count moves.
+             * Analog is left out; it would print on every jitter. */
+            u32 changed = full;
+            for (u32 i = JVSI_SW; i < JVSI_ANA; i++)
+                if (shown[i - JVSI_SW] != info[i])
+                    changed = 1;
+            if (changed && state == JVS_READY) {
+                scif_puts("  SW");
+                for (u32 i = 0; i < 1u + info[JVSI_PLAYERS] * info[JVSI_SWBYTES] && i < 16; i++) {
+                    scif_putc(' ');
+                    char h[3];
+                    hex_into(h, info[JVSI_SW + i], 2);
+                    h[2] = 0;
+                    scif_puts(h);
+                }
+                if (info[JVSI_COINS]) {
+                    scif_puts("  COIN");
+                    for (u32 c = 0; c < info[JVSI_COINS] && c < 4; c++) {
+                        scif_putc(' ');
+                        scif_putdec(((u32)(info[JVSI_COIN + c * 2] & 0x3F) << 8) |
+                                    info[JVSI_COIN + c * 2 + 1]);
+                    }
+                }
+                scif_puts("\n");
+            }
+            for (u32 i = JVSI_SW; i < JVSI_ANA; i++)
+                shown[i - JVSI_SW] = info[i];
+        }
+        delay_ms(40);
+        progress_heartbeat();
+    }
+    /* The press that ended the test must not also open the menu the
+     * console goes back to: wait for the board buttons to be let go. */
+    for (u32 t = 0; t < 100; t++) {
+        if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0 && (in5 & 0x30) == 0x30)
+            break;
+        delay_ms(20);
+    }
+    scif_puts(S_JT_END);
+}
+
 static void run_action(u32 act)
 {
     progress_clear_abort();
@@ -2406,6 +2708,9 @@ static void run_action(u32 act)
     case ACT_FLASH:
         report_restart();
         test_dimm_flash();
+        break;
+    case ACT_JVS:
+        jvs_input_test();
         break;
     default:
         break;
@@ -2612,6 +2917,7 @@ void cmain(void)
     if (g_maple_safe) {
         test_maple_mie(1);
         test_settings_eeprom();
+        test_jvs_io();
     }
     suite_check_abort();
 
@@ -2646,6 +2952,7 @@ void cmain(void)
     if (!g_maple_safe) {
         test_maple_mie(usable);
         test_settings_eeprom();
+        test_jvs_io();
     }
     suite_check_abort();
     test_serial_eeprom();
@@ -2694,9 +3001,6 @@ void cmain(void)
     say(CLIP_TESTS_DONE, REPORT_GAP_MS);
     scif_flush();
 
-#if CFG_JVS_MAP
-    jvs_map_aid();                      /* never returns */
-#endif
 #if CFG_LANE_BEACON
     lane_beacon();                      /* never returns */
 #else

@@ -121,6 +121,10 @@ the report (see [Operator console](#operator-console)).
     verified. Needs a Z80 program uploaded into the MIE first
     (`src/mie_prog.z80`), which then stays resident and also serves the
     board's buttons and DIP switches.
+    **JVS I/O board** — the same program is a JVS master: it resets the
+    bus, gives the board address 1, and reports its identification,
+    revisions and inputs (players, switches, coin slots, analog channels).
+    No board answering is reported as *not present*, not as a fault.
 13. **Serial-number EEPROM** (93C46 on SH-4 GPIO) — read + content check.
 14. **Cartridge security** (X76F100) — presence via response-to-reset.
     Menu action `g`, with items 15-17.
@@ -268,7 +272,7 @@ of the board's buttons (**TEST** or **SERVICE**), stops the suite: the test runn
 next block and draws **no** verdict from the part it did — its phases end in
 `interrupted`, not `ok` — and the suite does not resume. `a` goes to the
 report, a board button opens the menu, and a menu key (`c`, `v`, `s`, `d`, `g`,
-`f`) runs that action straight away.
+`f`, `j`) runs that action straight away.
 
 The buttons need a small Z80 program uploaded into the MIE first — the
 315-6146's factory firmware answers four Maple commands and reading the
@@ -278,8 +282,15 @@ been qualified to hold the Maple DMA buffers; the program then stays
 resident. So the buttons can interrupt the long part of the suite. On a
 board with no usable block the MIE stage falls back to its old place, after
 the CPU RAM test.
-A cabinet's JVS **TEST/START** are *not* wired up: reaching those means
-driving the MIE's JVS UART from the Z80 side, which is separate work.
+The cabinet's **TEST** and player 1 **START**, read from the JVS I/O board,
+act as the board's **TEST** and **SERVICE** once the board has answered.
+
+The JVS master lives in the same Z80 program. It drives the MIE's
+16550-style UART at 115200 baud (divisor 8, the original BIOS's own
+set-up), switches the RS-485 driver around each frame as that program
+does, and polls the I/O board by itself between Maple packets, one byte at
+a time, so a Maple request is always answered at once. The SH-4 only reads
+the result, 28 bytes per request.
 
 Keys on the serial console:
 
@@ -291,6 +302,7 @@ Keys on the serial console:
 | `d` | full DIMM SDRAM test |
 | `g` | game flash SHA-1 integrity |
 | `f` | DIMM firmware flash — identify, and choose a version |
+| `j` | JVS input test — every switch, coin count and analog channel, live |
 
 **TEST** steps through the menu and wraps; **SERVICE** runs the selection. The
 three RAM loops run until a board button is pressed and nothing else stops them —
@@ -302,6 +314,14 @@ TEX1, and every loop names a failing chip the way the boot suite does.
 
 Every other action starts a report of its own, prints it, and waits for
 **TEST** or **SERVICE** to bring the menu back.
+
+The JVS input test shows each input the I/O board declared: the system
+switches (TEST, TILT1-3), each player's START, SERVICE, four directions
+and buttons, lit while pressed; coin counters; analog channels in hex; and
+the raw switch bytes for a board whose layout differs. The serial console
+prints a line whenever a switch or a coin count changes. The cabinet's own
+TEST is one of the inputs under test, so the way out is a board button or
+any serial key.
 
 Two of these are operator-initiated precisely because they are not safe to
 run unattended: the DIMM SDRAM test overwrites whatever game is loaded in the
@@ -436,11 +456,13 @@ under the DRC, so fault injection into it needs `-nodrc`.
   included (TEX1, PVR-B, Elan RAM), and the **S** suffix is spoken: a fault
   on IC11S is heard as "I C eleven S". The voice is Piper text-to-speech, so
   the screen and the serial console remain authoritative.
-- Full JVS I/O-board testing still needs a JVS master in the MIE's Z80. The
-  settings EEPROM and the board's own buttons no longer do: `make mieprog`
-  rebuilds `src/mie_prog.h` from the Z80 source if you change it, and the
-  generated header is committed so the ROM builds with the SH-4 toolchain
-  alone.
+- The JVS master has been checked against MAME's emulated 837-13551 I/O
+  board. MAME does not model the UART's timing or the RS-485 direction, so
+  those follow the original BIOS's program and still need a real cabinet.
+  Only one I/O board is addressed (address 1); a daisy chain is not
+  enumerated. `make mieprog` rebuilds `src/mie_prog.h` from the Z80 source
+  if you change it; the generated header is committed so the ROM builds
+  with the SH-4 toolchain alone.
 
 ## DIMM board
 
