@@ -356,13 +356,14 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   n'existe que pour dialoguer avec une Naomi par le port série et en
   documente le câblage, ce qu'on ne peut pas dire des brochages qui circulent
   par ailleurs.
-- **Set the terminal to 57600 baud, 8N1, no flow control.** The ROM says so
-  itself on its second line, once the console is up.
+- **Réglez le terminal sur 57600 bauds, 8N1, sans contrôle de flux.** La ROM
+  l'indique elle-même sur sa deuxième ligne, dès que la console est active.
 
-  With the SH-4's 50 MHz peripheral clock, the rate is
-  `Pck/(32*(SCBRR+1))`. The ROM uses `SCBRR2 = 26`, giving approximately
-  **57870 baud, 0.47 % above 57600**. This reduces the mismatch from the
-  former 115200 setting's 3.1 % and improves the serial link's timing margin.
+  Avec l'horloge périphérique à 50 MHz du SH-4, le débit vaut
+  `Pck/(32*(SCBRR+1))`. La ROM utilise `SCBRR2 = 26`, soit un débit réel
+  d'environ **57870 bauds, 0,47 % au-dessus de 57600**. Ce réglage réduit
+  l'écart par rapport aux 3,1 % de l'ancien réglage à 115200 bauds et
+  améliore ainsi la marge de tolérance de la liaison série.
 - Un échec du test cache signifie que le SH-4 lui-même est mort : c'est
   rapporté sur SCIF puis la ROM s'arrête.
 - Une exception CPU est signalée puis la ROM s'arrête, sur chaque canal
