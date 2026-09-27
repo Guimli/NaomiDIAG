@@ -237,7 +237,12 @@
 #define S_PASS              "passe "
 #define S_PH_0101           "0101 : "
 #define S_PH_1010           "1010 : "
+/* the CRC is only there when CFG_RAM_CRC turns it on */
+#if CFG_RAM_CRC
 #define S_PH_PRNG           "pseudo-aleatoire + CRC : "
+#else
+#define S_PH_PRNG           "pseudo-aleatoire : "
+#endif
 #define S_AICA_HDR          "\nAICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...\n"
 #define S_PVR_HDR           "\nPVR : activation controleur VRAM, test RAM texture...\n"
 #define S_SDRAM_HDR         "\nSDRAM : test RAM CPU, bus et cellules...\n"
@@ -508,7 +513,11 @@
 #define S_PASS              "pass "
 #define S_PH_0101           "0101: "
 #define S_PH_1010           "1010: "
+#if CFG_RAM_CRC
 #define S_PH_PRNG           "pseudo-random + CRC: "
+#else
+#define S_PH_PRNG           "pseudo-random: "
+#endif
 #define S_AICA_HDR          "\nAICA: ARM7 held in reset, testing sound RAM (8MB, G2 bus)...\n"
 #define S_PVR_HDR           "\nPVR: enabling VRAM controller, testing texture RAM...\n"
 #define S_SDRAM_HDR         "\nSDRAM: testing CPU RAM, bus and cells...\n"

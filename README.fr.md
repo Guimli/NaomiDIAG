@@ -1,9 +1,9 @@
 # NaomiDiag
 
-> **En cours de développement.** Les numéros d'IC des RAM vidéo sont à
-> vérifier. Le test de la Naomi 2 est incomplet. Et d'autres fonctions
-> n'ont pas encore été testées. Mais je travaille dessus aussi vite que je
-> peux :-)
+> **En cours de développement.** Les tests mémoire de la Naomi 2 et le
+> maître JVS sont codés mais pas encore validés sur du vrai matériel. Et
+> d'autres fonctions n'ont pas encore été testées. Mais je travaille dessus
+> aussi vite que je peux :-)
 
 ROM de BIOS de diagnostic pour les cartes d'arcade **SEGA Naomi** et
 **Naomi 2**. Elle remplace le BIOS d'origine dans le support IC27 et teste
@@ -55,8 +55,9 @@ L'ordre d'activation des canaux suit ce dont chacun a besoin :
   il fonctionne dès le reset **sans aucune RAM externe**, c'est le canal
   primaire, toujours disponible.
 - L'**audio** a besoin de la RAM son (derrière l'AICA) et la **vidéo** de la
-  VRAM (derrière le PowerVR) ; ces mémoires sont testées d'abord, et chaque
-  canal ne s'active qu'une fois sa propre mémoire validée. Quand l'audio
+  VRAM (derrière le PowerVR) ; la petite zone de chacune qu'utilise son
+  canal est contrôlée d'abord, et chaque canal ne s'active qu'une fois sa
+  zone validée. Les tests complets de ces mémoires viennent plus tard. Quand l'audio
   s'active, il rejoue d'abord tous les résultats déjà acquis, puis rapporte
   en direct.
 
@@ -72,76 +73,103 @@ Les clips sont stockés en **ADPCM Yamaha 4 bits** et remis à l'AICA sous
 cette forme (`PCMS=2`), qu'elle décode en matériel. C'est un gain sec de 4:1
 sur l'EPROM, sans décompresseur, sans tampon intermédiaire et sans coût
 processeur — les octets sont copiés en RAM son exactement tels qu'ils sont
-en ROM. Le build français complet est passé de 98 % de l'EPROM à 29 %.
+en ROM. Le build français complet est passé de 98 % de l'EPROM à 29 % ;
+avec les clips ajoutés depuis (puces Naomi 2, carte JVS), un build complet
+occupe environ 40 %.
 
 ## Ce qui est testé
 
-Dans l'ordre. L'écran et le haut-parleur sont vivants bien avant que les
-mémoires qui les portent soient intégralement testées : chaque canal est
-amorcé sur la petite région qu'il utilise réellement, si bien que les
-résultats sont rapportés au fil de l'eau. Les points **1-9 et 11-13 sont la
-suite de démarrage** et s'exécutent seuls. Les points **10 et 14-17 sont des
-actions opérateur** au menu ci-dessous : soit ils écrivent quelque part, soit
-ils durent assez pour n'avoir rien à faire devant le rapport (voir
-[Console opérateur](#console-opérateur)).
+La **suite de démarrage** s'exécute seule, dans cet ordre. L'écran et le
+haut-parleur sont vivants bien avant que les mémoires qui les portent soient
+intégralement testées : chaque canal est amorcé sur la petite région qu'il
+utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
 
 1. **Cœur SH-4** — le cache est configuré en RAM interne et auto-testé ;
    il sert aussi de pile/`.bss` à toute la ROM (aucune RAM externe utilisée
    avant d'être validée).
-2. **Identification de la carte** — Naomi 1 ou Naomi 2 (identifiant Elan ou
-   sélection explicite par `CFG_BOARD_MODEL`). L'accès au PVR-B est vérifié
-   séparément, avant tout test destructif. `CFG_BOARD_MODEL=1` évite la lecture
-   de l'Elan absent sur une Naomi 1 ; `=2` sélectionne une Naomi 2 connue.
-   En mode automatique (`=0`), la lecture suppose que le bus répond même
-   sans Elan ; elle ne récupère pas une exception matérielle.
-3. **EPROM BIOS (IC27)** — auto-contrôle CRC32.
-4. **RAM CPU principale** (SDRAM, 16/32 Mo, IC9/IC10/IC11S/IC12S) — d'abord un test
-   bus de données (walking-ones) et un test bus d'adresses, puis **trois
-   phases**, annoncées `passe n/3` et menant chacune la barre de progression
-   de 0 à 100 % :
+2. **Amorçage de l'écran et du haut-parleur** — contrôle rapide de la zone
+   de VRAM qu'utilise l'image et de la zone de RAM son d'où jouent les
+   clips. Chaque canal ne s'active que si sa zone passe ; le haut-parleur
+   rejoue alors tous les résultats déjà acquis.
+3. **Identification de la carte** — Naomi 1 ou Naomi 2 par l'identifiant de
+   la puce Elan (`E1AD0000` sur Naomi 2, confirmé sur une vraie carte). Sur
+   une Naomi 1, cette lecture tombe dans une zone non peuplée et est supposée
+   rendre le bus flottant ; `CFG_BOARD_MODEL=1` l'évite, `=2` sélectionne
+   une Naomi 2 connue — voir [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md).
+4. **EPROM BIOS (IC27)** — auto-contrôle CRC32.
+5. **Relocalisation des boucles de test** — les boucles de test mémoire sont
+   recopiées dans un bloc de 8 Ko de RAM CPU, testé d'abord, et exécutées
+   de là en cache (voir
+   [Où s'exécutent les boucles de test](#où-sexécutent-les-boucles-de-test)).
+6. **Bus Maple / MIE** (Z80 315-6146) — requête de version + auto-test
+   d'usine.
+7. **EEPROM des réglages** (93C46 via MIE) — lue, et ses deux copies
+   vérifiées par CRC. Nécessite d'abord le téléversement d'un programme Z80
+   dans le MIE (`src/mie_prog.z80`), qui reste ensuite résident et sert
+   aussi les boutons de la carte et les DIP switches (tous deux rapportés
+   sur la console série).
+8. **Carte I/O JVS** — le même programme est un maître JVS : il
+   réinitialise le bus, donne l'adresse 1 à la carte, et rapporte son
+   identifiant, ses révisions et ses entrées (joueurs, contacts,
+   monnayeurs, voies analogiques). Si aucune carte ne répond, elle est
+   rapportée *absente*, pas en panne.
+
+   Les étapes 6 à 8 ont lieu ici, avant les tests mémoire, sur le bloc
+   qualifié à l'étape 5 : les boutons peuvent ainsi interrompre la partie
+   longue de la suite. Sur une carte où aucun bloc n'est qualifié, elles
+   attendent le test de la RAM CPU et sont ignorées s'il échoue.
+9. **RAM CPU principale** (SDRAM, 16/32 Mo, IC9/IC10/IC11S/IC12S) — d'abord
+   un test bus de données (walking-ones) et un test bus d'adresses, puis
+   **trois phases**, annoncées `passe n/3` et menant chacune la barre de
+   progression de 0 à 100 % :
    - **1/3** — écriture de `0x55555555` (0101…) sur toute la zone, puis
      relecture complète et comparaison ;
    - **2/3** — écriture de `0xAAAAAAAA` (1010…) sur toute la zone, puis
      relecture et comparaison ;
-   - **3/3** — écriture d'un flux pseudo-aléatoire en accumulant un **CRC32
-     conservé dans un registre CPU**, puis relecture de la zone en
-     recalculant le CRC et comparaison avec le CRC d'écriture ainsi que mot
-     à mot.
+   - **3/3** — écriture d'un flux pseudo-aléatoire, puis relecture et
+     comparaison mot à mot. Avec `CFG_RAM_CRC=1`, un CRC32 conservé dans un
+     registre CPU est aussi accumulé des deux côtés et comparé (voir
+     [Compilation](#compilation)).
 
-   Toute cellule défectueuse condamne la puce entière (et donc toute la RAM
-   entrelacée), qui n'est plus utilisée pour la suite du programme. Si
-   **toute** la RAM CPU est défectueuse, le programme continue depuis le
-   cache du SH-4 (OC-RAM) et effectue tous les tests ne nécessitant pas la
-   RAM principale — seul le test Maple/MIE, qui a besoin de RAM pour ses
-   descripteurs DMA, est ignoré.
-5. **VRAM** — 16 Mo en huit puces de 16 Mbit autour du circuit graphique,
-   testées en deux bancs de 64 bits, TEX0 et TEX1 de quatre puces chacun,
-   avec les mêmes trois phases.
-6. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2), mêmes trois
-   phases, chaque accès cadencé par la FIFO du bus G2.
-7. **Naomi 2 uniquement** — VRAM du PVR esclave (16 Mo) et RAM Elan (32 Mo).
-8. **NVRAM de sauvegarde** — test non destructif (sauvegarde/restauration).
-9. **RTC** (interne à l'AICA, IC33) — vérification non destructive de
-   l'avance de l'horloge.
-10. **Carte DIMM** — vidage de la mailbox et contrôle de stabilité en
-    lecture, puis le test destructif de la SDRAM par DMA G1. Action menu
-    `d` ; `f` identifie la flash du firmware DIMM.
-11. **Bus Maple / MIE** (Z80 315-6146) — requête de version + auto-test
-    d'usine.
-12. **EEPROM des réglages** (93C46 via MIE) — lue, et ses deux copies
-    vérifiées par CRC. Nécessite d'abord le téléversement d'un programme Z80
-    dans le MIE (`src/mie_prog.z80`), qui reste ensuite résident et sert
-    aussi les boutons de la carte et les DIP switches.
-    **Carte I/O JVS** — le même programme est un maître JVS : il
-    réinitialise le bus, donne l'adresse 1 à la carte, et rapporte son
-    identifiant, ses révisions et ses entrées (joueurs, contacts,
-    monnayeurs, voies analogiques). Si aucune carte ne répond, elle est
-    rapportée *absente*, pas en panne.
-13. **EEPROM numéro de série** (93C46 sur GPIO du SH-4) — lecture + contrôle
-    du contenu.
-14. **Sécurité cartouche** (X76F100) — présence par response-to-reset.
-    Action menu `g`, avec les points 15-17.
-15. **Contenu cartouche** — identifie le jeu dans une base embarquée de tous
+   Une panne est rapportée par puce, et un échec fait déclarer la RAM
+   principale inutilisable dans le résumé. Si **toute** la RAM CPU est
+   défectueuse, le programme continue depuis le cache du SH-4 (OC-RAM) et
+   effectue tous les tests ne nécessitant pas la RAM principale.
+10. **VRAM** — 16 Mo en huit puces de 16 Mbit autour du circuit graphique,
+    testées par la fenêtre 32 bits en deux régions de 8 Mo, TEX0
+    (IC16/18/20/22) et TEX1 (IC17S/19S/21S/23S), avec les mêmes tests de
+    bus et les trois phases. Dans une région, une puce est une moitié de
+    4 Mio et une moitié de 16 bits de données (voir
+    [Diagnostic TEX et PVR-A/B](#diagnostic-tex-et-pvr-ab)).
+11. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2), mêmes
+    tests, chaque accès cadencé par la FIFO du bus G2.
+12. **Naomi 2 uniquement** — VRAM du PVR-B (16 Mo, IC111 à IC118S) une fois
+    ses fenêtres reconnues indépendantes de celles du PVR-A, et RAM Elan
+    (32 Mo, IC106/107/108S/109S) ; voir
+    [plus bas](#accès-au-pvr-b-et-ram-elan).
+13. **NVRAM de sauvegarde (IC29)** — test non destructif
+    (sauvegarde/restauration).
+14. **RTC** (interne à l'AICA, IC33) — vérification non destructive de
+    l'avance de l'horloge ; la date qu'elle contient est affichée.
+15. **EEPROM numéro de série** (IC31, 93C46 sur GPIO du SH-4) — lecture +
+    contrôle du contenu.
+16. **Intégrité du code relogé** — les boucles relogées ont tourné depuis la
+    RAM même qu'on testait : elles sont relues et comparées à la copie en
+    ROM.
+
+Les **actions opérateur** sont au menu (voir
+[Console opérateur](#console-opérateur)) : soit elles écrivent quelque part,
+soit elles durent assez pour n'avoir rien à faire devant le rapport.
+
+- **Boucles RAM** (`c`, `v`, `s`) — le test RAM CPU, vidéo ou son, passe
+  après passe, pour les pannes intermittentes.
+- **Carte DIMM** (`d`) — vidage des registres et contrôle de stabilité en
+  lecture, puis le test destructif de la SDRAM par DMA G1 ; `f` identifie
+  la flash du firmware DIMM (voir [Carte DIMM](#carte-dimm)).
+- **Test des entrées JVS** (`j`) — chaque entrée de la carte I/O, en direct.
+- **Cartouche** (`g`) :
+  - **Puce de sécurité** (X76F100) — présence par response-to-reset.
+  - **Contenu** — identifie le jeu dans une base embarquée de tous
     les jeux cartouche Naomi/Naomi 2 connus (192 jeux, 2298 IC) et vérifie
     chaque puce ROM par SHA-1, en nommant l'IC fautive par sa sérigraphie.
     L'identification lit la première puce en flux et prend un instantané du
@@ -153,7 +181,7 @@ ils durent assez pour n'avoir rien à faire devant le rapport (voir
     cette base — et le test des lignes de données ci-dessous s'exécute quand
     même, une ligne morte étant l'une des raisons pour lesquelles une
     cartouche connue ne correspond plus.
-16. **Complétude du jeu de ROM cartouche** — une fois le jeu identifié,
+  - **Complétude du jeu de ROM** — une fois le jeu identifié,
     **l'ensemble des puces nécessaires à ce jeu** est vérifié : chaque mask
     ROM de la fiche de la base est sondée et le résultat est affirmé
     explicitement (`jeu de ROM : 13 / 13 puces presentes`). Une puce qui
@@ -163,7 +191,7 @@ ils durent assez pour n'avoir rien à faire devant le rapport (voir
     signalée comme miroir d'adresses — un support vide auquel une puce
     voisine répond. La présence est vérifiée sur toutes les puces même en
     build QUICK ; seul le hachage est réduit.
-17. **Lignes de données cartouche** — statistiques par broche sur le bus
+  - **Lignes de données** — statistiques par broche sur le bus
     16 bits : proportion de 1 lue par chaque ligne (une ligne qui ne bascule
     jamais est figée), plus la comparaison de deux lectures des mêmes
     adresses — tout bit qui diffère trahit une ligne instable, signature
@@ -173,12 +201,12 @@ ils durent assez pour n'avoir rien à faire devant le rapport (voir
 
 Les pannes RAM sont rapportées par composant : masque de bits, voies de
 données concernées, et désignateur IC sérigraphié (ex.
-`RAM CPU 1 (IC9) DEFECTUEUX`).
+`RAM CPU 1 (IC9) DEFECTUEUX`). Les puces de VRAM et de RAM Elan sont
+désignées comme *voie suspecte (puce ou connexions)*.
 
-La barre de progression se retire après le point 7 : à partir de là plus rien
-ne se mesure — la NVRAM, le RTC, la sonde DIMM, Maple et les EEPROM répondent
-par oui ou par non — et les deux lignes qu'elle occupait reviennent au
-rapport.
+La barre de progression se retire après les mémoires Naomi 2 : à partir de
+là plus rien ne se mesure — la NVRAM, le RTC et l'EEPROM série répondent par
+oui ou par non — et les lignes qu'elle occupait reviennent au rapport.
 
 
 ### Où s'exécutent les boucles de test
@@ -191,8 +219,8 @@ ce qui rejoint le BIOS d'origine, qui ne s'exécute jamais en cache depuis la
 ROM.
 
 L'exécution cachée depuis la SDRAM est tout autre chose : c'est là que tourne
-chaque jeu Naomi. Les quatre boucles de test mémoire — 356 octets, où passe
-la quasi-totalité du temps — sont donc recopiées au démarrage dans les 8 Ko
+chaque jeu Naomi. Les quatre boucles de test mémoire — environ 300 octets, où
+passe la quasi-totalité du temps — sont donc recopiées au démarrage dans les 8 Ko
 de RAM CPU et exécutées depuis là, en cache, le reste du programme demeurant
 en ROM.
 
@@ -267,7 +295,7 @@ Après une différence dans la vérification rapide, une relecture complète
 localise les erreurs. Cette boucle C s'exécute depuis la ROM et peut prendre
 plusieurs minutes. Elle affiche « Erreur detectee, localisation VRAM » avec
 sa propre progression et vérifie l'arrêt tous les 1024 mots. Les essais
-réels avec DQ9 coupée atteignent désormais le rapport final. Cette progression
+réels avec DQ9 coupée atteignent le rapport final. Cette progression
 ne raccourcit pas la relecture et ne récupère pas un accès matériel bloqué.
 
 ### Accès au PVR-B et RAM Elan
@@ -294,12 +322,15 @@ RAM Elan sur Naomi 2, aux mêmes conditions. Voir
 
 ## Console opérateur
 
-La suite de démarrage n'est pas la fin. Une touche au port série, ou l'un
-des deux boutons de la carte (**TEST** ou **SERVICE**), arrête la suite : le test en cours s'arrête au
-bloc suivant et **ne rend aucun verdict** sur la partie effectuée — ses
-phases se terminent par `interrompue`, pas par `ok` — et la suite ne reprend
-pas. `a` mène au rapport, un bouton de la carte ouvre le menu, et une touche du menu
-(`c`, `v`, `s`, `d`, `g`, `f`, `j`) lance directement son action.
+La suite de démarrage n'est pas la fin. `a` ou une touche du menu au port
+série, un bouton de la carte (**TEST** ou **SERVICE**), ou le **TEST** de la
+borne et le **START** du joueur 1 dès que la carte JVS a répondu, arrêtent la
+suite : le test en cours s'arrête au bloc suivant et **ne rend aucun
+verdict** sur la partie effectuée — ses phases se terminent par
+`interrompue`, pas par `ok` — et la suite ne reprend pas. `a` mène au
+rapport, un bouton ouvre le menu, et une touche du menu (`c`, `v`, `s`, `d`,
+`g`, `f`, `j`) lance directement son action. `h` affiche l'aide sans rien
+interrompre ; les autres touches sont ignorées.
 
 Les boutons exigent d'abord le téléversement d'un petit programme Z80 dans le
 MIE — le firmware d'usine du 315-6146 répond à quatre commandes Maple, et
@@ -308,7 +339,7 @@ relocalisation des boucles de test, avant les tests mémoire, dès qu'un bloc
 de RAM CPU a été qualifié pour accueillir les tampons DMA du Maple ; le
 programme reste ensuite résident. Les boutons peuvent donc interrompre la
 partie longue de la suite. Sur une carte sans bloc utilisable, l'étape MIE
-revient à son ancienne place, après le test de la RAM CPU. 
+revient à son ancienne place, après le test de la RAM CPU.
 
 Le **TEST** de la borne et le **START** du joueur 1, lus sur la carte I/O
 JVS, jouent le rôle du **TEST** et du **SERVICE** de la carte dès que la
@@ -334,16 +365,17 @@ Touches sur la console série :
 | `j` | test des entrées JVS — chaque contact, monnayeur et voie analogique, en direct |
 
 **TEST** parcourt le menu en bouclant ; **SERVICE** lance la sélection. Les
-trois boucles RAM tournent jusqu'à l'appui sur un bouton de la carte et rien d'autre ne
+trois boucles RAM tournent jusqu'à l'appui sur un bouton et rien d'autre ne
 les arrête — c'est le but, une panne intermittente se montrant à la dixième
-passe et non à la première. Une seule exception : quand les boutons de la
-carte sont indisponibles (le MIE n'a jamais répondu au programme
-téléversé), `a` arrête aussi une boucle, sinon seul un reset le pourrait. La
-boucle vidéo couvre les deux bancs, TEX0 et TEX1, et chaque boucle nomme une
-puce défaillante comme le fait la suite de démarrage.
+passe et non à la première. Une seule exception : quand les boutons sont
+indisponibles (le MIE n'a jamais répondu au programme téléversé), `a` arrête
+aussi une boucle, sinon seul un reset le pourrait. La boucle vidéo couvre
+TEX0 et TEX1, plus le PVR-B et la RAM Elan sur Naomi 2, et chaque boucle
+nomme une puce défaillante comme le fait la suite de démarrage.
 
-Toute autre action ouvre un rapport qui lui est propre, l'affiche, et attend
-**TEST** ou **SERVICE** pour ramener le menu.
+Les actions DIMM, cartouche et flash ouvrent chacune un rapport qui leur est
+propre, l'affichent, et attendent **TEST** ou **SERVICE** pour ramener le
+menu.
 
 Le test des entrées JVS montre chaque entrée que la carte I/O a déclarée :
 les contacts système (TEST, TILT1-3), le START, le SERVICE, les quatre
@@ -404,8 +436,8 @@ la machine ne se stabilise pas. À activer quand vous avez une sonde en main.
 **`AUDIO=0`** produit une ROM muette : la table des clips vocaux est
 remplacée par un stub et l'image tombe à 6 % de l'EPROM. Cette option est née
 quand les clips étaient du PCM 16 bits et ne laissaient de place à rien
-d'autre ; depuis leur passage en ADPCM, un build bilingue complet occupe
-27-29 %, ce n'est donc plus un moyen de faire de la place — c'est pour un
+d'autre ; depuis leur passage en ADPCM, un build complet occupe environ
+40 %, ce n'est donc plus un moyen de faire de la place — c'est pour un
 établi où la parole gêne, et ça démarre un peu plus vite. `AUDIO=1` est la
 valeur par défaut.
 
@@ -446,6 +478,14 @@ le SCIF). Les scripts `*_fault*.lua` injectent des pannes RAM pour les tests
 négatifs. Note : la RAM principale est en fastram
 sous le DRC, l'injection de panne y nécessite `-nodrc`.
 
+MAME (0.288) n'émule pas le matériel propre à la Naomi 2 : son `naomi2` n'a
+qu'un PowerVR, renvoie la fenêtre du PVR-B sur le PVR-A, lit 0 à
+l'identifiant Elan et n'a pas de RAM Elan ; la ROM y voit donc une Naomi 1.
+`mame/elan_id.lua` simule l'identifiant Elan pour exercer le chemin Naomi 2 :
+il aboutit, à juste titre, à un refus d'accès (code 4, le miroir) et à une
+RAM Elan en échec. Le maître JVS, lui, se teste : le `naomi` de MAME porte
+une carte I/O 837-13551 émulée.
+
 ## Notes pour le vrai matériel
 
 - Gravez `NaomiDIAG_xx.bin` sur une 27C160 (IC27). La sortie série est sur
@@ -456,7 +496,7 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   documente le câblage, ce qu'on ne peut pas dire des brochages qui circulent
   par ailleurs.
 - **Réglez le terminal sur 57600 bauds, 8N1, sans contrôle de flux.** La ROM
-  l'indique elle-même sur sa deuxième ligne, dès que la console est active.
+  l'indique elle-même dans ses premières lignes, dès que la console est active.
 
   Avec l'horloge périphérique à 50 MHz du SH-4, le débit vaut
   `Pck/(32*(SCBRR+1))`. La ROM utilise `SCBRR2 = 26`, soit un débit réel
@@ -493,14 +533,17 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   comprises (TEX1, PVR-B, RAM Elan), et le suffixe **S** est prononcé : une
   panne sur IC11S s'entend « I C onze S ». La voix est une synthèse Piper :
   l'écran et le port série font foi.
+- Les chemins Naomi 2 — identification par l'identifiant Elan,
+  initialisation de l'Elan, contrôle d'accès au PVR-B, tests de la VRAM du
+  PVR-B et de la RAM Elan — sont couverts par des tests côté PC mais n'ont
+  encore tourné sur aucune vraie Naomi 2, et MAME ne peut pas les exécuter.
+  La lecture de l'identifiant Elan sur une Naomi 1 n'a pas non plus été
+  essayée sur une vraie carte ; `CFG_BOARD_MODEL=1` la supprime.
 - Le maître JVS a été vérifié face à la carte I/O 837-13551 émulée par
   MAME. MAME ne modélise ni la temporisation de l'UART ni le sens de la
   ligne RS-485 : ceux-ci suivent le programme du BIOS d'origine et
   demandent encore une vraie borne. Une seule carte I/O est adressée
   (adresse 1) ; une chaîne de plusieurs cartes n'est pas énumérée.
-  `make mieprog` reconstruit `src/mie_prog.h` depuis le source Z80 si vous
-  le modifiez ; l'en-tête généré est versionné pour que la ROM se construise
-  avec la seule chaîne SH-4.
 
 ## Carte DIMM
 

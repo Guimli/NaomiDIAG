@@ -1,8 +1,8 @@
 # NaomiDiag
 
-> **Work in progress.** The video RAM IC numbers need verifying. Naomi 2
-> testing is incomplete. And other functions have not been tested yet. But I
-> am working on it as fast as I can :-)
+> **Work in progress.** The Naomi 2 memory tests and the JVS master are
+> coded but not yet validated on real hardware. And other functions have not
+> been tested yet. But I am working on it as fast as I can :-)
 
 A replacement diagnostic BIOS ROM for the **SEGA Naomi** and **Naomi 2**
 arcade boards. It replaces the stock BIOS in the IC27 socket and tests the
@@ -54,8 +54,9 @@ The order in which the channels come up follows what each one needs:
   works from reset with **no external RAM at all**, so it is the primary and
   always-available channel.
 - **Audio** needs the sound RAM (behind the AICA) and **video** needs the
-  VRAM (behind the PowerVR); those memories are tested first, and each
-  channel switches on only once its own memory has passed. When audio comes
+  VRAM (behind the PowerVR); the small area of each that its channel uses is
+  checked first, and each channel switches on only once its own area has
+  passed. The full tests of those memories come later. When audio comes
   up it first replays every result acquired so far, then reports live.
 
 Because sound and video are brought up before the long main-RAM test, the
@@ -69,66 +70,93 @@ The clips are stored as **4-bit Yamaha ADPCM** and handed to the AICA in that
 form (`PCMS=2`), which decodes it in hardware. That is a straight 4:1 saving
 on the EPROM with no decompressor, no scratch buffer and no CPU cost — the
 bytes are copied into sound RAM exactly as they sit in the ROM. The full
-French build went from 98 % of the EPROM to 29 %.
+French build went from 98 % of the EPROM to 29 %; with the clips added since
+(Naomi 2 chips, JVS board) a full build sits at about 40 %.
 
 ## What it tests
 
-In order. The screen and the speaker are alive long before the memories
-they live in are fully tested: each channel is brought up on the small
-region it actually uses, so results are reported as they land. Items **1-9
-and 11-13 are the boot suite** and run on their own.
-Items **10 and 14-17 are operator actions** on the menu below: they either
-write to something or take long enough that they have no business delaying
-the report (see [Operator console](#operator-console)).
+The **boot suite** runs on its own, in this order. The screen and the
+speaker come up long before the memories they live in are fully tested:
+each channel is brought up on the small region it actually uses, so results
+are reported as they land.
 
 1. **SH-4 core** — the operand cache is configured as on-chip RAM and
    self-tested; this is also the stack/`.bss` for the whole ROM (no external
    RAM used until proven).
-2. **Board identification** — Naomi 1 vs Naomi 2 (Elan ID, or explicit
-   `CFG_BOARD_MODEL` selection). PVR-B access is qualified separately;
-   see [PVR-B access checks and build options](docs/PVR_B_ACCESS.md).
-3. **BIOS EPROM (IC27)** — CRC32 self-check.
-4. **Main CPU RAM** (SDRAM, 16/32 MB, IC9/IC10/IC11S/IC12S) — first a data-bus
+2. **Screen and speaker bring-up** — a quick check of the VRAM area the
+   framebuffer uses and of the sound RAM area the clips play from. Each
+   channel switches on only if its own area passes; the speaker then replays
+   every result acquired so far.
+3. **Board identification** — Naomi 1 vs Naomi 2 by the Elan chip's ID
+   (`E1AD0000` on a Naomi 2, confirmed on a real board). On a Naomi 1 that
+   read lands in an unpopulated area and is assumed to return open bus;
+   `CFG_BOARD_MODEL=1` avoids it, `=2` selects a known Naomi 2 — see
+   [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md).
+4. **BIOS EPROM (IC27)** — CRC32 self-check.
+5. **Test-loop relocation** — the memory-test loops are copied into an 8 KB
+   block of CPU RAM, tested first, and run from there cached (see
+   [Where the test loops execute](#where-the-test-loops-execute)).
+6. **Maple bus / MIE** (315-6146 Z80) — version request + factory
+   self-test.
+7. **Settings EEPROM** (93C46 via MIE) — read and both CRC-checked copies
+   verified. Needs a Z80 program uploaded into the MIE first
+   (`src/mie_prog.z80`), which then stays resident and also serves the
+   board's buttons and DIP switches (both reported on the serial console).
+8. **JVS I/O board** — the same program is a JVS master: it resets the
+   bus, gives the board address 1, and reports its identification,
+   revisions and inputs (players, switches, coin slots, analog channels).
+   No board answering is reported as *not present*, not as a fault.
+
+   Steps 6-8 run here, before the memory tests, on the block qualified at
+   step 5, so the buttons can interrupt the long part of the suite. On a
+   board where no block qualifies they wait for the CPU RAM test and are
+   skipped if it fails.
+9. **Main CPU RAM** (SDRAM, 16/32 MB, IC9/IC10/IC11S/IC12S) — first a data-bus
    walking-ones test and an address-bus test, then **three phases**, each
    reported as `pass n/3` and each driving the progress bar from 0 to 100%:
    - **1/3** — write `0x55555555` (0101…) over the whole region, then read it
      all back and compare;
    - **2/3** — write `0xAAAAAAAA` (1010…) over the whole region, then read
      back and compare;
-   - **3/3** — write a pseudo-random stream while accumulating a **CRC32 kept
-     in a CPU register**, then read the region back recomputing the CRC and
-     compare it against the write-side CRC as well as word by word.
+   - **3/3** — write a pseudo-random stream, then read it back and compare
+     word by word. With `CFG_RAM_CRC=1` a CRC32 kept in a CPU register is
+     also accumulated on both sides and compared (see [Building](#building)).
 
-   Any single bad cell marks the whole chip (and thus the entire interleaved
-   RAM) defective; that RAM is never used for the rest of the program. If
-   **all** CPU RAM is bad, the program keeps running from the SH-4 cache
-   (OC-RAM) and completes every test that does not need main RAM — only the
-   Maple/MIE test, which needs RAM for its DMA descriptors, is skipped.
-5. **VRAM** — 16 MB in eight 16 Mbit chips around the graphics chip, tested
-   as two 64-bit banks, TEX0 and TEX1 of four chips each, with the same
-   three phases.
-6. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus), same
-   three phases, every access paced by the G2 FIFO.
-7. **Naomi 2 only** — slave PVR VRAM (16 MB) and Elan RAM (32 MB).
-8. **Backup SRAM** — non-destructive save/restore test.
-9. **RTC** (inside the AICA, IC33) — non-destructive tick check.
-10. **DIMM board** — mailbox dump and read stability, then the destructive
-    SDRAM test over the G1 DMA. Menu action `d`; `f` identifies the DIMM's
-    firmware flash.
-11. **Maple bus / MIE** (315-6146 Z80) — version request + factory
-    self-test.
-12. **Settings EEPROM** (93C46 via MIE) — read and both CRC-checked copies
-    verified. Needs a Z80 program uploaded into the MIE first
-    (`src/mie_prog.z80`), which then stays resident and also serves the
-    board's buttons and DIP switches.
-    **JVS I/O board** — the same program is a JVS master: it resets the
-    bus, gives the board address 1, and reports its identification,
-    revisions and inputs (players, switches, coin slots, analog channels).
-    No board answering is reported as *not present*, not as a fault.
-13. **Serial-number EEPROM** (93C46 on SH-4 GPIO) — read + content check.
-14. **Cartridge security** (X76F100) — presence via response-to-reset.
-    Menu action `g`, with items 15-17.
-15. **Cartridge content** — identifies the game against an embedded
+   A fault is reported per chip, and a failed test means the summary calls
+   main RAM unusable. If **all** CPU RAM is bad, the program keeps running
+   from the SH-4 cache (OC-RAM) and completes every test that does not need
+   main RAM.
+10. **VRAM** — 16 MB in eight 16 Mbit chips around the graphics chip, tested
+    through the 32-bit window as two 8 MB regions, TEX0 (IC16/18/20/22) and
+    TEX1 (IC17S/19S/21S/23S), with the same bus tests and three phases.
+    Inside a region a chip is a 4 MiB half and a 16-bit data half (see
+    [TEX and PVR-A/B diagnostics](#tex-and-pvr-ab-diagnostics)).
+11. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus), same
+    tests, every access paced by the G2 FIFO.
+12. **Naomi 2 only** — PVR-B VRAM (16 MB, IC111 to IC118S) once its windows
+    are shown independent of PVR-A, and the Elan RAM (32 MB,
+    IC106/107/108S/109S); see [below](#pvr-b-access-and-the-elan-ram).
+13. **Backup NVRAM (IC29)** — non-destructive save/restore test.
+14. **RTC** (inside the AICA, IC33) — non-destructive tick check; the date
+    it holds is shown.
+15. **Serial-number EEPROM** (IC31, 93C46 on SH-4 GPIO) — read + content
+    check.
+16. **Relocated code integrity** — the relocated loops ran from the very RAM
+    under test, so they are read back and compared with the ROM copy.
+
+The **operator actions** are on the menu (see
+[Operator console](#operator-console)): they either write to something or
+take long enough that they have no business delaying the report.
+
+- **RAM loops** (`c`, `v`, `s`) — the CPU, video or sound RAM test, pass
+  after pass, for intermittent faults.
+- **DIMM board** (`d`) — register dump and read stability, then the
+  destructive SDRAM test over the G1 DMA; `f` identifies the DIMM's firmware
+  flash (see [DIMM board](#dimm-board)).
+- **JVS input test** (`j`) — every input of the I/O board, live.
+- **Cartridge** (`g`):
+  - **Security chip** (X76F100) — presence via response-to-reset.
+  - **Content** — identifies the game against an embedded
     database of every known Naomi/Naomi 2 cartridge (192 games, 2298 ICs)
     and verifies each ROM chip by SHA-1, reporting the failing IC by its
     silkscreen name. Identification streams the first chip and snapshots the
@@ -138,7 +166,7 @@ the report (see [Operator console](#operator-console)).
     reported as *unknown content* rather than as faulty — it may simply be a
     dump this database does not carry — and the data-line test below still
     runs, because a dead line is one reason a known cart fails to match.
-16. **Cartridge ROM set completeness** — once the game is identified, the
+  - **ROM set completeness** — once the game is identified, the
     **whole set of chips that game needs** is checked: every mask ROM in the
     database entry is probed and the result is stated affirmatively
     (`ROM set: 13 / 13 chips present`). A chip answering a constant
@@ -147,7 +175,7 @@ the report (see [Operator console](#operator-console)).
     same bytes as another one is flagged as an address-aliasing mirror —
     an empty socket that a neighbouring chip answers for. Presence is
     checked on every chip even on QUICK builds; only hashing is trimmed.
-17. **Cartridge data lines** — per-pin statistics over the 16-bit cartridge
+  - **Data lines** — per-pin statistics over the 16-bit cartridge
     bus: the share of 1s each line reads (a line that never toggles is
     stuck), plus a comparison of two reads of the same addresses — any bit
     that differs is an unstable line, the signature of a tired bus
@@ -156,11 +184,12 @@ the report (see [Operator console](#operator-console)).
     identification.
 
 RAM faults are reported per component: a bit mask, the affected data lanes,
-and the silkscreen IC designator (e.g. `CPU RAM 1 (IC9) DEFECTIVE`).
+and the silkscreen IC designator (e.g. `CPU RAM 1 (IC9) DEFECTIVE`). VRAM and
+Elan RAM chips are named as a *suspect lane (chip or connections)*.
 
-The progress bar retires after item 7: from there on nothing is being
-measured — the NVRAM, the RTC, the DIMM probe, Maple and the EEPROMs all
-answer yes or no — and the two rows it occupied go to the report instead.
+The progress bar retires after the Naomi 2 memories: from there on nothing
+is being measured — the NVRAM, the RTC and the serial EEPROM answer yes or
+no — and the rows it occupied go to the report instead.
 
 
 ### Where the test loops execute
@@ -172,8 +201,8 @@ refuses it outright -- black screen before the first visible instruction --
 which matches the original BIOS, that never executes cached from ROM either.
 
 Cached execution from SDRAM is a different matter: it is where every Naomi
-game runs. So the four memory-test loops -- 356 bytes, where essentially all
-the time goes -- are copied into an 8 KB block of CPU RAM at boot and run
+game runs. So the four memory-test loops -- about 300 bytes, where
+essentially all the time goes -- are copied into an 8 KB block of CPU RAM at boot and run
 from there, cached, while everything else stays in ROM.
 
 The four CPU RAM chips are interleaved by data lane rather than by address
@@ -238,9 +267,9 @@ cancel an earlier intermittent failure.
 ### Rescanning after 90%
 
 After a fast verifier detects a mismatch, a complete rescan locates failures.
-This C loop executes from ROM and can take several minutes. It now prints
+This C loop executes from ROM and can take several minutes. It prints
 “Error detected, locating VRAM failures” with its own progress and checks
-abort input every 1024 words. Real-board DQ9-disconnection tests now reach
+abort input every 1024 words. Real-board DQ9-disconnection tests reach
 the final report. Progress reporting does not shorten the scan or recover
 a stalled hardware access.
 
@@ -267,12 +296,14 @@ and all access codes.
 
 ## Operator console
 
-The boot suite is not the end of it. A key on the serial port, or either
-of the board's buttons (**TEST** or **SERVICE**), stops the suite: the test running at the time stops at its
-next block and draws **no** verdict from the part it did — its phases end in
-`interrupted`, not `ok` — and the suite does not resume. `a` goes to the
-report, a board button opens the menu, and a menu key (`c`, `v`, `s`, `d`, `g`,
-`f`, `j`) runs that action straight away.
+The boot suite is not the end of it. `a` or a menu key on the serial port,
+a board button (**TEST** or **SERVICE**), or the cabinet's **TEST** or player
+1 **START** once the JVS board has answered, stops the suite: the test running
+at the time stops at its next block and draws **no** verdict from the part it
+did — its phases end in `interrupted`, not `ok` — and the suite does not
+resume. `a` goes to the report, a button opens the menu, and a menu key (`c`,
+`v`, `s`, `d`, `g`, `f`, `j`) runs that action straight away. `h` prints the
+help without interrupting anything; other keys are ignored.
 
 The buttons need a small Z80 program uploaded into the MIE first — the
 315-6146's factory firmware answers four Maple commands and reading the
@@ -305,15 +336,16 @@ Keys on the serial console:
 | `j` | JVS input test — every switch, coin count and analog channel, live |
 
 **TEST** steps through the menu and wraps; **SERVICE** runs the selection. The
-three RAM loops run until a board button is pressed and nothing else stops them —
+three RAM loops run until a button is pressed and nothing else stops them —
 that is the point, since an intermittent fault shows up on the tenth pass,
-not the first. The one exception: when the board buttons are unavailable
-(the MIE never answered the uploaded program), `a` stops a loop too, or it
-could only be stopped by a reset. The video loop covers both banks, TEX0 and
-TEX1, and every loop names a failing chip the way the boot suite does.
+not the first. The one exception: when the buttons are unavailable (the MIE
+never answered the uploaded program), `a` stops a loop too, or it could only
+be stopped by a reset. The video loop covers TEX0 and TEX1, plus PVR-B and
+the Elan RAM on a Naomi 2, and every loop names a failing chip the way the
+boot suite does.
 
-Every other action starts a report of its own, prints it, and waits for
-**TEST** or **SERVICE** to bring the menu back.
+The DIMM, cartridge and flash actions each start a report of its own, print
+it, and wait for **TEST** or **SERVICE** to bring the menu back.
 
 The JVS input test shows each input the I/O board declared: the system
 switches (TEST, TILT1-3), each player's START, SERVICE, four directions
@@ -371,7 +403,7 @@ have a probe in hand.
 **`AUDIO=0`** builds a silent ROM: the spoken-clip table is replaced by a
 stub and the image drops to 6 % of the EPROM. It was introduced when the
 clips were 16-bit PCM and left no room for anything else; since they became
-ADPCM a full bilingual build sits at 27-29 %, so this is no longer a way of
+ADPCM a full build sits at about 40 %, so this is no longer a way of
 making room — it is for a bench where the speech is in the way, and it boots
 a little faster. `AUDIO=1` is the default.
 
@@ -396,6 +428,7 @@ Regenerating generated sources (rarely needed, committed in the repo):
 make audio     # re-render the spoken clips (needs the Piper venv + sox)
                # TTS -> 22050 Hz mono -> ADPCM (tools/adpcm.py)
 make cartdb    # rebuild the cartridge SHA-1 DB from `mame -listxml`
+make mieprog   # rebuild src/mie_prog.h from the Z80 source (z80asm)
 ```
 
 ## Testing under MAME
@@ -411,6 +444,13 @@ SCIF to anything). The `*_fault*.lua` scripts inject RAM faults for negative
 testing. Note: main RAM is fastram
 under the DRC, so fault injection into it needs `-nodrc`.
 
+MAME (0.288) does not emulate the Naomi 2's own hardware: its `naomi2` has
+one PowerVR, mirrors the PVR-B window onto PVR-A, reads 0 at the Elan ID and
+has no Elan RAM, so the ROM sees a Naomi 1 there. `mame/elan_id.lua` fakes
+the Elan ID so the Naomi 2 path can be exercised: it ends, correctly, in an
+access refusal (code 4, the mirror) and a failing Elan RAM. The JVS master
+can be tested: MAME's `naomi` carries an emulated 837-13551 I/O board.
+
 ## Real hardware notes
 
 - Burn `NaomiDIAG_xx.bin` on a 27C160 (IC27). Serial output is on the SCIF
@@ -420,7 +460,7 @@ under the DRC, so fault injection into it needs `-nodrc`.
   talk to a Naomi over the serial port and documents the wiring, which is
   more than can be said for the pinouts circulating elsewhere.
 - **Set the terminal to 57600 baud, 8N1, no flow control.** The ROM says so
-  itself on its second line, once the console is up.
+  itself in its first lines, once the console is up.
 
   With the SH-4's 50 MHz peripheral clock, the rate is
   `Pck/(32*(SCBRR+1))`. The ROM uses `SCBRR2 = 26`, giving approximately
@@ -456,13 +496,16 @@ under the DRC, so fault injection into it needs `-nodrc`.
   included (TEX1, PVR-B, Elan RAM), and the **S** suffix is spoken: a fault
   on IC11S is heard as "I C eleven S". The voice is Piper text-to-speech, so
   the screen and the serial console remain authoritative.
+- The Naomi 2 paths — board identification by the Elan ID, the Elan's
+  initialisation, the PVR-B access check, the PVR-B and Elan RAM tests —
+  are covered by host-side tests but have run on no real Naomi 2 yet, and
+  MAME cannot run them. The Elan ID read on a Naomi 1 has not been tried on
+  a real board either; `CFG_BOARD_MODEL=1` removes it.
 - The JVS master has been checked against MAME's emulated 837-13551 I/O
   board. MAME does not model the UART's timing or the RS-485 direction, so
   those follow the original BIOS's program and still need a real cabinet.
   Only one I/O board is addressed (address 1); a daisy chain is not
-  enumerated. `make mieprog` rebuilds `src/mie_prog.h` from the Z80 source
-  if you change it; the generated header is committed so the ROM builds
-  with the SH-4 toolchain alone.
+  enumerated.
 
 ## DIMM board
 

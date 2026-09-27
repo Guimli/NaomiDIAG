@@ -15,7 +15,8 @@
  * Cached execution from SDRAM is a different proposition entirely: it is
  * where every Naomi game runs. And the whole diagnostic does not need to
  * move, only the four memory-test loops, which is where essentially all the
- * time goes. They are 356 bytes, they are position independent as written,
+ * time goes. They are about 300 bytes (more with CFG_RAM_CRC), position
+ * independent as written,
  * and the memory they test is still addressed through P2 -- so the data path
  * stays uncached and the test keeps exactly the coverage it has today.
  *
