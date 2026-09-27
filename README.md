@@ -331,23 +331,13 @@ under the DRC, so fault injection into it needs `-nodrc`.
   [JinGasa](https://github.com/Tchan0/JinGasa) project: it exists solely to
   talk to a Naomi over the serial port and documents the wiring, which is
   more than can be said for the pinouts circulating elsewhere.
-- **Set the terminal to 115200 baud, 8N1, no flow control.** The ROM says so
+- **Set the terminal to 57600 baud, 8N1, no flow control.** The ROM says so
   itself on its second line, once the console is up.
 
-  Strictly the line runs a little slow. 115200 is not reachable exactly from
-  the SH-4's 50 MHz peripheral clock — the rate is `Pck/(32*(SCBRR+1))`,
-  which would want a divisor of 12.56 — so the ROM uses `SCBRR2 = 13` and
-  the real rate is **111607 baud, 3.1 % below 115200**. Well inside UART
-  tolerance and fine with the usual adapters, but if a board gives you
-  consistently garbled output while the border still pulses, suspect the
-  link before the board.
-
-  Lower rates are reachable far more precisely, because the divisor gets
-  bigger and its granularity finer: 57600 lands within 0.47 %, 9600 within
-  0.15 %, and 31250 — the MIDI rate — is exact. The ROM stays at 115200
-  because a whole run emits under 5 KB, so the speed buys nothing that
-  matters; the figures are here in case a marginal adapter ever makes the
-  trade worth revisiting.
+  With the SH-4's 50 MHz peripheral clock, the rate is
+  `Pck/(32*(SCBRR+1))`. The ROM uses `SCBRR2 = 26`, giving approximately
+  **57870 baud, 0.47 % above 57600**. This reduces the mismatch from the
+  former 115200 setting's 3.1 % and improves the serial link's timing margin.
 - A failed cache test means the SH-4 itself is dead: it is reported on SCIF
   and the ROM halts.
 - A CPU exception is reported and the ROM halts, on every channel that is up

@@ -356,24 +356,13 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
   n'existe que pour dialoguer avec une Naomi par le port série et en
   documente le câblage, ce qu'on ne peut pas dire des brochages qui circulent
   par ailleurs.
-- **Réglez le terminal sur 115200 bauds, 8N1, sans contrôle de flux.** La ROM
-  l'indique elle-même sur sa deuxième ligne, dès que la console est active.
+- **Set the terminal to 57600 baud, 8N1, no flow control.** The ROM says so
+  itself on its second line, once the console is up.
 
-  À la rigueur, la ligne va un peu trop lentement. 115200 n'est pas
-  atteignable exactement depuis l'horloge périphérique à 50 MHz du SH-4 — le
-  débit vaut `Pck/(32*(SCBRR+1))`, ce qui demanderait un diviseur de 12,56 —
-  la ROM utilise donc `SCBRR2 = 13` et le débit réel est de **111607 bauds,
-  soit 3,1 % en dessous de 115200**. C'est largement dans la tolérance d'un
-  UART et ça fonctionne avec les adaptateurs habituels, mais si une carte
-  vous donne une sortie systématiquement illisible alors que la bordure bat
-  toujours, soupçonnez la liaison avant la carte.
-
-  Les débits plus bas s'atteignent bien plus précisément, le diviseur étant
-  plus grand et sa granularité plus fine : 57600 tombe à 0,47 % près, 9600 à
-  0,15 %, et 31250 — le débit MIDI — est exact. La ROM reste à 115200 parce
-  qu'une exécution complète n'émet pas 5 Ko : la vitesse n'achète rien
-  d'important. Les chiffres sont ici au cas où un adaptateur capricieux
-  rendrait un jour l'échange intéressant.
+  With the SH-4's 50 MHz peripheral clock, the rate is
+  `Pck/(32*(SCBRR+1))`. The ROM uses `SCBRR2 = 26`, giving approximately
+  **57870 baud, 0.47 % above 57600**. This reduces the mismatch from the
+  former 115200 setting's 3.1 % and improves the serial link's timing margin.
 - Un échec du test cache signifie que le SH-4 lui-même est mort : c'est
   rapporté sur SCIF puis la ROM s'arrête.
 - Une exception CPU est signalée puis la ROM s'arrête, sur chaque canal

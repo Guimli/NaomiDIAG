@@ -25,9 +25,8 @@ static void scif_raw(char c)
  * the only place that knows where a message really begins.
  *
  * Blank lines are left bare: they separate sections, and a timestamp on
- * nothing is just noise. The stamp costs 16 characters, about a
- * millisecond of serial time at 115200 baud, a tenth of a second over a
- * whole run.
+ * nothing is just noise. The stamp costs 16 characters, about 2.8
+ * milliseconds of serial time at 57600 baud (8N1).
  *
  * TMU and not the RTC: the RTC counts whole seconds, so a dozen
  * consecutive lines would carry the same stamp and the one thing the log

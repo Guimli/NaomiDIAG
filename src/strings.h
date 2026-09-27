@@ -193,7 +193,7 @@
 #define S_CG_SRAM           "NVRAM"
 
 /* phase headers / narrative */
-#define S_SCIF_UP           "Console SCIF active, 115200 8N1\n"
+#define S_SCIF_UP           "Console SCIF active, 57600 8N1\n"
 #define S_SDRAM_INIT        "\nInit SDRAM (valeurs BSC du BIOS d'origine)...\n"
 #define S_SDRAM_SIZE        "Taille SDRAM detectee : "
 #define S_MB                " Mo\n"
@@ -419,7 +419,7 @@
 #define S_CG_SOUND          "SOUND RAM"
 #define S_CG_SRAM           "SRAM"
 
-#define S_SCIF_UP           "SCIF console up, 115200 8N1\n"
+#define S_SCIF_UP           "SCIF console up, 57600 8N1\n"
 #define S_SDRAM_INIT        "\nSDRAM init (BSC values from original BIOS)...\n"
 #define S_SDRAM_SIZE        "SDRAM detected size: "
 #define S_MB                " MB\n"
