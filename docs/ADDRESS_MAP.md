@@ -173,10 +173,43 @@ testée. Les diagnostics TEX et les traces PVR annoncent l'association BIOS.
 La balise VRAM utilise désormais des offsets séparés de 4 Mio pour ses
 voies 3/4. La RAM CPU garde son propre mécanisme.
 
-Les codes d'accès 1–5 de NaomiDIAG sont nos codes de qualification ; ils
+Les codes d'accès 1–6 de NaomiDIAG sont nos codes de qualification ; ils
 ne sont pas des codes SEGA. Le BIOS utilise ici des bits de résultat par
-IC et des textes BAD/GOOD. POLY est documenté mais son mapping de données
-n'a pas été intégré : la table seule ne justifie pas une attribution.
+IC et des textes BAD/GOOD.
+
+### RAM Elan (POLY) : chaîne de calcul
+
+La boucle de dispatch à **1AD4E8** choisit la réduction selon l'index de
+région (r13) : BACK (0) → 0C02801C, AICA (1) → 0C0280F4 sans réduction,
+WORK (2) → 0C0281BC puis **1AD120**, **POLY (5)** → 0C0281BC puis
+**1AD1FE**, les régions TEX/TXB → 0C0281BC puis 1AD1C8.
+
+- 0C0281BC (ROM **1B01BC**) est le même accumulateur que pour TEX : pour le
+  mot d'indice i, l'erreur de l'octet k pose le bit `4*(i mod 8) + k`.
+- **1AD1FE** est le sélecteur de moitié de 1AD1C8, mais il appelle
+  **1AD174** au lieu de 1AD120. 1AD174 réduit avec `0F0F0F0F` → bit 0 et
+  `F0F0F0F0` → bit 1. Les quartets pairs sont les mots pairs, les quartets
+  impairs les mots impairs : le bit 0 désigne un **mot 32 bits pair entier**,
+  le bit 1 un **mot impair entier**, quel que soit l'octet fautif.
+- Au-delà de la moitié de la région, le résultat est décalé de deux bits.
+
+Avec la table POLY `106, 107, 108, 109` :
+
+| Plage | Mots pairs (`addr & 4 = 0`) | Mots impairs |
+| --- | --- | --- |
+| AA000000–AAFFFFFC | IC106 | IC107 |
+| AB000000–ABFFFFFC | IC108S | IC109S |
+
+Le BIOS teste AA000000–ABFF0000 et coupe donc à AAFF8000 ; la ROM coupe
+à la frontière physique de 16 Mio. Chaque puce porte un mot de 32 bits :
+la position du bit de données ne change pas l'attribution. Le suffixe S
+(verso) vient du relevé sur carte. `tools/test_vram_mapping.c` recalcule
+cette réduction pour les 32 bits et les huit positions de mot.
+
+Au passage : WORK (2) passe par 1AD120 sans sélecteur de moitié ni parité,
+donc le BIOS Naomi 2 ne peut désigner que IC9 (D0–D15) ou IC10 (D16–D31) ;
+IC11 et IC12 de sa table ne sont jamais marqués. NaomiDIAG garde pour la
+RAM CPU la parité du mot, validée par la réparation d'IC10.
 
 Reproduction, avec le BIOS utilisateur conservé dans un dossier ignoré :
 

@@ -12,41 +12,60 @@ The revised sequence identifies the board independently of VRAM contents,
 checks Elan's ID, sets IFCTL bits 1 and 2 and clears broadcast bit 0,
 verifies the control readback, then checks and initializes PVR-B. It probes
 four scratch offsets in both halves of A and B through the 32-bit windows.
-Distinct patterns, their complements, and opposite write orders detect
-mirrors, one-way broadcast, and failed readback at the sampled locations.
 Scratch contents are restored, B first and A last. Display writes are
 suppressed during the destructive B test; the report is redrawn afterwards.
 
-An access failure produces a separate access failure and skips the
-B/Elan memory tests, without announcing defective RAM chips. Serial codes:
+At each offset the probe runs in two steps:
 
-| Code | Meaning |
-| --- | --- |
-| 1 | Elan ID unavailable |
-| 2 | Elan interface-control readback incorrect |
-| 3 | PVR-B ID unavailable after enabling its windows |
-| 4 | Scratch readback failed: aliasing, broadcast, inaccessible or faulty RAM |
-| 5 | A-only scratch failure; B remains inconclusive, including possible B-to-A broadcast |
+1. **Each cell alone.** Every one of the four cells is written and read back
+   immediately, with its marker and the complement, twice. The bits that fail
+   there are that cell's own fault — a cut data line, a dead chip — and are
+   recorded as *unreliable* for that cell.
+2. **All four together.** Distinct patterns, their complements, and opposite
+   write orders, every cell read only after all four hold distinct contents.
+   A cell whose *reliable* bits changed was changed by a write to another
+   window: a mirror, a one-way broadcast or crossed halves.
 
-Code 4 does not prove aliasing: genuinely faulty scratch cells can also
-fail qualification. These samples do not prove the entire address map;
-the normal data-bus, address-bus, and pattern tests still run after success.
-A persistent hardware broadcast fault may prevent complete restoration.
+A cell's own fault therefore no longer blocks anything: it is left for the
+RAM tests, which locate and name it. Only a write reaching another window
+does, because then testing B would write into A.
 
-On code 4 or 5, eight `PVR probe` lines capture both passes at the first failing
-offset, including matching locations. Each line contains the address,
-expected value, observed value, and XOR difference. Reads are captured
-during the probe and printed after restoration; logging does not repeat
-the memory accesses or change the interval between writes and reads.
-Pass 0 writes A-low, A-high, B-low, B-high; pass 1 reverses that order and
-complements the patterns. A matching ID alone does not prove independent
-VRAM decoding. A physical Naomi 2 reported an A-only mismatch at A5FFFFFC,
-with XOR 00000300. This is now classified as code 5 and triggers sparse
-address-pair diagnosis of that A half. Code 4 triggers diagnosis of B.
-An A-only mismatch can also result from B-to-A broadcast, so it does not
-authorize the full B test. The probe alone cannot determine the physical cause.
+An access failure produces a separate access failure and skips the PVR-B
+memory test, without announcing defective RAM chips. The Elan RAM is the
+Elan's own memory, not a window onto either GPU: testing it writes no VRAM,
+so it is still tested unless the Elan itself does not answer (codes 1-2).
+Serial codes:
 
-## Known limitation: a local PVR-A data fault also blocks B
+| Code | Meaning | PVR-B test | Elan RAM test |
+| --- | --- | --- | --- |
+| 1 | Elan ID unavailable | skipped | skipped |
+| 2 | Elan interface-control readback incorrect | skipped | skipped |
+| 3 | PVR-B ID unavailable after enabling its windows | skipped | run |
+| 4 | A write to one window changed another: mirror, broadcast, crossed halves | skipped | run |
+| 5 | A PVR-A cell fails on more than 16 bits alone: too few left to judge | skipped | run |
+| 6 | A PVR-B cell fails on more than 16 bits alone: B holds nothing written | skipped | run |
+
+Codes 5 and 6 leave too few trustworthy bits to see another window's marker
+through, so nothing is concluded. Code 6 means PVR-B's VRAM keeps nothing
+written to it — its chips, its controller, or an initialisation this ROM
+gets wrong on real hardware; no chip is named, and B is not written any
+further, because B writes were never shown to leave A alone.
+
+These samples do not prove the entire address map; the normal data-bus,
+address-bus, and pattern tests still run after success. A persistent
+hardware broadcast fault may prevent complete restoration.
+
+On code 4, eight `PVR probe pass=` lines capture both passes at the first
+failing offset, including matching locations; on codes 5 and 6, four
+`PVR probe cell alone` lines capture the cells written alone. Each line
+contains the address, expected value, observed value, XOR difference and,
+when non-zero, `alone=`: the bits that failed with the cell written alone.
+Reads are captured during the probe and printed after restoration; logging
+does not repeat the memory accesses. Pass 0 writes A-low, A-high, B-low,
+B-high; pass 1 reverses that order and complements the patterns. Code 4
+triggers sparse address-pair diagnosis of B, code 5 of the failing A half.
+
+## The case that motivated per-cell characterization
 
 A real Naomi 2 run with DQ9 deliberately disconnected completed the TEX1
 cell tests and reported CPU data mask `00000200`, starting at `A5C00000`,
@@ -58,24 +77,14 @@ in the BIOS-associated IC21 lane. During access qualification it recorded:
 | B: `A77FFFFC`, pass 0 | `A5963CC3` | `A5963CC3` | `00000000` |
 | B: `A7FFFFFC`, pass 0 | `5A69C33C` | `5A69C33C` | `00000000` |
 
-Both B locations also matched on pass 1. Nevertheless, `pvr2_prepare()`
-returns `PVR2_A_REFERENCE` (code 5), and `test_naomi2_ram`'s access-failure path
-returns before either full memory test. Thus **both PVR-B VRAM and Elan RAM
-are skipped**. This is a software qualification rule, not a PVR-B or Elan
-RAM failure verdict. Passing the sampled B reads does not certify all B RAM.
-
-The current probe compares A only after writes to both A and B. It cannot
-separate an existing local A data fault from changes caused by writes to B.
-The same guard intentionally rejects potential B-to-A broadcast, but also
-rejects this known local A fault. Further sparse diagnosis of A does not
-resume the skipped tests.
-
-A proposed improvement, **not implemented**, is to characterize A before
-writing B, then check for changes attributable to B writes. Qualification
-would need to tolerate independently established A data faults while still
-detecting mirrors and one-way broadcast, including intermittent readback.
-Simply ignoring code 5 or masking every faulty A bit would not establish
-independent access. The current conservative skip remains in effect.
+Both B locations also matched on pass 1. The former probe compared A only
+after writes to both A and B, could not tell this local fault from a B write
+changing A, and returned code 5 — skipping both PVR-B VRAM and Elan RAM on a
+board whose B side was never in question. With per-cell characterization,
+`A5FFFFFC` fails bit 9 alone, bit 9 is left out of the comparison, the other
+31 bits show no interference, and both memories are tested. The host harness
+reproduces this case (`BAD_A`) and the same fault combined with a real
+mirror (`BAD_A_MIRROR`, still code 4).
 
 ## Board selection
 
@@ -97,15 +106,21 @@ on Naomi 1. The fixed Naomi 1 setting avoids all B/Elan accesses.
 The host harness executes the production setup and board-detection code
 with simulated MMIO. It covers healthy memory, whole-window and half-window
 mirrors, crossed halves, discarded writes, both broadcast directions,
-failed control writes, missing IDs, and a bad scratch cell. It checks
-enable-before-access ordering and restoration where the mapping permits it.
+failed control writes, missing IDs, a bad scratch cell, a data line cut on
+PVR-A alone and combined with a mirror, a dead PVR-A cell and a data line
+cut across PVR-B. It checks enable-before-access ordering and restoration
+where the mapping permits it.
 
 ```sh
 sh tools/test_pvr2.sh
 ```
 
-Physical Naomi 1/2 validation remains required. MAME maps B independently
-and stubs Elan control, so its results alone cannot validate hardware routing.
+Physical Naomi 1/2 validation remains required. MAME 0.288 does not emulate
+the Naomi 2's own hardware: one PowerVR only, `0x07000000` mirrors
+`0x05000000`, the Elan ID reads 0 and nothing answers at the Elan RAM. A
+Naomi 2 therefore runs as a Naomi 1 there. `mame/elan_id.lua` fakes the ID
+and IFCTL so the Naomi 2 path can be exercised: it ends in code 4, the mirror
+correctly refused, and in a failing Elan RAM.
 
 References:
 - [MAME Naomi 2 map](https://github.com/mamedev/mame/blob/master/src/mame/sega/naomi.cpp)

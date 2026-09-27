@@ -240,26 +240,26 @@ abort input every 1024 words. Real-board DQ9-disconnection tests now reach
 the final report. Progress reporting does not shorten the scan or recover
 a stalled hardware access.
 
-### PVR-B and Elan skipped: code 5
+### PVR-B access and the Elan RAM
 
-Access qualification checks that A/B windows are independent. If A fails
-while sampled B reads match, it returns **code 5** and skips the full
-**PVR-B and Elan** memory tests. Additional diagnosis of A does not resume
-them. A B mismatch produces code 4; neither code alone proves mirroring
-or defective RAM.
+Before PVR-B is written, access qualification checks that the A and B
+windows are independent. Each sampled cell is first written and read back
+alone; the bits that fail there are that cell's own fault and are left out
+of the comparison that follows, where all four cells hold distinct values
+and a change can only come from a write to another window. A cut data line
+on one chip — the DQ9 case above — therefore no longer blocks the PVR-B and
+Elan tests: it is reported by the RAM test of its own region. A mirror or a
+broadcast still is (code 4), and so is a cell too broken to judge (code 5
+on A, 6 on B). **Untested means neither healthy nor defective.**
 
-With DQ9 disconnected, `A5FFFFFC` reads `2468AEE0` instead of `2468ACE0`
-(XOR `00000200`), while `A77FFFFC` and `A7FFFFFC` match in both passes.
-The A reference therefore fails despite matching B samples. The current
-probe cannot distinguish a local A fault from a B write that changes A.
-**Untested means neither healthy nor defective.**
-
-The proposed improvement, not implemented, would characterize A before B
-writes to distinguish existing faults from changes caused by B. It must
-retain detection of mirrors, one-way broadcast and intermittent readback.
-The conservative skip remains active; ignoring code 5 or masking faulty bits
-would not suffice. See [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) for the setup
-sequence and all access codes.
+The Elan RAM is the Elan's own memory, not a window onto either GPU, so it
+is tested whatever PVR-B's qualification says, unless the Elan itself does
+not answer. Its chips follow the BIOS POLY table: even and odd 32-bit words
+of the lower 16 MiB are **IC106** and **IC107**, of the upper 16 MiB
+**IC108S** and **IC109S** — see [ADDRESS_MAP.md](docs/ADDRESS_MAP.md).
+The `v` loop covers PVR-B and the Elan RAM on a Naomi 2, under the same
+conditions. See [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) for the sequence
+and all access codes.
 
 ## Operator console
 
@@ -316,11 +316,12 @@ Toolchain: Debian `gcc-sh-elf` / `binutils-sh-elf`.
 make LANG=EN            # -> NaomiDIAG_EN.bin (English text + voice)
 make LANG=FR            # -> NaomiDIAG_FR.bin (French text + voice)
 make LANG=EN QUICK=1    # 1 MB per RAM pass, for fast emulator bring-up
+make LANG=EN BAUD=115200  # serial console at 115200 instead of 57600
 ```
 
 [`src/config.h`](src/config.h) holds the options that are a decision about
 the ROM rather than a per-build variation. The Makefile carries what changes
-from one build to the next — `LANG`, `QUICK`, `RELOC`, `ROM_BASE`; the header
+from one build to the next — `LANG`, `QUICK`, `RELOC`, `BAUD`, `ROM_BASE`; the header
 carries what is edited once and stays. Anything in it can still be overridden
 without touching the file:
 
@@ -403,8 +404,10 @@ under the DRC, so fault injection into it needs `-nodrc`.
 
   With the SH-4's 50 MHz peripheral clock, the rate is
   `Pck/(32*(SCBRR+1))`. The ROM uses `SCBRR2 = 26`, giving approximately
-  **57870 baud, 0.47 % above 57600**. This reduces the mismatch from the
-  former 115200 setting's 3.1 % and improves the serial link's timing margin.
+  **57870 baud, 0.47 % above 57600**, confirmed on a Naomi 2 with a USB
+  serial adapter. `make BAUD=115200` builds the former setting instead:
+  `SCBRR2 = 13`, **111607 baud, 3.1 % below 115200** — inside UART tolerance,
+  with less margin.
 - A failed cache test means the SH-4 itself is dead: it is reported on SCIF
   and the ROM halts.
 - A CPU exception is reported and the ROM halts, on every channel that is up

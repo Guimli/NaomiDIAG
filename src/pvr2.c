@@ -17,37 +17,95 @@ const pvr2_probe_sample *pvr2_probe_samples(u32 *count)
     return samples;
 }
 
-static u32 probe_offset(u32 offset)
+static u32 popcount(u32 x)
+{
+    u32 n = 0;
+    for (; x; x &= x - 1)
+        n++;
+    return n;
+}
+
+static void record(u32 addr, u32 expected, u32 observed, u32 unreliable)
+{
+    if (sample_count >= sizeof(samples) / sizeof(samples[0]))
+        return;
+    pvr2_probe_sample *s = &samples[sample_count++];
+    s->addr = addr;
+    s->expected = expected;
+    s->observed = observed;
+    s->unreliable = unreliable;
+}
+
+/* A cell is judged alone before anything is compared across windows: write
+ * it, read it back at once, with the marker and its complement, twice. The
+ * bits that fail there are that cell's own fault -- a cut data line, a dead
+ * chip -- and say nothing about whether the windows are independent. They
+ * used to: one broken line on IC21 failed the A reference and skipped every
+ * PVR-B and Elan test on a board whose B side was never in question.
+ *
+ * Returns the bits that cannot be trusted at this cell. */
+static u32 probe_cell(u32 addr, u32 marker)
+{
+    u32 bad = 0;
+    for (u32 k = 0; k < 4; k++) {
+        u32 v = marker ^ ((k & 1) ? 0xFFFFFFFFu : 0);
+        PVR2_WRITE(addr, v);
+        bad |= PVR2_READ(addr) ^ v;
+    }
+    return bad;
+}
+
+/* More than half a word failing alone leaves too few bits to see another
+ * window's marker through. Nothing is concluded from such a cell. */
+#define PROBE_MAX_UNRELIABLE 16u
+
+static pvr2_access probe_offset(u32 offset)
 {
     const u32 addr[4] = { VRAM_TEX0_BASE + offset, VRAM_TEX1_BASE + offset,
                          VRAM_PVRB_BASE + offset,
                          VRAM_PVRB_BASE + 0x00800000u + offset };
     const u32 marker[4] = { 0x13579BDF, 0x2468ACE0, 0xA5963CC3, 0x5A69C33C };
-    u32 saved[4], failed = 0;
+    u32 saved[4], unreliable[4];
+    pvr2_access verdict = PVR2_READY;
     sample_count = 0;
     for (u32 i = 0; i < 4; i++)
         saved[i] = PVR2_READ(addr[i]);
+
+    for (u32 i = 0; i < 4; i++) {
+        unreliable[i] = probe_cell(addr[i], marker[i]);
+        if (popcount(unreliable[i]) > PROBE_MAX_UNRELIABLE && verdict == PVR2_READY)
+            verdict = i < 2 ? PVR2_A_REFERENCE : PVR2_B_SILENT;
+    }
+    if (verdict != PVR2_READY) {
+        for (u32 i = 0; i < 4; i++)
+            record(addr[i], marker[i], marker[i] ^ unreliable[i], unreliable[i]);
+        goto restore;
+    }
+
     /* Opposite write orders expose one-way broadcast as well as mirrors.
-     * Read every location only after all four have distinct contents. */
+     * Read every location only after all four have distinct contents, and
+     * look only at the bits each cell held on its own: a change there was
+     * made by a write to another window. */
     for (u32 pass = 0; pass < 2; pass++) {
         for (u32 n = 0; n < 4; n++) {
             u32 i = pass ? 3 - n : n;
             PVR2_WRITE(addr[i], marker[i] ^ (pass ? 0xFFFFFFFFu : 0));
         }
         for (u32 i = 0; i < 4; i++) {
-            pvr2_probe_sample *s = &samples[sample_count++];
-            s->addr = addr[i];
-            s->expected = marker[i] ^ (pass ? 0xFFFFFFFFu : 0);
-            s->observed = PVR2_READ(addr[i]);
-            if (s->observed != s->expected)
-                failed |= i < 2 ? 1u : 2u;
+            u32 expected = marker[i] ^ (pass ? 0xFFFFFFFFu : 0);
+            u32 observed = PVR2_READ(addr[i]);
+            record(addr[i], expected, observed, unreliable[i]);
+            if ((observed ^ expected) & ~unreliable[i])
+                verdict = PVR2_MAPPING;
         }
     }
+
+restore:
     /* Restore B first, A last, preserving the visible framebuffer if B
      * aliases A. Probe offsets are outside the active framebuffer. */
     for (u32 n = 4; n; n--)
         PVR2_WRITE(addr[n - 1], saved[n - 1]);
-    return failed;
+    return verdict;
 }
 
 pvr2_access pvr2_prepare(void)
@@ -75,9 +133,9 @@ pvr2_access pvr2_prepare(void)
      * These samples are an access preflight, not a substitute for RAM tests. */
     const u32 offsets[] = { 0, 4, 0x1000, 0x007FFFFC };
     for (u32 i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++) {
-        u32 failed = probe_offset(offsets[i]);
-        if (failed)
-            return (failed & 2) ? PVR2_MAPPING : PVR2_A_REFERENCE;
+        pvr2_access a = probe_offset(offsets[i]);
+        if (a != PVR2_READY)
+            return a;
     }
     return PVR2_READY;
 }

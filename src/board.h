@@ -17,7 +17,7 @@ typedef struct {
     board_type type;
     u32 sh4_ver;
     u32 holly_id, holly_rev;
-    u32 elan_id, elan_rev;
+    u32 elan_id;
 } board_info;
 
 void board_detect(board_info *b);

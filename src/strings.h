@@ -14,6 +14,7 @@
  * ========================================================================== */
 #ifndef STRINGS_H
 #define STRINGS_H
+#include "config.h"           /* SCIF_BAUD_STR */
 
 #if defined(LANG_FR)
 /* ------------------------------- French -------------------------------- */
@@ -84,7 +85,7 @@
 #define S_L_VRAM_TEX0_IC    "VRAM TEX0 (IC16/18/20/22)"
 #define S_L_VRAM_TEX1       "VRAM TEX1"
 #define S_L_VRAM_TEX1_IC    "VRAM TEX1 (IC17S/19S/21S/23S)"
-#define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
+#define S_L_VRAM_B          "VRAM PVR-B (IC111 a IC118S)"
 /* short labels for the progress bar: they get a " NN/10" pass suffix, so
  * they must stay well inside the screen width */
 #define S_L_RELOC           "Boucles de test relogees en RAM"
@@ -103,7 +104,7 @@
 #define S_P_CART_IC         "Cartouche"
 #define S_P_CART_PINS       "Lignes cartouche"
 
-#define S_L_ELAN            "RAM Elan (Naomi 2)"
+#define S_L_ELAN            "RAM Elan (IC106/107/108S/109S)"
 #define S_L_BACKSRAM        "NVRAM sauvegarde IC29 (intacte)"
 #define S_L_RTC             "RTC (AICA, doit avancer)"
 #define S_L_DIMM_ABSENT     "Carte DIMM : absente"
@@ -191,9 +192,11 @@
 #define S_JVS_NO_MIE        "\nReleve JVS impossible : aucun MIE detecte.\n"
 #define S_CG_SOUND          "RAM son"
 #define S_CG_SRAM           "NVRAM"
+#define S_CG_PVRB           "VRAM PVR-B"
+#define S_CG_ELAN           "RAM Elan"
 
 /* phase headers / narrative */
-#define S_SCIF_UP           "Console SCIF active, 57600 8N1\n"
+#define S_SCIF_UP           "Console SCIF active, " SCIF_BAUD_STR " 8N1\n"
 #define S_SDRAM_INIT        "\nInit SDRAM (valeurs BSC du BIOS d'origine)...\n"
 #define S_SDRAM_SIZE        "Taille SDRAM detectee : "
 #define S_MB                " Mo\n"
@@ -214,7 +217,9 @@
 #define S_VRAM_UNLOCATED    "  Erreur non relocalisee : plusieurs IC candidats dans la plage testee.\n"
 #define S_VRAM_SUSPECT      " : voie suspecte (puce ou connexions)\n"
 #define S_VRAM_DIAG        "  Diagnostic VRAM : cellules puis paires d'adresses.\n  Bits CPU uniquement : correspondance broches RAM non etablie.\n"
-#define S_PVRB_SKIP         "  VRAM PVR-B et RAM Elan non testees, acces non valide.\n  Aucun verdict sur les puces RAM. Code acces : "
+#define S_PVRB_SKIP         "  VRAM PVR-B non testee, acces non valide.\n  Aucun verdict sur les puces RAM. Code acces : "
+#define S_ELAN_SKIP         "  RAM Elan non testee : l'Elan ne repond pas (voir le code ci-dessus).\n"
+#define S_PVRB_SILENT       "  La VRAM du PVR-B ne garde aucune valeur ecrite : puces, controleur\n  ou initialisation. Pas de verdict par puce.\n"
 #define S_SCREEN_ONLINE     "Ecran actif : rapport affiche sur la sortie VGA.\n"
 #define S_PERIPH_HDR        "\nNVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...\n"
 #define S_RTC_DATE          "  Date RTC : "
@@ -321,7 +326,7 @@
 #define S_L_VRAM_TEX0_IC    "VRAM TEX0 (IC16/18/20/22)"
 #define S_L_VRAM_TEX1       "VRAM TEX1"
 #define S_L_VRAM_TEX1_IC    "VRAM TEX1 (IC17S/19S/21S/23S)"
-#define S_L_VRAM_B          "VRAM PVR-B (Naomi 2)"
+#define S_L_VRAM_B          "VRAM PVR-B (IC111 to IC118S)"
 /* short labels for the progress bar: they get a " NN/10" pass suffix, so
  * they must stay well inside the screen width */
 #define S_L_RELOC           "Test loops relocated to CPU RAM"
@@ -340,7 +345,7 @@
 #define S_P_CART_IC         "Cartridge"
 #define S_P_CART_PINS       "Cartridge lines"
 
-#define S_L_ELAN            "Elan RAM (Naomi 2)"
+#define S_L_ELAN            "Elan RAM (IC106/107/108S/109S)"
 #define S_L_BACKSRAM        "Backup NVRAM IC29 (kept intact)"
 #define S_L_RTC             "RTC (AICA, must tick)"
 #define S_L_DIMM_ABSENT     "DIMM board: not present"
@@ -426,8 +431,10 @@
 #define S_JVS_NO_MIE        "\nJVS survey impossible: no MIE detected.\n"
 #define S_CG_SOUND          "SOUND RAM"
 #define S_CG_SRAM           "SRAM"
+#define S_CG_PVRB           "PVR-B VRAM"
+#define S_CG_ELAN           "ELAN RAM"
 
-#define S_SCIF_UP           "SCIF console up, 57600 8N1\n"
+#define S_SCIF_UP           "SCIF console up, " SCIF_BAUD_STR " 8N1\n"
 #define S_SDRAM_INIT        "\nSDRAM init (BSC values from original BIOS)...\n"
 #define S_SDRAM_SIZE        "SDRAM detected size: "
 #define S_MB                " MB\n"
@@ -448,7 +455,9 @@
 #define S_VRAM_UNLOCATED    "  Error not relocated: multiple IC candidates within the tested range.\n"
 #define S_VRAM_SUSPECT      " : suspect lane (chip or connections)\n"
 #define S_VRAM_DIAG        "  VRAM diagnosis: cells followed by address pairs.\n  CPU bits only: RAM address-pin mapping is not established.\n"
-#define S_PVRB_SKIP         "  PVR-B VRAM and Elan RAM not tested: access not qualified.\n  No RAM-chip verdict. Access code: "
+#define S_PVRB_SKIP         "  PVR-B VRAM not tested: access not qualified.\n  No RAM-chip verdict. Access code: "
+#define S_ELAN_SKIP         "  Elan RAM not tested: the Elan does not answer (see the code above).\n"
+#define S_PVRB_SILENT       "  PVR-B VRAM holds nothing written to it: chips, controller or\n  initialisation. No per-chip verdict.\n"
 #define S_SCREEN_ONLINE     "Screen online: report displayed on VGA output.\n"
 #define S_PERIPH_HDR        "\nBackup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...\n"
 #define S_RTC_DATE          "  RTC date: "

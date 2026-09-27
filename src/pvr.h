@@ -28,12 +28,15 @@ void pvr_vram_enable(void);
 #define ELAN_RAM_SIZE   0x02000000u     /* 32 MB */
 
 typedef enum { PVR2_READY, PVR2_NO_ELAN, PVR2_CONTROL,
-               PVR2_NO_PVR, PVR2_MAPPING, PVR2_A_REFERENCE } pvr2_access;
+               PVR2_NO_PVR, PVR2_MAPPING, PVR2_A_REFERENCE,
+               PVR2_B_SILENT } pvr2_access;
 /* Call only for an identified/explicitly selected Naomi 2, after PVR-A init.
  * Failure means access could not be qualified, not a defective RAM verdict. */
 pvr2_access pvr2_prepare(void);
 /* Snapshot of both passes at the last sampled offset. No MMIO on retrieval. */
-typedef struct { u32 addr, expected, observed; } pvr2_probe_sample;
+/* unreliable: bits that failed with the cell written alone, left out of
+ * the independence comparison (they are that cell's own fault). */
+typedef struct { u32 addr, expected, observed, unreliable; } pvr2_probe_sample;
 const pvr2_probe_sample *pvr2_probe_samples(u32 *count);
 
 typedef struct {

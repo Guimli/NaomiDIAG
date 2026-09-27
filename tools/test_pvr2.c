@@ -22,7 +22,8 @@ static u32 *board_reg(u32 addr);
 #include "../src/board.c"
 
 enum { GOOD, MIRROR_A, MIRROR_HALF, OPEN_B, BROADCAST_AB, BROADCAST_BA,
-       CONTROL_STUCK, NO_ELAN, NO_PVR, BAD_CELL, CROSS_HALF, BAD_A };
+       CONTROL_STUCK, NO_ELAN, NO_PVR, BAD_CELL, CROSS_HALF, BAD_A,
+       DEAD_A, BAD_B_LINE, BAD_A_MIRROR };
 static int mode;
 static u32 mem[4][4], original[4][4], ctl, writes, b_accesses;
 static u32 board_regs[5];
@@ -56,7 +57,7 @@ static int decode(u32 addr, u32 *slot)
 
 static int physical(int bank)
 {
-    if (mode == MIRROR_A && bank >= 2) return bank - 2;
+    if ((mode == MIRROR_A || mode == BAD_A_MIRROR) && bank >= 2) return bank - 2;
     if (mode == MIRROR_HALF && bank == 3) return 2;
     if (mode == CROSS_HALF && bank >= 2) return 3 - bank;
     return bank;
@@ -80,7 +81,11 @@ static u32 read_mmio(u32 addr)
         if (mode == OPEN_B) return 0xFFFFFFFF;
     }
     u32 value = mem[physical(bank)][slot];
-    if (mode == BAD_A && bank == 1 && slot == 3) value |= 0x300u;
+    /* D8/D9 cut on IC21: every TEX1 cell of the upper 4 MiB reads them high */
+    if ((mode == BAD_A || mode == BAD_A_MIRROR) && bank == 1 && slot == 3)
+        value |= 0x300u;
+    if (mode == DEAD_A && bank == 0) value = 0;
+    if (mode == BAD_B_LINE && bank >= 2) value &= ~0x10000u;
     return value;
 }
 
@@ -112,37 +117,45 @@ static void write_mmio(u32 addr, u32 value)
 
 int main(void)
 {
-    for (mode = GOOD; mode <= BAD_A; mode++) {
+    for (mode = GOOD; mode <= BAD_A_MIRROR; mode++) {
         ctl = 0x80 | 1; /* Disabled B plus broadcast, preserve unrelated bits. */
         writes = b_accesses = 0;
         for (u32 i = 0; i < 4; i++)
             for (u32 j = 0; j < 4; j++) mem[i][j] = (i * 100 + j) * 2;
         memcpy(original, mem, sizeof(mem));
         pvr2_access result = pvr2_prepare();
-        pvr2_access expected = mode == GOOD ? PVR2_READY :
+        /* A cell's own faults (BAD_A, BAD_CELL, BAD_B_LINE) no longer block
+         * the B tests: they are left for the RAM tests to report. Only a
+         * write to one window changing another is a mapping failure. */
+        pvr2_access expected =
+            (mode == GOOD || mode == BAD_A || mode == BAD_CELL ||
+             mode == BAD_B_LINE) ? PVR2_READY :
             mode == CONTROL_STUCK ? PVR2_CONTROL :
             mode == NO_ELAN ? PVR2_NO_ELAN :
             mode == NO_PVR ? PVR2_NO_PVR :
-            (mode == BAD_A || mode == BROADCAST_BA) ? PVR2_A_REFERENCE : PVR2_MAPPING;
+            mode == DEAD_A ? PVR2_A_REFERENCE :
+            mode == OPEN_B ? PVR2_B_SILENT : PVR2_MAPPING;
+        if (result != expected)
+            printf("mode %d: got %d expected %d\n", mode, result, expected);
         assert(result == expected);
         u32 count, mismatches = 0;
         const pvr2_probe_sample *samples = pvr2_probe_samples(&count);
-        assert(count == ((result == PVR2_READY || result == PVR2_MAPPING ||
-                          result == PVR2_A_REFERENCE) ? 8u : 0u));
+        assert(count == ((result == PVR2_READY || result == PVR2_MAPPING) ? 8u :
+                         (result == PVR2_A_REFERENCE || result == PVR2_B_SILENT) ? 4u : 0u));
         for (u32 i = 0; i < count; i++) {
-            if (samples[i].expected != samples[i].observed) mismatches++;
-            if (mode == OPEN_B && i % 4 >= 2)
-                assert(samples[i].observed == 0xFFFFFFFFu);
-            if (mode == BAD_CELL)
-                assert((samples[i].addr & 0x7FFFFFu) == 0x1000u);
+            if ((samples[i].expected ^ samples[i].observed) & ~samples[i].unreliable)
+                mismatches++;
+            if (mode == BAD_A && i % 4 == 1 && (samples[i].addr & 0x7FFFFFu) == 0x7FFFFCu)
+                assert(samples[i].unreliable == 0x300u);
         }
-        assert((mismatches != 0) == (result == PVR2_MAPPING || result == PVR2_A_REFERENCE));
+        assert((mismatches != 0) == (result == PVR2_MAPPING));
         if (mode == NO_ELAN) assert(writes == 0);
         if (mode == NO_ELAN || mode == CONTROL_STUCK) assert(b_accesses == 0);
         if (mode != NO_ELAN && mode != CONTROL_STUCK) assert(ctl == 0x86);
         /* Healthy RAM and aliases must preserve all physical cells. A
          * forced one-way broadcast may make full restoration impossible. */
-        if (mode != BROADCAST_AB && mode != BROADCAST_BA && mode != BAD_A)
+        if (mode != BROADCAST_AB && mode != BROADCAST_BA && mode != BAD_A &&
+            mode != DEAD_A && mode != BAD_B_LINE && mode != BAD_A_MIRROR)
             assert(memcmp(original, mem, sizeof(mem)) == 0);
     }
     for (u32 present = 0; present < 2; present++) {
@@ -156,6 +169,6 @@ int main(void)
             present ? BOARD_NAOMI2 : BOARD_NAOMI1));
         assert(id_reads == (CFG_BOARD_MODEL == 1 ? 0u : 1u));
     }
-    puts("PVR-B: 12 access scenarios and board identification passed");
+    puts("PVR-B: 15 access scenarios and board identification passed");
     return 0;
 }

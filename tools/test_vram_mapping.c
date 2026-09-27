@@ -35,6 +35,18 @@ int main(void)
     assert(vram_range_chip_mask(0xA5000000,0x800000,0x300)==5);
     assert(vram_range_chip_mask(0xA7000000,0x1000000,0x300)==0x55);
     assert(vram_chip_mask(0xAC000000,~0u)==0);
-    assert(vram_ic(0xAA000000,8)==0);
-    puts("BIOS VRAM mapping: all 32 bits, word parities, four regions and boundaries passed");
+    /* Elan RAM: 0F0F0F0F/F0F0F0F0 reduction (word parity), 16 MiB halves */
+    for (u32 upper=0; upper<2; upper++)
+        for (u32 word=0; word<8; word++)
+            for (u32 bit=0; bit<32; bit++) {
+                u32 addr=0xAA000000+upper*0x1000000+word*4;
+                u32 packed=1u<<((4*(word%8)+bit/8)%32);
+                u32 expected=((packed&0x0F0F0F0Fu)?1u:0)|((packed&0xF0F0F0F0u)?2u:0);
+                expected<<=upper?2:0;
+                assert(vram_chip_mask(addr,1u<<bit)==expected);
+                assert(vram_ic(addr,bit)==106+upper*2+(word&1));
+            }
+    assert(vram_range_chip_mask(0xAA000000,0x2000000,1)==0xF);
+    assert(vram_range_chip_mask(0xAA000000,0x1000000,1)==0x3);
+    puts("BIOS VRAM mapping: all 32 bits, word parities, four regions, Elan RAM and boundaries passed");
 }

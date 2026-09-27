@@ -199,12 +199,21 @@ static const comp_map tex1_comps[4] = {
     { CLIP_NONE, "IC23S" },
 };
 
-/* EPR-23608C Naomi 2 TXB0/TXB1 tables, in BIOS result-bit order. */
+/* EPR-23608C Naomi 2 TXB0/TXB1 tables, in BIOS result-bit order. The even
+ * numbers are on the underside, as TEX1's are (designators read off a
+ * Naomi 2 and checked against Sega's service manual). */
 static const comp_map pvrb_comps[8] = {
-    { CLIP_NONE, "IC111" }, { CLIP_NONE, "IC113" },
-    { CLIP_NONE, "IC115" }, { CLIP_NONE, "IC117" },
-    { CLIP_NONE, "IC112" }, { CLIP_NONE, "IC114" },
-    { CLIP_NONE, "IC116" }, { CLIP_NONE, "IC118" },
+    { CLIP_NONE, "IC111" },  { CLIP_NONE, "IC113" },
+    { CLIP_NONE, "IC115" },  { CLIP_NONE, "IC117" },
+    { CLIP_NONE, "IC112S" }, { CLIP_NONE, "IC114S" },
+    { CLIP_NONE, "IC116S" }, { CLIP_NONE, "IC118S" },
+};
+
+/* EPR-23608C POLY table: bit 0/1 = even/odd 32-bit word of the lower
+ * 16 MiB, bit 2/3 the same in the upper 16 MiB (see vram_mapping.h). */
+static const comp_map elan_comps[4] = {
+    { CLIP_NONE, "IC106" },  { CLIP_NONE, "IC107" },
+    { CLIP_NONE, "IC108S" }, { CLIP_NONE, "IC109S" },
 };
 
 
@@ -475,7 +484,8 @@ static void report_comps(const char *ramname, u32 compmask,
             scif_puts(comps[i].name);
             scif_puts(")");
         }
-        scif_puts((comps == tex0_comps || comps == tex1_comps || comps == pvrb_comps)
+        scif_puts((comps == tex0_comps || comps == tex1_comps ||
+                   comps == pvrb_comps || comps == elan_comps)
                   ? S_VRAM_SUSPECT : S_DEFECTIVE);
     }
 }
@@ -497,7 +507,8 @@ static void report_region(const region_desc *d, const ram_result *r)
         report_badbits_aram(r->badbits);
     else
         report_badbits(r->badbits);
-    u32 is_vram = r->vram_chips || d->comps == tex0_comps || d->comps == tex1_comps;
+    u32 is_vram = r->vram_chips || d->comps == tex0_comps || d->comps == tex1_comps ||
+                  d->comps == pvrb_comps || d->comps == elan_comps;
     report_comps(d->group, is_vram ? r->vram_chips : ram_comp_mask(r), d->comps);
 }
 
@@ -1146,13 +1157,22 @@ static void test_naomi2_ram(void)
         scif_puts(S_PVRB_SKIP);
         scif_putdec((u32)access);
         scif_puts("\n");
-        if (access == PVR2_MAPPING || access == PVR2_A_REFERENCE) {
+        if (access == PVR2_B_SILENT)
+            scif_puts(S_PVRB_SILENT);
+        if (access == PVR2_MAPPING || access == PVR2_A_REFERENCE ||
+            access == PVR2_B_SILENT) {
             u32 count;
             const pvr2_probe_sample *samples = pvr2_probe_samples(&count);
-            /* Print captured reads after restoration, without rerunning MMIO. */
+            /* Print captured reads after restoration, without rerunning MMIO.
+             * Four samples are the cells written alone (the probe stopped
+             * there); eight are the two passes across all four windows. */
             for (u32 i = 0; i < count; i++) {
-                scif_puts("  PVR probe pass=");
-                scif_putdec(i / 4);
+                if (count == 4) {
+                    scif_puts("  PVR probe cell alone");
+                } else {
+                    scif_puts("  PVR probe pass=");
+                    scif_putdec(i / 4);
+                }
                 scif_puts(" addr=");
                 scif_puthex(samples[i].addr);
                 scif_puts(" expected=");
@@ -1161,10 +1181,16 @@ static void test_naomi2_ram(void)
                 scif_puthex(samples[i].observed);
                 scif_puts(" xor=");
                 scif_puthex(samples[i].expected ^ samples[i].observed);
+                if (samples[i].unreliable) {
+                    scif_puts(" alone=");
+                    scif_puthex(samples[i].unreliable);
+                }
                 scif_puts("\n");
                 report_vram_ic(samples[i].addr, samples[i].expected ^ samples[i].observed);
             }
-            if (access == PVR2_A_REFERENCE) {
+            if (access == PVR2_B_SILENT) {
+                /* B writes were never shown to leave A alone: no more of them */
+            } else if (access == PVR2_A_REFERENCE) {
                 /* Diagnose the failing A half without assigning its fault to B. */
                 for (u32 i = 0; i < count; i++)
                     if (samples[i].expected != samples[i].observed) {
@@ -1176,20 +1202,30 @@ static void test_naomi2_ram(void)
             }
             screen_render();
         }
+    } else {
+        /* No framebuffer writes while exercising B, even after the sampled
+         * independence check. An untested alias must not corrupt our
+         * patterns. */
+        u32 screen_ready = g_screen_ready;
+        g_screen_ready = 0;
+        test_vram_region(S_L_VRAM_B, S_L_VRAM_B_DBUS, S_L_VRAM_B_ABUS,
+                         VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
+                         IC(pvrb_comps), CLIP_VRAM_B, &ok);
+        g_screen_ready = screen_ready;
+        screen_render();
+    }
+
+    /* The Elan RAM is the Elan's own memory, not a window onto either GPU's:
+     * testing it writes no VRAM, so a doubt about PVR-B's windows is no
+     * reason to leave it out. It needs the Elan itself, and the interface
+     * control that routes its channel. */
+    if (access == PVR2_NO_ELAN || access == PVR2_CONTROL) {
+        scif_puts(S_ELAN_SKIP);
         return;
     }
-    /* No framebuffer writes while exercising B, even after the sampled
-     * independence check. An untested alias must not corrupt our patterns. */
-    u32 screen_ready = g_screen_ready;
-    g_screen_ready = 0;
-    test_vram_region(S_L_VRAM_B, S_L_VRAM_B_DBUS, S_L_VRAM_B_ABUS,
-                     VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
-                     IC(pvrb_comps), CLIP_VRAM_B, &ok);
-    g_screen_ready = screen_ready;
-    screen_render();
     test_vram_region(S_L_ELAN, S_L_ELAN_DBUS, S_L_ELAN_ABUS,
                      ELAN_RAM_BASE, ELAN_RAM_SIZE,
-                     0, CLIP_ELAN, &ok);
+                     IC(elan_comps), CLIP_ELAN, &ok);
 }
 
 /* ------------------------------------------------------------------ */
@@ -2200,7 +2236,10 @@ static void loop_regions(const loop_part *parts, u32 nparts, const char *what)
              * and report a fault that does not exist -- the boot test guards
              * against this, the loop did not. */
             u32 fbaddr = VRAM_TEX0_BASE + FB_VRAM_OFFSET;
-            progress_screen_enable(!(lp->base <= fbaddr && fbaddr < lp->base + lp->len));
+            /* PVR-B's independence rests on a sample: draw nothing while
+             * its whole range is being written, as the boot suite does. */
+            progress_screen_enable(lp->base != VRAM_PVRB_BASE &&
+                                   !(lp->base <= fbaddr && fbaddr < lp->base + lp->len));
             progress_begin(what, (lp->len >> 2) * 2);
             if (lp->base == ARAM_P2_BASE) {
                 aram_test_pattern(0, lp->len, 0x55555555, &res);
@@ -2318,11 +2357,36 @@ static void run_action(u32 act)
         break;
     }
     case ACT_VRAM: {
-        loop_part p[2] = {
+        loop_part p[4] = {
             { VRAM_TEX0_BASE, VRAM_TEX0_SIZE, { S_L_VRAM_TEX0, IC(tex0_comps), 0 } },
             { VRAM_TEX1_BASE, VRAM_TEX1_SIZE, { S_L_VRAM_TEX1, IC(tex1_comps), 0 } },
         };
-        loop_regions(p, 2, S_M_VRAM);
+        u32 n = 2;
+        /* A Naomi 2 loops its other graphics memories too, under the same
+         * conditions as the boot suite: PVR-B only once its windows have
+         * been shown independent of PVR-A, the Elan RAM whenever the Elan
+         * answers. Qualified again here: the suite may have been cut short
+         * before it reached them. */
+        if (g_board_type == BOARD_NAOMI2) {
+            pvr2_access a = pvr2_prepare();
+            if (a == PVR2_READY) {
+                loop_part b = { VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
+                                { S_CG_PVRB, IC(pvrb_comps), 0 } };
+                p[n++] = b;
+            } else {
+                scif_puts(S_PVRB_SKIP);
+                scif_putdec((u32)a);
+                scif_puts("\n");
+            }
+            if (a != PVR2_NO_ELAN && a != PVR2_CONTROL) {
+                loop_part e = { ELAN_RAM_BASE, ELAN_RAM_SIZE,
+                                { S_CG_ELAN, IC(elan_comps), 0 } };
+                p[n++] = e;
+            } else {
+                scif_puts(S_ELAN_SKIP);
+            }
+        }
+        loop_regions(p, n, S_M_VRAM);
         break;
     }
     case ACT_ARAM: {

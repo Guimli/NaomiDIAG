@@ -265,26 +265,27 @@ sa propre progression et vérifie l'arrêt tous les 1024 mots. Les essais
 réels avec DQ9 coupée atteignent désormais le rapport final. Cette progression
 ne raccourcit pas la relecture et ne récupère pas un accès matériel bloqué.
 
-### PVR-B et Elan non testés : code 5
+### Accès au PVR-B et RAM Elan
 
-Le contrôle préalable vérifie l'indépendance des fenêtres A/B. Si A échoue
-alors que les lectures sondées de B réussissent, il renvoie le **code 5** et
-saute les tests complets de **PVR-B et d'Elan**. Le diagnostic supplémentaire
-de A ne les relance pas. Une erreur sur B produit le code 4 ; aucun de ces
-codes ne prouve à lui seul un miroir ni une RAM défectueuse.
+Avant d'écrire dans le PVR-B, le contrôle d'accès vérifie que les fenêtres
+A et B sont indépendantes. Chaque cellule sondée est d'abord écrite et
+relue seule ; les bits qui y échouent sont une panne propre à cette cellule
+et sont exclus de la comparaison suivante, où les quatre cellules portent
+des valeurs distinctes et où un changement ne peut venir que d'une écriture
+dans une autre fenêtre. Une ligne de données coupée sur une puce — le cas
+DQ9 ci-dessus — ne bloque donc plus les tests PVR-B et Elan : elle est
+signalée par le test RAM de sa propre région. Un miroir ou une diffusion
+les bloque toujours (code 4), comme une cellule trop abîmée pour juger
+(code 5 sur A, 6 sur B). **Non testé ne signifie ni sain ni défectueux.**
 
-Avec DQ9 coupée, `A5FFFFFC` renvoie `2468AEE0` au lieu de `2468ACE0`
-(XOR `00000200`), alors que `A77FFFFC` et `A7FFFFFC` réussissent les deux
-passes. La référence A échoue donc malgré les sondes B correctes.
-Le contrôle actuel ne distingue pas un défaut local de A d'une écriture B
-qui modifie A. **Non testé ne signifie ni sain ni défectueux.**
-
-L'amélioration envisagée, non implémentée, caractériserait A avant les
-écritures B pour distinguer les défauts préexistants des modifications
-provoquées par B. La détection des miroirs, diffusions dans un seul sens et
-lectures intermittentes doit être conservée. La règle conservatrice reste
-active ; ignorer le code 5 ou masquer les bits fautifs ne suffit pas.
-Voir [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) pour la séquence et tous les codes.
+La RAM Elan est la mémoire propre de l'Elan, pas une fenêtre sur l'un des
+GPU : elle est testée quel que soit le verdict d'accès au PVR-B, sauf si
+l'Elan lui-même ne répond pas. Ses puces suivent la table POLY du BIOS :
+mots 32 bits pairs et impairs des 16 premiers Mio = **IC106** et **IC107**,
+des 16 derniers = **IC108S** et **IC109S** — voir
+[ADDRESS_MAP.md](docs/ADDRESS_MAP.md). La boucle `v` couvre le PVR-B et la
+RAM Elan sur Naomi 2, aux mêmes conditions. Voir
+[PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) pour la séquence et tous les codes.
 
 ## Console opérateur
 
@@ -343,11 +344,12 @@ Chaîne d'outils : paquets Debian `gcc-sh-elf` / `binutils-sh-elf`.
 make LANG=EN            # -> NaomiDIAG_EN.bin (texte + voix anglais)
 make LANG=FR            # -> NaomiDIAG_FR.bin (texte + voix français)
 make LANG=FR QUICK=1    # 1 Mo par passe RAM, pour l'émulateur
+make LANG=FR BAUD=115200  # console série à 115200 au lieu de 57600
 ```
 
 [`src/config.h`](src/config.h) regroupe les options qui relèvent d'une
 décision sur la ROM plutôt que d'une variation d'une construction à l'autre.
-Le Makefile porte ce qui change à chaque build — `LANG`, `QUICK`, `RELOC`,
+Le Makefile porte ce qui change à chaque build — `LANG`, `QUICK`, `RELOC`, `BAUD`,
 `ROM_BASE` ; l'en-tête porte ce qu'on règle une fois. Tout y reste
 surchargeable sans éditer le fichier :
 
@@ -434,9 +436,10 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
 
   Avec l'horloge périphérique à 50 MHz du SH-4, le débit vaut
   `Pck/(32*(SCBRR+1))`. La ROM utilise `SCBRR2 = 26`, soit un débit réel
-  d'environ **57870 bauds, 0,47 % au-dessus de 57600**. Ce réglage réduit
-  l'écart par rapport aux 3,1 % de l'ancien réglage à 115200 bauds et
-  améliore ainsi la marge de tolérance de la liaison série.
+  d'environ **57870 bauds, 0,47 % au-dessus de 57600**, validé sur une
+  Naomi 2 avec un adaptateur série USB. `make BAUD=115200` produit l'ancien
+  réglage : `SCBRR2 = 13`, **111607 bauds, 3,1 % sous 115200** — dans la
+  tolérance d'un UART, avec moins de marge.
 - Un échec du test cache signifie que le SH-4 lui-même est mort : c'est
   rapporté sur SCIF puis la ROM s'arrête.
 - Une exception CPU est signalée puis la ROM s'arrête, sur chaque canal
