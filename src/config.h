@@ -81,6 +81,30 @@
 #define CFG_RAM_CRC 0
 #endif
 
+/* Serial console speed (57600 or 115200 baud, 8N1).
+ *
+ * The rate is Pck/(32*(SCBRR+1)) from the SH-4's 50 MHz peripheral clock, so
+ * only some rates come out close:
+ *   57600  -> SCBRR 26 -> 57870 baud,  +0.47 %
+ *   115200 -> SCBRR 13 -> 111607 baud, -3.1 %
+ * 57600 is the default for that margin, and it has been confirmed on a
+ * Naomi 2 with a USB serial adapter. 115200 stays available for a terminal
+ * set up for it; it is inside UART tolerance, just with less to spare.
+ * A whole run emits a few kilobytes, so the slower rate costs nothing that
+ * matters. Select with make BAUD=115200. */
+#ifndef CFG_SCIF_BAUD
+#define CFG_SCIF_BAUD 57600
+#endif
+#if CFG_SCIF_BAUD == 57600
+#define SCIF_BRR        26
+#define SCIF_BAUD_STR   "57600"
+#elif CFG_SCIF_BAUD == 115200
+#define SCIF_BRR        13
+#define SCIF_BAUD_STR   "115200"
+#else
+#error "CFG_SCIF_BAUD must be 57600 or 115200"
+#endif
+
 /* JVS button mapping aid (0 = off, 1 = on).
  *
  * The MIE answers a control-state request with fourteen words, and no public

@@ -63,7 +63,7 @@ _start:
 p1_entry:
 
 ! ---------------------------------------------------------------------------
-! SCIF init: 57600 8N1, FIFOs on. Registers only, no memory involved.
+! SCIF init: CFG_SCIF_BAUD 8N1 (config.h), FIFOs on. Registers only, no memory involved.
 ! ---------------------------------------------------------------------------
 scif_setup:
     mov.l   Lscif, r1           ! r1 = 0xFFE80000
@@ -73,11 +73,10 @@ scif_setup:
     mov.w   r0, @(24, r1)       ! SCFCR2  = TFRST|RFRST (reset both FIFOs)
     mov     #0, r0
     mov.w   r0, @(0, r1)        ! SCSMR2  = 0      (8N1, Pck/1)
-    ! Baud rate = Pck/(32*(SCBRR+1)). With Pck = 50 MHz, SCBRR = 26
-    ! gives 57870 baud, +0.47 % from 57600, reducing the clock mismatch
-    ! compared with the former 115200 setting (111607 baud, -3.1 %).
-    mov     #26, r0
-    mov.b   r0, @(4, r1)        ! SCBRR2  = 26     (Pck 50MHz -> 57870 baud)
+    ! Baud rate = Pck/(32*(SCBRR+1)), Pck = 50 MHz. SCIF_BRR comes from
+    ! config.h: 26 for 57600 (57870, +0.47 %), 13 for 115200 (111607, -3.1 %).
+    mov     #SCIF_BRR, r0
+    mov.b   r0, @(4, r1)        ! SCBRR2  = SCIF_BRR
     mov.l   Ldelay, r2          ! wait > 1 bit time
 1:  dt      r2
     bf      1b

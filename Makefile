@@ -27,13 +27,16 @@ ELF     := naomi_diag_$(lang_lc).elf
 # depends on nothing beyond the ROM itself.
 RELOC ?= 1
 
+# Serial console speed: 57600 (default, +0.47 %) or 115200 (-3.1 %).
+BAUD ?= 57600
+
 # Anything in src/config.h can be overridden from the command line without
 # editing the file, e.g. make CFLAGS_EXTRA=-DCFG_LANE_BEACON=1
 CFLAGS_EXTRA ?=
 
 CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
            -Wall -Wextra -std=c11 -DQUICK_TEST=$(QUICK) -DLANG_$(LANG) \
-           -DRELOC=$(RELOC) $(CFLAGS_EXTRA)
+           -DRELOC=$(RELOC) -DCFG_SCIF_BAUD=$(BAUD) $(CFLAGS_EXTRA)
 # P2 (0xA0000000) is the default: it is the window the reset vector lands in
 # and the only one this ROM has been observed to run from on real hardware.
 # ROM_BASE=0x80000000 links for P1, the cached alias, which is much faster but
@@ -53,7 +56,7 @@ all: $(BIN)
 
 # config stamp: objects carry no LANG/QUICK in their name, so force a
 # rebuild whenever the selected language or QUICK setting changes.
-STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)_A$(AUDIO)$(subst -,,$(subst =,,$(CFLAGS_EXTRA)))
+STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)_A$(AUDIO)_B$(BAUD)$(subst -,,$(subst =,,$(CFLAGS_EXTRA)))
 $(STAMP):
 	rm -f .build_* && touch $@
 
