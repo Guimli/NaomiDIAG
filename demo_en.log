@@ -1,4 +1,4 @@
-==== NAOMI DIAG ROM v0.15 (SH4/SCIF, no-RAM boot) ====
+==== NAOMI DIAG ROM v0.16 (SH4/SCIF, no-RAM boot) ====
 CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:00:00.000] SCIF console up, 57600 8N1
 [00:00:00.140] CPU OC-RAM (SH-4 IC1) ........ OK
@@ -70,7 +70,7 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:00:55.448] Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
 [00:00:55.699] Backup NVRAM IC29 (kept intact) ........ OK
 [00:01:01.107] RTC (AICA, must tick) ........ OK
-[00:01:04.702]   RTC date: 2026-09-28 00:36:25 (ticking)
+[00:01:04.702]   RTC date: 2026-09-28 00:40:29 (ticking)
 
 [00:01:04.926] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
 [00:01:05.238] Serial EEPROM (IC31, 93C46) ........ OK
