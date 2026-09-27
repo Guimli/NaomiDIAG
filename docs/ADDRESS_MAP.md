@@ -3,7 +3,9 @@
 Sources : désassemblage du BIOS epr-21576h (tables du RAM TEST à ROM
 0x5C470-0x5C560), captures d'écran du menu de test exécuté sous MAME
 (naomi-diag/snap/), driver MAME naomi.cpp/dc.cpp, liste de composants du
-PCB 837-13544 dans l'en-tête MAME.
+PCB 837-13544 dans l'en-tête MAME. Pour la Naomi 2 : relevé sur une carte
+837-14009, recoupé avec le manuel de service Sega et les tables du BIOS
+EPR-23608C (voir [Naomi 2](#naomi-2-837-14009--désignateurs-relevés)).
 
 ## Correspondance région ↔ puces (officielle, affichée par le BIOS)
 
@@ -30,6 +32,43 @@ Les groupes WORK et TEX ainsi que les rôles IC29/IC35 ont été corrigés aprè
   TEX0, TEX1 (+BACK), tables de numéros IC à ROM 0x5C484-0x5C4C8).
 - Écrans capturés : `naomi-diag/snap/naomi/*.png` (liste complète tous GOOD :
   IC29, IC35, IC9-12, IC16/18/20/22, IC17/19/21/23).
+
+## Naomi 2 (837-14009) — désignateurs relevés
+
+Relevé sur une Naomi 2 réelle, puis comparé au manuel de
+service Sega NAOMI 2 : toutes les désignations concordent. IC29 et IC46 ont
+été confirmés une seconde fois sur la carte. La Naomi 2 reprend les
+désignateurs de la Naomi 1 pour les parties communes et ajoute le second
+GPU (PVR-B) et l'Elan.
+
+| Rôle | Adresse SH4 (P2) | Puces (sérigraphie) | Notes |
+|---|---|---|---|
+| SH-4 (CPU) | — | **IC1** | |
+| RAM CPU (WORK) | 0xAC000000, 32 Mo | **IC9, IC10, IC11S, IC12S** | voies : parité du mot, comme sur Naomi 1 |
+| PowerVR 1 (PVR-A, maître) | registres 0xA05F8000 | **IC15** | |
+| VRAM PVR-A TEX0 | 0xA5000000, 8 Mo | **IC16, IC18, IC20, IC22** (dessus) | |
+| VRAM PVR-A TEX1 | 0xA5800000, 8 Mo | **IC17S, IC19S, IC21S, IC23S** (dessous) | IC21S confirmé par coupure de DQ9 |
+| PowerVR 2 (PVR-B, esclave) | registres 0xA25F8000 | **IC110** | fenêtres fermées au démarrage, ouvertes par l'Elan |
+| VRAM PVR-B TXB0 | 0xA7000000, 8 Mo | **IC111, IC113, IC115, IC117** (dessus) | numéros impairs d'abord, table BIOS |
+| VRAM PVR-B TXB1 | 0xA7800000, 8 Mo | **IC112S, IC114S, IC116S, IC118S** (dessous) | |
+| Elan (T&L) | registres 0xA8800000 | **IC105** | ID `E1AD0000`, confirmé sur carte |
+| RAM Elan (POLY) | 0xAA000000, 32 Mo | **IC106, IC107, IC108S, IC109S** | voies : parité du mot + moitié de 16 Mio |
+| ROM BIOS | 0xA0000000, 2 Mo | **IC27** | 27C160 |
+| NVRAM sauvegarde | 0xA0200000 | **IC29** | D43256BGU |
+| Puce son (AICA) | 0xA0700000 | **IC33** | |
+| RAM son | 0xA0800000, 8 Mo | **IC35** | |
+| FPGA Altera EPF8452AQC160-3 | — | **IC30** | |
+| EEPROM série 315-6188 (93C46) | GPIO SH-4 | **IC31** | |
+| MIE 315-6146 (Z80) | bus Maple | **IC45** | |
+| SRAM D43256BGU | — | **IC46** | 32 Ko près du MIE ; rôle non vérifié |
+| 315-6269 | — | **IC7** | rôle non vérifié |
+| EPROM 315-6268 | — | *aucune sérigraphie* | |
+
+Les voies de chaque région Naomi 2 sont détaillées plus bas :
+[Correspondance exploitable](#correspondance-exploitable) pour TEX et TXB,
+[RAM Elan (POLY)](#ram-elan-poly--chaîne-de-calcul) pour l'Elan. Le suffixe
+**S** désigne le verso. Les numéros viennent du relevé ; seule
+l'association d'un numéro à une voie de données vient du BIOS.
 
 ## Identification des deux gros circuits (relevé carte réelle)
 
@@ -81,6 +120,11 @@ croisées — le nôtre est plus exigeant.
 | RAM son (G2) | 0x00800000-0x00FFFFFF | 8 Mo |
 | VRAM accès 64 bits | 0x04000000 | 8 Mo (TEX) |
 | VRAM accès 32 bits | 0x05000000 | 8+8 Mo (TEX0/TEX1) |
+| Registres PVR-B (Naomi 2) | 0x025F8000 | ouverts après IFCTL de l'Elan |
+| VRAM PVR-B accès 64 bits (Naomi 2) | 0x06000000 | même mémoire que la fenêtre 32 bits |
+| VRAM PVR-B accès 32 bits (Naomi 2) | 0x07000000 | 8+8 Mo (TXB0/TXB1) |
+| Registres Elan (Naomi 2) | 0x08800000 | ID +0, IFCTL +0x10 (bits 1-2 : canal et CLXB, bit 0 : diffusion), rafraîchissement +0x14 |
+| RAM Elan (Naomi 2) | 0x0A000000-0x0BFFFFFF | 32 Mo |
 | RAM principale | 0x0C000000-0x0DFFFFFF | 32 Mo |
 | Cartouche/ROM board (G1) | 0x10000000 zone DMA | via registres G1 5F74xx |
 
