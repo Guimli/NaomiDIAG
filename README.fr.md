@@ -415,7 +415,69 @@ des 16 derniers = **IC108S** et **IC109S** — voir
 RAM Elan sur Naomi 2, aux mêmes conditions. Voir
 [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) pour la séquence et tous les codes.
 
+### Communication Maple / MIE sur matériel réel
+
+Les tampons DMA Maple sont réservés dans un bloc de RAM CPU validé, souvent
+près du sommet des 32 Mo. La protection `MDAPRO` est calculée à partir des
+deux tampons, avec des bornes inclusives de 1 Mio. L'ancienne constante
+`0x6155404F` ne couvrait que les premiers 16 Mo : les tampons en RAM haute
+étaient hors plage, ce qui pouvait produire un faux « MIE sans réponse ».
+Le [pilote libnaomi](https://github.com/DragonMinded/libnaomi/blob/main/libnaomi/maple.c)
+utilise le même encodage des bornes. MAME ignore ce registre de protection ;
+une réussite dans l'émulateur ne valide donc pas ce point sur la carte.
+
+En cas d'échec de détection, une trace par port fournit `desc`, `rx`,
+`mdapro` (valeur programmée), `mdst`, le mot de réponse et `isterr_before` /
+`isterr_after`. Ces derniers sont des instantanés bruts : ils peuvent contenir
+des erreurs anciennes ou étrangères à Maple et ne sont pas effacés.
+Le champ `status` distingue :
+
+| État | Signification |
+| --- | --- |
+| `invalid-request` | Adresse, alignement ou taille de requête non valide |
+| `busy-timeout` | Le transfert précédent reste actif ; tampons non réutilisés |
+| `dma-timeout` | Le nouveau transfert reste actif après 100 ms |
+| `rx-unchanged` | DMA terminé, mais le marqueur du tampon est resté intact |
+| `no-response` | Mot de réponse indiquant une absence de réponse |
+| `invalid-version-reply` | Réponse reçue, mais différente d'une version MIE valide |
+
+Un échec de communication ne désigne pas automatiquement un MIE défectueux.
+Les tests hôtes (`sh tools/test_maple.sh`) vérifient les bornes DMA, la RAM
+haute, les délais, le retour du compteur temporel à zéro et les réponses
+incorrectes.
+
+Validation sur une PCB Naomi 2 fonctionnelle, avec les boutons TEST/SERVICE
+de la **filter board** : communication MIE, auto-test, chargement du programme
+Z80 et navigation dans le menu série confirmés sur matériel réel.
+Réponse observée avant le chargement du programme Z80 (espaces conservés) :
+
+```text
+MIE on maple port 0, resp cmd 0x00000083
+MIE version: "315-6149    COPYRIGHT SEGA E"
+Bus Maple / MIE (JVS) ........ OK
+  MIE self-test status word: 00000000
+Auto-test MIE (Z80 ROM+RAM) ........ OK
+  programme Z80 charge dans le MIE
+  DIP SW1 : 1=31 kHz  2=OFF  3=ON  4=OFF   (port brut 000000FB)
+  Boutons carte : TEST relache, SERVICE relache
+```
+
+`0x83` est la réponse à la requête de version `0x82` ; `00000000` est le
+résultat réussi de l'auto-test. La chaîne ci-dessus est celle affichée par
+notre lecteur de réponse, pas une exigence d'identification ni une preuve
+du marquage physique du composant. Le lecteur affiche le contenu de la
+première trame ; il ne reconstitue pas une éventuelle suite du texte de
+version. Les positions DIP et l'état des boutons sont propres à cet essai,
+pas des valeurs obligatoires pour une carte saine. Ce retour valide les
+boutons de la filter board, pas les commandes d'une carte I/O JVS externe.
+
 ## Menu opérateur
+
+Le menu affiche ses huit choix sur VGA et sur la console série. Sur le port
+série, chaque ligne indique la touche directe (`c`, `v`, `s`, `d`, `g`, `f`, `j`, `m`) ;
+le repère `>` désigne le choix courant. Chaque appui sur TEST réaffiche la
+liste avec la nouvelle sélection, et SERVICE la lance. Aucun écran VGA ni
+support des séquences ANSI n'est nécessaire pour suivre la navigation.
 
 La suite de démarrage n'est pas la fin. `a` ou une touche du menu au port
 série, un bouton de la carte (**TEST** ou **SERVICE**), ou le **TEST** de la

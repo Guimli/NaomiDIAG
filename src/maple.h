@@ -3,7 +3,7 @@
 #include "hw.h"
 
 /* Maple bus (HOLLY DMA engine). On Naomi the MIE (315-6146 Z80) — the
- * JVS/inputs controller — is a Maple device: a Device Request transaction
+ * JVS/inputs controller — is a Maple device: a version request transaction
  * exercises the DMA engine, the link and the MIE's Z80 in one go.
  * Requires working main RAM (descriptors + rx buffer), so this runs only
  * after the SDRAM has been validated. */
@@ -63,7 +63,8 @@ u32 maple_jvs_info(u32 port, u32 idx, u8 *out28);
 #define JVS_NONE        3
 #define JVS_ERROR       4
 
-/* Put the DMA descriptors and receive buffer at p2_base (needs 0x200 bytes).
+/* Put the DMA descriptors and receive buffer at a 32-byte-aligned P2 address
+ * in CPU SDRAM (needs 0x200 reserved bytes). MDAPRO follows these buffers.
  * They must NOT sit in memory a running test is writing patterns over. */
 void maple_set_buffers(u32 p2_base);
 

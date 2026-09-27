@@ -380,7 +380,63 @@ The `v` loop covers PVR-B and the Elan RAM on a Naomi 2, under the same
 conditions. See [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) for the sequence
 and all access codes.
 
+### Maple / MIE communication on real hardware
+
+Maple DMA buffers live in a validated CPU RAM block, usually near the top
+of 32 MiB. `MDAPRO` protection is computed from both buffers using inclusive
+1 MiB bounds. The old `0x6155404F` constant covered only the first 16 MiB,
+leaving high-RAM buffers outside the allowed range and potentially causing
+a false "MIE not responding" result. The
+[libnaomi driver](https://github.com/DragonMinded/libnaomi/blob/main/libnaomi/maple.c)
+uses the same bounds encoding. MAME ignores this protection register, so
+emulator success does not validate it on hardware.
+
+Failed detection prints one trace per port: `desc`, `rx`, `mdapro` (the
+programmed value), `mdst`, the response header and `isterr_before` /
+`isterr_after`. The latter are raw snapshots that may contain old or unrelated
+errors; the diagnostic does not clear them. The `status` field distinguishes:
+
+| Status | Meaning |
+| --- | --- |
+| `invalid-request` | Invalid buffer address, alignment or request size |
+| `busy-timeout` | Previous transfer still active; buffers were not reused |
+| `dma-timeout` | New transfer still active after 100 ms |
+| `rx-unchanged` | DMA finished but the receive sentinel was untouched |
+| `no-response` | Response header indicates no response |
+| `invalid-version-reply` | Received a reply that is not a valid MIE version |
+
+A communication failure does not by itself identify a defective MIE.
+Host tests (`sh tools/test_maple.sh`) check DMA bounds, high RAM, deadlines,
+timer wraparound and invalid replies.
+
+Validated on a working Naomi 2 PCB using the **filter board** TEST/SERVICE
+buttons: MIE communication, self-test, Z80 program upload and serial-menu
+navigation all worked on real hardware. The observed identification before
+uploading the Z80 program was (spacing preserved):
+
+```text
+MIE on maple port 0, resp cmd 0x00000083
+MIE version: "315-6149    COPYRIGHT SEGA E"
+```
+
+The self-test status was `00000000`, followed by a successful program upload.
+The input report showed raw port `000000FB`, DIP SW1 set to 31 kHz / OFF /
+ON / OFF, and both TEST and SERVICE released.
+
+`0x83` answers the `0x82` version request; `00000000` indicates a successful
+self-test. This is the string displayed by our response reader, not a required
+identity or proof of the chip's physical marking. The reader displays the
+first response frame and does not assemble any continuation of the version
+text. DIP and button states describe this particular run, not mandatory
+values for a healthy board. This validates filter-board buttons, not the
+controls of an external JVS I/O board.
+
 ## Operator menu
+
+The menu lists all eight actions on both VGA and the serial console. Each
+serial entry includes its direct key (`c`, `v`, `s`, `d`, `g`, `f`, `j`, `m`); `>` marks
+the current selection. TEST prints the list again with the next selection,
+and SERVICE runs it. Navigation needs neither a VGA monitor nor ANSI support.
 
 The boot suite is not the end of it. `a` or a menu key on the serial port,
 a board button (**TEST** or **SERVICE**), or the cabinet's **TEST** or player
