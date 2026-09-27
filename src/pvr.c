@@ -42,24 +42,6 @@ void pvr_vram_enable(void)
     PVR_VRAM_REFRESH = 0x00000020;
 }
 
-/* Naomi 2 slave PVR: same controller at the +0x02000000 register window. */
-void pvr2_vram_enable(void)
-{
-    REG32(0xA25F8008) = 0;
-    REG32(0xA25F80A4) = 0x0000001F;
-    REG32(0xA25F80A8) = 0x15D1C951;
-    REG32(0xA25F80A0) = 0x00000020;
-}
-
-/* Elan T&L chip: control (bit 1..2 = enable slave/broadcast) and SDRAM
- * refresh, per the register defaults documented in the MAME driver.
- * Real-hardware init sequence still to be confirmed on a live 837-14009. */
-void elan_init(void)
-{
-    REG32(0xA8800010) = 6;
-    REG32(0xA8800014) = 0x2029;
-}
-
 /* ---- VRAM tests: identical suite to the SDRAM one ---- */
 
 u32 vram_test_databus(u32 base)
@@ -73,36 +55,6 @@ u32 vram_test_databus(u32 base)
         bad |= *p ^ ~bit;
     }
     return bad;
-}
-
-static void note_fail(ram_result *r, u32 addr, u32 exp, u32 got)
-{
-    r->errors++;
-    r->badbits |= exp ^ got;
-    if (addr & 4)
-        r->badbits_o |= exp ^ got;
-    else
-        r->badbits_e |= exp ^ got;
-    if (r->nfails < RAM_MAX_FAILS) {
-        r->fail_addr[r->nfails] = addr;
-        r->fail_exp [r->nfails] = exp;
-        r->fail_got [r->nfails] = got;
-        r->nfails++;
-    }
-}
-
-/* VRAM sits on the PowerVR bus, plain accesses with no FIFO discipline, so
- * it can use the same hand-written loops as the CPU RAM. Sound RAM
- * deliberately does NOT: it is behind G2, whose write FIFO must be drained
- * every eight words, and trading that for speed is what locked the bus up. */
-static void vram_pattern_locate(u32 base, u32 n, u32 pattern, ram_result *r)
-{
-    volatile u32 *p = (volatile u32 *)base;
-    for (u32 i = 0; i < n; i++) {
-        u32 got = p[i];
-        if (got != pattern)
-            note_fail(r, base + (i << 2), pattern, got);
-    }
 }
 
 void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
@@ -147,44 +99,23 @@ void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
             diff_e |= d;
     }
 
+    u32 previous_errors = r->errors;
     if (diff_e | diff_o)
-        vram_pattern_locate(base, n, pattern, r);
+        vram_locate(base, n, pattern, 0, r);
+    if (progress_aborted()) return;
 
-    /* A difference the re-scan could not reproduce is an intermittent cell,
-     * and it used to be discarded here: locate() found nothing, errors stayed
-     * zero and the region was reported good. The masks are kept per address
-     * parity precisely so this case still names one chip -- the data half
-     * gives the pair, the parity gives which of the two. */
-    if ((diff_e | diff_o) && r->errors == 0) {
+    /* An unlocated mismatch cannot choose a 4 MiB half from word parity. */
+    if ((diff_e | diff_o) && r->errors == previous_errors) {
         r->errors++;
         r->unpinned = 1;
         r->badbits |= diff_e | diff_o;
         r->badbits_e |= diff_e;
         r->badbits_o |= diff_o;
+        r->vram_chips |= vram_range_chip_mask(base, len, diff_e | diff_o);
     }
 }
 
 
-
-static inline u32 xorshift32(u32 x)
-{
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    return x;
-}
-
-static void vram_prng_locate(u32 base, u32 n, u32 seed, ram_result *r)
-{
-    volatile u32 *p = (volatile u32 *)base;
-    u32 x = seed ? seed : 1;
-    for (u32 i = 0; i < n; i++) {
-        x = xorshift32(x);
-        u32 got = p[i];
-        if (got != x)
-            note_fail(r, base + (i << 2), x, got);
-    }
-}
 
 void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
 {
@@ -224,10 +155,11 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
 
     r->crc_w = ~c.crc_w;
     r->crc_r = ~c.crc_r;
+    u32 previous_errors = r->errors;
     if (c.diff_e | c.diff_o)
-        vram_prng_locate(base, n, seed, r);
-#if CFG_RAM_CRC
-    if (c.crc_w != c.crc_r && r->errors == 0) {
+        vram_locate(base, n, seed, 1, r);
+    if (progress_aborted()) return;
+    if ((c.diff_e | c.diff_o) && r->errors == previous_errors) {
         /* intermittent: see the note in ramtest.c -- a CRC XOR is not a
          * data-line mask and must never be read as one */
         r->errors++;
@@ -235,8 +167,8 @@ void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
         r->badbits |= c.diff_e | c.diff_o;
         r->badbits_e |= c.diff_e;
         r->badbits_o |= c.diff_o;
+        r->vram_chips |= vram_range_chip_mask(base, len, c.diff_e | c.diff_o);
     }
-#endif
 }
 
 /* ---- display ---- */

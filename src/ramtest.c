@@ -23,6 +23,7 @@ void ram_result_clear(ram_result *r)
     r->crc_w = 0;
     r->crc_r = 0;
     r->unpinned = 0;
+    r->vram_chips = 0;
 }
 
 static void note_fail(ram_result *r, u32 addr, u32 exp, u32 got)

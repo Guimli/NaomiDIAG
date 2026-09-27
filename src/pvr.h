@@ -2,9 +2,10 @@
 #define PVR_H
 #include "hw.h"
 #include "ramtest.h"
+#include "vram_mapping.h"
 
 /* VRAM regions as tested by the original BIOS RAM TEST (32-bit path, P2):
- * TEX0 = IC9-IC12 (4x 16Mbit), TEX1 = IC35 (1x 64Mbit). */
+ * TEX0 = IC16/18/20/22; TEX1 = IC17/19/21/23 (4x 16 Mbit each). */
 #define VRAM_TEX0_BASE  0xA5000000u
 #define VRAM_TEX0_SIZE  0x00800000u
 #define VRAM_TEX1_BASE  0xA5800000u
@@ -26,13 +27,30 @@ void pvr_vram_enable(void);
 #define ELAN_RAM_BASE   0xAA000000u
 #define ELAN_RAM_SIZE   0x02000000u     /* 32 MB */
 
-void pvr2_vram_enable(void);            /* slave PVR SDRAM controller */
-void elan_init(void);                   /* Elan control + SDRAM refresh */
+typedef enum { PVR2_READY, PVR2_NO_ELAN, PVR2_CONTROL,
+               PVR2_NO_PVR, PVR2_MAPPING, PVR2_A_REFERENCE } pvr2_access;
+/* Call only for an identified/explicitly selected Naomi 2, after PVR-A init.
+ * Failure means access could not be qualified, not a defective RAM verdict. */
+pvr2_access pvr2_prepare(void);
+/* Snapshot of both passes at the last sampled offset. No MMIO on retrieval. */
+typedef struct { u32 addr, expected, observed; } pvr2_probe_sample;
+const pvr2_probe_sample *pvr2_probe_samples(u32 *count);
+
+typedef struct {
+    u32 first, second, expected, observed, reread, cpu_bits, alias;
+    u32 peer_expected, peer_observed;
+} vram_address_event;
+typedef void (*vram_address_report)(const vram_address_event *event);
+/* Destructive sparse diagnosis; report callbacks must not write VRAM. */
+u32 vram_address_diagnose(u32 base, u32 size, vram_address_report report);
 
 /* VRAM tests (plain bus accesses, same suite as SDRAM). */
 u32  vram_test_databus(u32 base);
 void vram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r);
 void vram_test_prng(u32 base, u32 len, u32 seed, ram_result *r);
+
+/* Detailed rescan: random=0 repeats value; random=1 regenerates the seed. */
+void vram_locate(u32 base, u32 n, u32 value, u32 random, ram_result *r);
 
 /* Display: VGA 640x480@31kHz, RGB565, timings from the original BIOS. */
 

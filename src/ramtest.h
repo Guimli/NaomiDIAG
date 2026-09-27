@@ -51,6 +51,7 @@ typedef struct {
     u32 crc_w, crc_r;
                                  /* PRNG pass: write-side / read-side CRC32 */
     u32 unpinned;                /* seen while verifying, gone on re-scan    */
+    u32 vram_chips;              /* BIOS slots, independent of word parity */
 } ram_result;
 
 void ram_result_clear(ram_result *r);
@@ -60,7 +61,8 @@ void ram_result_clear(ram_result *r);
 u32 ram_test_databus(u32 addr);
 
 /* Power-of-two address line test over [base, base+size). Returns bitmask
- * of faulty address lines (0 = OK). */
+ * of failing address-test steps (0 = OK). Data faults can set this mask;
+ * it is not proof of defective address lines. */
 u32 ram_test_addrbus(u32 base, u32 size);
 
 /* Fixed-pattern pass: fill [base, base+len) with pattern, verify. */
