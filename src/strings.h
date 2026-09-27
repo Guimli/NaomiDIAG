@@ -176,7 +176,7 @@
 #define S_L_ABORTED         "Test interrompu par l'operateur"
 #define S_LOOP_PASS         "passe "
 #define S_LOOP_ERR          "  erreurs cumulees : "
-#define S_WAIT_TEST         "\nAppuyez sur TEST (carte) pour le menu.\n"
+#define S_WAIT_TEST         "\nAppuyez sur TEST ou SERVICE (carte) pour le menu.\n"
 #define S_HELP              "\nTouches :\n"\
                             "  h  cette aide (n'interrompt pas)\n"\
                             "  a  interrompre le test en cours (et une boucle, si les\n"\
@@ -403,7 +403,7 @@
 #define S_L_ABORTED         "Test interrupted by the operator"
 #define S_LOOP_PASS         "pass "
 #define S_LOOP_ERR          "  errors so far: "
-#define S_WAIT_TEST         "\nPress TEST (on the board) for the menu.\n"
+#define S_WAIT_TEST         "\nPress TEST or SERVICE (on the board) for the menu.\n"
 #define S_HELP              "\nKeys:\n"\
                             "  h  this help (does not interrupt)\n"\
                             "  a  abort the running test (and a loop, when the board\n"\

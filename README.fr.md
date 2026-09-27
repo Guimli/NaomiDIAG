@@ -215,11 +215,11 @@ complètement le mécanisme.
 
 ## Console opérateur
 
-La suite de démarrage n'est pas la fin. Une touche au port série, ou le
-bouton **TEST** de la carte, arrête la suite : le test en cours s'arrête au
+La suite de démarrage n'est pas la fin. Une touche au port série, ou l'un
+des deux boutons de la carte (**TEST** ou **SERVICE**), arrête la suite : le test en cours s'arrête au
 bloc suivant et **ne rend aucun verdict** sur la partie effectuée — ses
 phases se terminent par `interrompue`, pas par `ok` — et la suite ne reprend
-pas. `a` mène au rapport, **TEST** ouvre le menu, et une touche du menu
+pas. `a` mène au rapport, un bouton de la carte ouvre le menu, et une touche du menu
 (`c`, `v`, `s`, `d`, `g`, `f`) lance directement son action.
 
 Les boutons exigent d'abord le téléversement d'un petit programme Z80 dans le
@@ -245,7 +245,7 @@ Touches sur la console série :
 | `f` | flash du firmware DIMM — identification, et choix d'une version |
 
 **TEST** parcourt le menu en bouclant ; **SERVICE** lance la sélection. Les
-trois boucles RAM tournent jusqu'à l'appui sur **TEST** et rien d'autre ne
+trois boucles RAM tournent jusqu'à l'appui sur un bouton de la carte et rien d'autre ne
 les arrête — c'est le but, une panne intermittente se montrant à la dixième
 passe et non à la première. Une seule exception : quand les boutons de la
 carte sont indisponibles (le MIE n'a jamais répondu au programme
@@ -254,7 +254,7 @@ boucle vidéo couvre les deux bancs, TEX0 et TEX1, et chaque boucle nomme une
 puce défaillante comme le fait la suite de démarrage.
 
 Toute autre action ouvre un rapport qui lui est propre, l'affiche, et attend
-un **TEST** pour ramener le menu.
+**TEST** ou **SERVICE** pour ramener le menu.
 
 Deux d'entre elles sont à l'initiative de l'opérateur précisément parce
 qu'elles ne sont pas sûres sans surveillance : le test SDRAM du DIMM écrase

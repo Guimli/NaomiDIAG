@@ -94,7 +94,7 @@ void diag_input_check(u32 in_loop)
             scif_puts(S_HELP);          /* help never interrupts */
             return;
         }
-        /* Only TEST ends a soak run -- unless there is no TEST button to
+        /* Only the board buttons end a soak run -- unless there are none to
          * press. The buttons exist only once the Z80 program answers in the
          * MIE; without it a loop started from the console could only be
          * stopped by a reset. So 'a' does it then, and only then. */
@@ -115,9 +115,10 @@ void diag_input_check(u32 in_loop)
         }
         return;                         /* unknown key: ignored */
     }
-    /* TEST always stops. In a soak run that is all it does; anywhere else it
-     * is also the way into the menu, as it is once the report is up. */
-    if (ev.kind == INPUT_SELECT)
+    /* Either board button always stops, TEST or SERVICE alike. In a soak
+     * run that is all it does; anywhere else it is also the way into the
+     * menu, as it is once the report is up. */
+    if (ev.kind == INPUT_SELECT || ev.kind == INPUT_CONFIRM)
         progress_request_abort(in_loop ? ABORT_PLAIN : ABORT_MENU);
 }
 

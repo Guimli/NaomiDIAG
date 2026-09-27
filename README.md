@@ -196,11 +196,11 @@ that needs diagnosing. Build with `RELOC=0` to disable it entirely.
 
 ## Operator console
 
-The boot suite is not the end of it. A key on the serial port, or the board's
-**TEST** button, stops the suite: the test running at the time stops at its
+The boot suite is not the end of it. A key on the serial port, or either
+of the board's buttons (**TEST** or **SERVICE**), stops the suite: the test running at the time stops at its
 next block and draws **no** verdict from the part it did — its phases end in
 `interrupted`, not `ok` — and the suite does not resume. `a` goes to the
-report, **TEST** opens the menu, and a menu key (`c`, `v`, `s`, `d`, `g`,
+report, a board button opens the menu, and a menu key (`c`, `v`, `s`, `d`, `g`,
 `f`) runs that action straight away.
 
 The buttons need a small Z80 program uploaded into the MIE first — the
@@ -226,7 +226,7 @@ Keys on the serial console:
 | `f` | DIMM firmware flash — identify, and choose a version |
 
 **TEST** steps through the menu and wraps; **SERVICE** runs the selection. The
-three RAM loops run until **TEST** is pressed and nothing else stops them —
+three RAM loops run until a board button is pressed and nothing else stops them —
 that is the point, since an intermittent fault shows up on the tenth pass,
 not the first. The one exception: when the board buttons are unavailable
 (the MIE never answered the uploaded program), `a` stops a loop too, or it
@@ -234,7 +234,7 @@ could only be stopped by a reset. The video loop covers both banks, TEX0 and
 TEX1, and every loop names a failing chip the way the boot suite does.
 
 Every other action starts a report of its own, prints it, and waits for
-**TEST** to bring the menu back.
+**TEST** or **SERVICE** to bring the menu back.
 
 Two of these are operator-initiated precisely because they are not safe to
 run unattended: the DIMM SDRAM test overwrites whatever game is loaded in the
