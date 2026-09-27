@@ -432,9 +432,10 @@ under the DRC, so fault injection into it needs `-nodrc`.
 - For WORK, IC10 on D16–D31 of the even word was validated by repair.
   IC9, IC11S and IC12S still follow the inferred lane order without
   individual measurements; the lane beacon can verify them.
-- The spoken clips say the number without the **S** suffix, so a fault on
-  IC11S is heard as "I C eleven". The screen and the serial console are
-  authoritative.
+- Every RAM chip the ROM can name has its own spoken clip, Naomi 2 chips
+  included (TEX1, PVR-B, Elan RAM), and the **S** suffix is spoken: a fault
+  on IC11S is heard as "I C eleven S". The voice is Piper text-to-speech, so
+  the screen and the serial console remain authoritative.
 - Full JVS I/O-board testing still needs a JVS master in the MIE's Z80. The
   settings EEPROM and the board's own buttons no longer do: `make mieprog`
   rebuilds `src/mie_prog.h` from the Z80 source if you change it, and the

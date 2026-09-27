@@ -465,8 +465,10 @@ sous le DRC, l'injection de panne y nécessite `-nodrc`.
 - Pour WORK, IC10 sur D16–D31 du mot pair a été validé par réparation.
   IC9, IC11S et IC12S restent déduits de l'ordre des voies, sans mesure
   individuelle ; la balise de voies permet de les vérifier.
-- Les clips vocaux énoncent le numéro sans le suffixe **S** : une panne sur
-  IC11S s'entend « I C onze ». L'écran et le port série font foi.
+- Chaque puce RAM que la ROM sait nommer a son clip vocal, puces Naomi 2
+  comprises (TEX1, PVR-B, RAM Elan), et le suffixe **S** est prononcé : une
+  panne sur IC11S s'entend « I C onze S ». La voix est une synthèse Piper :
+  l'écran et le port série font foi.
 - Le test JVS complet de la carte I/O demande encore un maître JVS dans le
   Z80 du MIE. L'EEPROM des réglages et les boutons de la carte, eux, ne le
   demandent plus : `make mieprog` reconstruit `src/mie_prog.h` depuis le

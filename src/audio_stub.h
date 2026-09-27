@@ -56,6 +56,22 @@ enum {
     CLIP_X76,
     CLIP_CART,
     CLIP_CPU_EXC,
+    CLIP_IC_17S,
+    CLIP_IC_19S,
+    CLIP_IC_21S,
+    CLIP_IC_23S,
+    CLIP_IC_111,
+    CLIP_IC_113,
+    CLIP_IC_115,
+    CLIP_IC_117,
+    CLIP_IC_112S,
+    CLIP_IC_114S,
+    CLIP_IC_116S,
+    CLIP_IC_118S,
+    CLIP_IC_106,
+    CLIP_IC_107,
+    CLIP_IC_108S,
+    CLIP_IC_109S,
     CLIP_COUNT
 };
 

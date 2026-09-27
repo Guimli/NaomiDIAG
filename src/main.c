@@ -190,30 +190,28 @@ static const comp_map tex0_comps[4] = {
     { CLIP_IC_20, "IC20" },         /* last 4 MiB, D0-D15 */
     { CLIP_IC_22, "IC22" },         /* last 4 MiB, D16-D31 */
 };
-/* No spoken clips exist for these four: the voice falls back to the position
- * number rather than announcing a chip it cannot name. */
 static const comp_map tex1_comps[4] = {
-    { CLIP_NONE, "IC17S" },
-    { CLIP_NONE, "IC19S" },
-    { CLIP_NONE, "IC21S" },
-    { CLIP_NONE, "IC23S" },
+    { CLIP_IC_17S, "IC17S" },
+    { CLIP_IC_19S, "IC19S" },
+    { CLIP_IC_21S, "IC21S" },
+    { CLIP_IC_23S, "IC23S" },
 };
 
 /* EPR-23608C Naomi 2 TXB0/TXB1 tables, in BIOS result-bit order. The even
  * numbers are on the underside, as TEX1's are (designators read off a
  * Naomi 2 and checked against Sega's service manual). */
 static const comp_map pvrb_comps[8] = {
-    { CLIP_NONE, "IC111" },  { CLIP_NONE, "IC113" },
-    { CLIP_NONE, "IC115" },  { CLIP_NONE, "IC117" },
-    { CLIP_NONE, "IC112S" }, { CLIP_NONE, "IC114S" },
-    { CLIP_NONE, "IC116S" }, { CLIP_NONE, "IC118S" },
+    { CLIP_IC_111, "IC111" },  { CLIP_IC_113, "IC113" },
+    { CLIP_IC_115, "IC115" },  { CLIP_IC_117, "IC117" },
+    { CLIP_IC_112S, "IC112S" }, { CLIP_IC_114S, "IC114S" },
+    { CLIP_IC_116S, "IC116S" }, { CLIP_IC_118S, "IC118S" },
 };
 
 /* EPR-23608C POLY table: bit 0/1 = even/odd 32-bit word of the lower
  * 16 MiB, bit 2/3 the same in the upper 16 MiB (see vram_mapping.h). */
 static const comp_map elan_comps[4] = {
-    { CLIP_NONE, "IC106" },  { CLIP_NONE, "IC107" },
-    { CLIP_NONE, "IC108S" }, { CLIP_NONE, "IC109S" },
+    { CLIP_IC_106, "IC106" },  { CLIP_IC_107, "IC107" },
+    { CLIP_IC_108S, "IC108S" }, { CLIP_IC_109S, "IC109S" },
 };
 
 

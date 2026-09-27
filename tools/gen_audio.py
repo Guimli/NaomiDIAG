@@ -49,8 +49,8 @@ CLIPS = {
     # silkscreen IC designators (mapping from the original BIOS RAM TEST)
     "ic_9":       {"fr": "I C neuf,",                         "en": "I C nine,"},
     "ic_10":      {"fr": "I C dix,",                          "en": "I C ten,"},
-    "ic_11":      {"fr": "I C onze,",                         "en": "I C eleven,"},
-    "ic_12":      {"fr": "I C douze,",                        "en": "I C twelve,"},
+    "ic_11":      {"fr": "I C onze S,",                       "en": "I C eleven S,"},
+    "ic_12":      {"fr": "I C douze S,",                      "en": "I C twelve S,"},
     "ic_16":      {"fr": "I C seize,",                        "en": "I C sixteen,"},
     "ic_18":      {"fr": "I C dix-huit,",                     "en": "I C eighteen,"},
     "ic_20":      {"fr": "I C vingt,",                        "en": "I C twenty,"},
@@ -76,6 +76,23 @@ CLIPS = {
     "cart":       {"fr": "Cartouche de jeu.",                 "en": "Game cartridge."},
     # appended, never inserted: the enum order is shared by both languages
     "cpu_exc":    {"fr": "Exception du processeur.",          "en": "C P U exception."},
+    # TEX1, PVR-B and Elan RAM designators; the S (underside) is spoken
+    "ic_17s":     {"fr": "I C dix-sept S,",                  "en": "I C seventeen S,"},
+    "ic_19s":     {"fr": "I C dix-neuf S,",                  "en": "I C nineteen S,"},
+    "ic_21s":     {"fr": "I C vingt et un S,",               "en": "I C twenty one S,"},
+    "ic_23s":     {"fr": "I C vingt-trois S,",               "en": "I C twenty three S,"},
+    "ic_111":     {"fr": "I C cent onze,",                   "en": "I C one hundred eleven,"},
+    "ic_113":     {"fr": "I C cent treize,",                 "en": "I C one hundred thirteen,"},
+    "ic_115":     {"fr": "I C cent quinze,",                 "en": "I C one hundred fifteen,"},
+    "ic_117":     {"fr": "I C cent dix-sept,",               "en": "I C one hundred seventeen,"},
+    "ic_112s":    {"fr": "I C cent douze S,",                "en": "I C one hundred twelve S,"},
+    "ic_114s":    {"fr": "I C cent quatorze S,",             "en": "I C one hundred fourteen S,"},
+    "ic_116s":    {"fr": "I C cent seize S,",                "en": "I C one hundred sixteen S,"},
+    "ic_118s":    {"fr": "I C cent dix-huit S,",             "en": "I C one hundred eighteen S,"},
+    "ic_106":     {"fr": "I C cent six,",                    "en": "I C one hundred six,"},
+    "ic_107":     {"fr": "I C cent sept,",                   "en": "I C one hundred seven,"},
+    "ic_108s":    {"fr": "I C cent huit S,",                 "en": "I C one hundred eight S,"},
+    "ic_109s":    {"fr": "I C cent neuf S,",                 "en": "I C one hundred nine S,"},
 }
 
 RATE = 22050
