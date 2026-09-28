@@ -1680,16 +1680,46 @@ static void test_sram_rtc(void)
         report_fails(&res);
     }
 
-    u32 rtcval = 0;
-    u32 bad = rtc_test(&rtcval);
-    log_result(S_L_RTC, CLIP_RTC, bad ? T_FAIL : T_OK, 0, 0);
+    rtc_result rr;
+    rtc_check(&rr);
+    log_result(S_L_RTC, CLIP_RTC, rr.verdict ? T_FAIL : T_OK, 0, 0);
+    /* both reads of each measurement, so a failure says what happened */
+    for (u32 i = 0; i < rr.n; i += 2) {
+        u32 d = rr.t[i + 1] - rr.t[i];
+        scif_puts(S_RTC_READS);
+        scif_putdec(rr.t[i]);
+        scif_puts(" -> ");
+        scif_putdec(rr.t[i + 1]);
+        scif_puts(" (");
+        if (d & 0x80000000u) {
+            scif_puts("-");
+            scif_putdec(0u - d);
+        } else {
+            scif_puts("+");
+            scif_putdec(d);
+        }
+        scif_puts(" s)\n");
+    }
     /* A raw counter tells the operator nothing; the date tells them when
      * this board was last on, and whether its battery still holds. */
+    u32 rtcval = rr.t[rr.n - 1];
     rtc_fmt(rtcval, g_rtc_str);
     scif_puts(S_RTC_DATE);
     scif_puts(g_rtc_str);
-    scif_puts(bad ? S_RTC_STUCK : S_RTC_TICK);
+    scif_puts(rr.verdict == RTC_OK ? S_RTC_TICK :
+              rr.verdict == RTC_STUCK ? S_RTC_STUCK :
+              rr.verdict == RTC_IRREGULAR ? S_RTC_IRREG : S_RTC_JUMP);
     screen_draw_date();
+
+    /* Whether it ticks and whether it holds the right date are separate
+     * questions. A date before 2026 cannot be today's: the battery went
+     * flat at some point, or the clock was never set. Serial only while
+     * it is fine; on screen and in speech when it is not. */
+    u32 date_ok = rtc_year(rtcval) >= 2026u;
+    log_result_q(S_L_RTC_DATE, CLIP_RTC_DATE, date_ok ? T_OK : T_FAIL,
+                 0, 0, 1, CLIP_NONE);
+    if (!date_ok)
+        scif_puts(S_RTC_DATE_BAD);
 }
 
 /* ------------------------------------------------------------------ */

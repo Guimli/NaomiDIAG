@@ -150,8 +150,14 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
     [plus bas](#accès-au-pvr-b-et-ram-elan).
 13. **NVRAM de sauvegarde (IC29)** — test non destructif
     (sauvegarde/restauration).
-14. **RTC** (interne à l'AICA, IC33) — vérification non destructive de
-    l'avance de l'horloge ; la date qu'elle contient est affichée.
+14. **RTC** (interne à l'AICA, IC33) — non destructif : le compteur doit
+    avancer d'une valeur plausible en 2,2 s. Un échec est mesuré une
+    seconde fois, pour distinguer une horloge figée (deux fois immobile),
+    irrégulière (immobile puis repartie) ou une lecture aberrante (saut ou
+    retour en arrière) ; le port série imprime chaque lecture brute. Sa date
+    est un contrôle à part : avant 2026, elle ne peut pas être celle du jour
+    — pile HS ou horloge jamais réglée — et elle a sa propre ligne
+    (`Date RTC (2026 ou apres)`).
 15. **EEPROM numéro de série** (IC31, 93C46 sur GPIO du SH-4) — lecture +
     contrôle du contenu.
 16. **Intégrité du code relogé** — les boucles relogées ont tourné depuis la

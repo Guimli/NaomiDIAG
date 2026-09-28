@@ -129,6 +129,7 @@ CLIPS = {
     "addr_bit":   {"fr": "Bit d'adresse,",                    "en": "Address bit,"},
     "faulty_on":  {"fr": "fautif sur",                        "en": "faulty on"},
     "cut_all":    {"fr": "coupée, commune à toutes les puces.", "en": "cut, common to all chips."},
+    "rtc_date":   {"fr": "Date de l'horloge.",                "en": "Clock date."},
 }
 
 RATE = 22050

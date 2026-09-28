@@ -107,6 +107,7 @@ enum {
     CLIP_ADDR_BIT,
     CLIP_FAULTY_ON,
     CLIP_CUT_ALL,
+    CLIP_RTC_DATE,
     CLIP_COUNT
 };
 

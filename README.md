@@ -138,8 +138,13 @@ are reported as they land.
     are shown independent of PVR-A, and the Elan RAM (32 MB,
     IC106/107/108S/109S); see [below](#pvr-b-access-and-the-elan-ram).
 13. **Backup NVRAM (IC29)** — non-destructive save/restore test.
-14. **RTC** (inside the AICA, IC33) — non-destructive tick check; the date
-    it holds is shown.
+14. **RTC** (inside the AICA, IC33) — non-destructive: the counter must
+    advance by a plausible amount over 2.2 s. A failure is measured again,
+    so the report tells a stopped clock (still twice) from an irregular one
+    (still, then moving) and from an implausible read (a jump or a step
+    backwards); the serial console prints every raw read. Its date is a
+    separate check: before 2026 it cannot be today's — a flat battery, or a
+    clock never set — and it gets its own line (`RTC date (2026 or later)`).
 15. **Serial-number EEPROM** (IC31, 93C46 on SH-4 GPIO) — read + content
     check.
 16. **Relocated code integrity** — the relocated loops ran from the very RAM

@@ -247,17 +247,50 @@ void rtc_fmt(u32 secs, char *out)
     out[19] = 0;
 }
 
-u32 rtc_test(u32 *value)
+/* One measurement: two reads 2.2 s apart, more than two ticks of the
+ * one-second counter. */
+static u32 rtc_measure(u32 *a, u32 *b)
 {
-    u32 t0 = rtc_read();
-    delay_ms(2200);                     /* > 2 RTC ticks */
-    u32 t1 = rtc_read();
-    *value = t1;
-    /* the counter must move, forward, by a plausible amount */
-    if (t1 == t0)
-        return 1;
-    u32 d = t1 - t0;
-    if (d < 1 || d > 10)
-        return 1;
-    return 0;
+    *a = rtc_read();
+    delay_ms(2200);
+    *b = rtc_read();
+    u32 d = *b - *a;                    /* backwards wraps to a huge value */
+    if (d == 0)
+        return RTC_STUCK;
+    return (d >= 1 && d <= 10) ? RTC_OK : RTC_JUMP;
+}
+
+/* The counter must move, forward, by a plausible amount. A failure is
+ * measured a second time, so the verdict can tell a clock that stopped
+ * (twice still), one that stalls now and then (still, then moving), and a
+ * read that made no sense (a jump or a step backwards). */
+void rtc_check(rtc_result *r)
+{
+    u32 v1 = rtc_measure(&r->t[0], &r->t[1]);
+    r->n = 2;
+    r->verdict = v1;
+    if (v1 == RTC_OK)
+        return;
+    u32 v2 = rtc_measure(&r->t[2], &r->t[3]);
+    r->n = 4;
+    if (v2 == RTC_OK)
+        r->verdict = RTC_IRREGULAR;
+    else if (v1 == RTC_JUMP || v2 == RTC_JUMP)
+        r->verdict = RTC_JUMP;
+    else
+        r->verdict = RTC_STUCK;
+}
+
+u32 rtc_year(u32 secs)
+{
+    u32 days = secs / 86400u;
+    u32 y = 1950;
+    for (;;) {
+        u32 leap = ((y % 4u) == 0u && ((y % 100u) != 0u || (y % 400u) == 0u));
+        u32 dy = leap ? 366u : 365u;
+        if (days < dy)
+            return y;
+        days -= dy;
+        y++;
+    }
 }

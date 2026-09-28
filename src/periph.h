@@ -15,7 +15,17 @@ u32 sram_test(ram_result *r);
 /* AICA RTC (32.768kHz crystal + battery), seconds since 1950.
  * Non-destructive: reads the counter twice around a TMU delay and checks
  * that it ticks. Returns 0 = OK, 1 = stuck/dead. *value out = counter. */
-u32 rtc_test(u32 *value);
+#define RTC_OK          0
+#define RTC_STUCK       1   /* still over two measurements          */
+#define RTC_IRREGULAR   2   /* still, then moving on the second one */
+#define RTC_JUMP        3   /* moved backwards or by more than 10 s */
+typedef struct {
+    u32 t[4];               /* raw reads, pairs 2.2 s apart */
+    u32 n;                  /* 2, or 4 when measured twice  */
+    u32 verdict;            /* RTC_*                        */
+} rtc_result;
+void rtc_check(rtc_result *r);
+u32  rtc_year(u32 secs);    /* calendar year of a counter value */
 
 /* Format an AICA RTC reading (seconds since 1950) as
  * "YYYY-MM-DD HH:MM:SS". `out` needs 20 bytes. */
