@@ -74,8 +74,9 @@ cette forme (`PCMS=2`), qu'elle décode en matériel. C'est un gain sec de 4:1
 sur l'EPROM, sans décompresseur, sans tampon intermédiaire et sans coût
 processeur — les octets sont copiés en RAM son exactement tels qu'ils sont
 en ROM. Le build français complet est passé de 98 % de l'EPROM à 29 % ;
-avec les clips ajoutés depuis (puces Naomi 2, carte JVS), un build complet
-occupe environ 40 %.
+avec les clips ajoutés depuis (puces Naomi 2, carte JVS, lignes de données),
+un build complet
+occupe environ 50 %.
 
 ## Ce qui est testé
 
@@ -206,6 +207,18 @@ Les pannes RAM sont rapportées par composant : masque de bits, voies de
 données concernées, et désignateur IC sérigraphié (ex.
 `RAM CPU 1 (IC9) DEFECTUEUX`). Les puces de VRAM et de RAM Elan sont
 désignées comme *voie suspecte (puce ou connexions)*.
+
+Une panne de RAM CPU est aussi examinée pour une **ligne de données
+coupée**. Chaque bit fautif est sondé sur 64 adresses réparties dans la zone
+testée, sur la parité de mot où il a échoué : toutes écrites, puis un leurre
+de polarité opposée pour qu'une ligne flottante ne se contente pas de
+garder la dernière valeur envoyée, puis toutes relues, avec le bit à 0 puis
+à 1. Faux sur 60 ou plus, c'est une ligne et non une cellule : elle a sa
+propre ligne à l'écran et à la voix — `Ligne D5 coupee sur IC9`, « Ligne D,
+cinq, coupée sur, I C neuf » — et le port série précise comment elle se lit
+(toujours 0, toujours 1, ou flottante). Les lignes sont numérotées comme le
+bus 64 bits du SH-4 les porte : un mot pair est D0-D31, un mot impair
+D32-D63.
 
 La barre de progression se retire après les mémoires Naomi 2 : à partir de
 là plus rien ne se mesure — la NVRAM, le RTC et l'EEPROM série répondent par
@@ -501,7 +514,7 @@ la machine ne se stabilise pas. À activer quand vous avez une sonde en main.
 remplacée par un stub et l'image tombe à 6 % de l'EPROM. Cette option est née
 quand les clips étaient du PCM 16 bits et ne laissaient de place à rien
 d'autre ; depuis leur passage en ADPCM, un build complet occupe environ
-40 %, ce n'est donc plus un moyen de faire de la place — c'est pour un
+50 %, ce n'est donc plus un moyen de faire de la place — c'est pour un
 établi où la parole gêne, et ça démarre un peu plus vite. `AUDIO=1` est la
 valeur par défaut.
 

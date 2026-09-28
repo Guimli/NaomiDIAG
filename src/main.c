@@ -47,6 +47,11 @@ u32 crc32_rom_block(const u32 *src, u32 nquads, u32 crc);
  * bar from 0 to 100%, so the operator can see which of the three is running
  * and how far it has got. */
 #define N_PHASES    3
+#ifdef LANG_FR
+#define LANG_IS_FR 1
+#else
+#define LANG_IS_FR 0
+#endif
 #define REPORT_GAP_MS 1000          /* >= 1 s between spoken reports */
 
 #define CLIP_NONE   0xFFFFFFFFu
@@ -227,6 +232,7 @@ typedef struct {
     const comp_map *comps;          /* NULL, or 4-entry position->IC table */
     u32 quiet_ok;                   /* screen+speech: only when it FAILS   */
     u32 pre;                        /* clip spoken first, or CLIP_NONE     */
+    u32 line;                       /* cut data line: D number + 1, else 0 */
 } log_entry;
 
 static log_entry g_log[LOG_MAX];
@@ -358,10 +364,35 @@ static void say(u32 clip, u32 gap_ms)
  * name when the mapping is known ("Main memory, I C sixteen, defective")
  * and the position number otherwise. Duplicate IC clips (single-chip
  * RAMs) are only spoken once. */
+/* 0..63, from the number clips: French composes 17-19 and 61 its own way,
+ * but with 0-19 and the tens as clips only "et un" needs a rule. */
+static void say_number(u32 n)
+{
+    if (n < 20) {
+        say(CLIP_W_0 + n, 0);
+        return;
+    }
+    u32 t = n / 10, u = n - t * 10;     /* constant divide: no libgcc */
+    say(CLIP_W_20 + (t - 2), 0);
+    if (u == 1 && LANG_IS_FR)
+        say(CLIP_W_AND_ONE, 0);
+    else if (u)
+        say(CLIP_W_0 + u, 0);
+}
+
 static void say_entry(const log_entry *e)
 {
     if (!g_audio_ready || e->clip == CLIP_NONE)
         return;
+    /* "Line D, thirty seven, cut on, I C eleven S" */
+    if (e->line) {
+        say(CLIP_LINE_D, 0);
+        say_number(e->line - 1);
+        say(CLIP_CUT_ON, 0);
+        say(e->clip, 250);
+        progress_wait_ms(REPORT_GAP_MS);
+        return;
+    }
     /* Same rule as the screen: an entry that gives up its line while it
      * passes gives up its clip too. The operator hears what is written in
      * front of them, and a bus test announcing itself with nothing to show
@@ -408,6 +439,18 @@ static void say_entry(const log_entry *e)
 /* quiet_ok: the screen and the speech report this result only if it FAILS.
  * Serial reports it either way -- it is the screen that is short of lines,
  * and the spoken report follows the screen so the two agree. */
+/* A log_entry grew past what GCC copies inline, and a struct assignment
+ * would then call memmove from libgcc, which this ROM does not link. */
+static void log_store(const log_entry *e)
+{
+    if (g_log_n >= LOG_MAX)
+        return;
+    const u32 *src = (const u32 *)e;
+    u32 *dst = (u32 *)&g_log[g_log_n++];
+    for (u32 i = 0; i < sizeof(log_entry) / 4; i++)
+        dst[i] = src[i];
+}
+
 static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
                          const comp_map *comps, u32 quiet_ok, u32 pre)
 {
@@ -423,8 +466,8 @@ static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
     e.comps = comps;
     e.quiet_ok = quiet_ok;
     e.pre = pre;
-    if (g_log_n < LOG_MAX)
-        g_log[g_log_n++] = e;
+    e.line = 0;
+    log_store(&e);
 
     scif_puts(name);
     scif_puts(st == T_OK ? S_SUF_OK : S_SUF_FAIL);
@@ -796,6 +839,114 @@ static void relocate_fast_loops(void)
 }
 
 
+
+/* ---- cut data lines on the CPU RAM ------------------------------------
+ * A failing cell test says which bits failed, not why. A cut (or shorted)
+ * line fails that bit on essentially every word of its parity; a bad cell
+ * fails it here and there. After a CPU RAM fault each failing bit is
+ * probed on 64 addresses spread over the tested region, on the word parity
+ * it failed on: all 64 written, then a decoy of the opposite polarity so a
+ * floating line cannot just hold the last value driven, then all read
+ * back -- once with the bit at 0, once at 1. Wrong on 60 or more in either
+ * polarity is a line, not a cell.
+ *
+ * Named in the SH-4's 64-bit numbering, which is what the board traces
+ * carry: an even word is D0-D31, an odd word D32-D63. */
+#define LINE_SAMPLES    64u
+#define LINE_THRESHOLD  60u
+#define CUT_MAX         4u
+
+static char g_cut_name[CUT_MAX][32];
+static u32  g_cut_n;
+
+static u32 line_probe(u32 base, u32 len, u32 odd, u32 bit, u32 set)
+{
+    volatile u32 *p = (volatile u32 *)base;
+    u32 stride = (len >> 6) & ~7u;          /* 64 samples, 8-byte steps */
+    u32 m = 1u << bit;
+    u32 w0 = odd ? 1u : 0u;
+    for (u32 k = 0; k < LINE_SAMPLES; k++) {
+        u32 v = (0x5A5AA5A5u ^ (k * 0x01010101u)) & ~m;
+        p[k * (stride >> 2) + w0] = set ? v | m : v;
+    }
+    p[w0 + 2] = set ? 0u : 0xFFFFFFFFu;     /* decoy, opposite polarity */
+    u32 wrong = 0;
+    for (u32 k = 0; k < LINE_SAMPLES; k++)
+        if (((p[k * (stride >> 2) + w0] >> bit) & 1u) != set)
+            wrong++;
+    return wrong;
+}
+
+static void report_cut_lines(u32 base, u32 len, u32 bits_even, u32 bits_odd)
+{
+    if (len < LINE_SAMPLES * 64u)
+        return;
+    for (u32 odd = 0; odd < 2; odd++) {
+        u32 bits = odd ? bits_odd : bits_even;
+        for (u32 bit = 0; bit < 32 && bits; bit++) {
+            if (!(bits & (1u << bit)))
+                continue;
+            bits &= ~(1u << bit);
+            u32 f0 = line_probe(base, len, odd, bit, 0);
+            u32 f1 = line_probe(base, len, odd, bit, 1);
+            if (f0 < LINE_THRESHOLD && f1 < LINE_THRESHOLD)
+                continue;                   /* cells, not the line */
+            u32 line = bit + (odd ? 32u : 0u);
+            u32 comp = (odd ? 2u : 0u) + (bit >= 16 ? 1u : 0u);
+
+            /* serial: the detail, and how the line reads */
+            scif_puts(S_CUT_SERIAL);
+            scif_putdec(line);
+            scif_puts(" (");
+            scif_puts(work_comps[comp].name);
+            scif_puts(", DQ");
+            scif_putdec(bit & 15u);
+            scif_puts(") : ");
+            scif_puts(f0 >= LINE_THRESHOLD && f1 >= LINE_THRESHOLD ? S_CUT_FLOAT :
+                      f0 >= LINE_THRESHOLD ? S_CUT_HIGH : S_CUT_LOW);
+            scif_puts(" (");
+            scif_putdec(f0);
+            scif_puts("/64, ");
+            scif_putdec(f1);
+            scif_puts("/64)\n");
+
+            if (g_cut_n >= CUT_MAX)
+                continue;
+            /* "Line D37 cut on IC11S": a name the log can keep */
+            char *d = g_cut_name[g_cut_n++];
+            const char *parts[4] = { S_CUT_PRE, 0, S_CUT_MID,
+                                     g_ic_valid ? work_comps[comp].name : "?" };
+            u32 o = 0;
+            for (u32 i = 0; i < 4; i++) {
+                if (i == 1) {
+                    if (line >= 10)
+                        d[o++] = (char)('0' + line / 10);
+                    d[o++] = (char)('0' + line % 10);
+                    continue;
+                }
+                for (const char *s = parts[i]; *s && o < 31; s++)
+                    d[o++] = *s;
+            }
+            d[o] = 0;
+
+            log_entry e;
+            e.name = d;
+            e.clip = g_ic_valid ? work_comps[comp].clip : CLIP_NUM_1 + comp;
+            e.status = T_FAIL;
+            e.detail = 0;
+            e.comps = 0;
+            e.quiet_ok = 0;
+            e.pre = CLIP_NONE;
+            e.line = line + 1;
+            log_store(&e);
+            scif_puts(d);
+            scif_puts(S_SUF_FAIL);
+            screen_append(&e);
+            say_entry(&e);
+        }
+    }
+}
+
 static u32 test_sdram_cells(void)
 {
     u32 size = g_ram_size;
@@ -804,6 +955,7 @@ static u32 test_sdram_cells(void)
     /* data bus test runs at an even word address (A2=0): comps 1/2 */
     u32 bad = ram_test_databus(SDRAM_P2_BASE);
     u32 bus_bad = bad;
+    u32 dbus_bad = bad;
     u32 comps = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
     log_result_q(S_L_SDRAM_DBUS, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, comps,
                  IC(work_comps), 1, CLIP_CPU_RAM);
@@ -859,12 +1011,18 @@ static u32 test_sdram_cells(void)
     t_status st = res.errors ? T_FAIL : T_OK;
     log_result(S_L_SDRAM_CELL, CLIP_CPU_RAM, st,
                ram_comp_mask(&res), IC(work_comps));
-    if (res.errors) {
-        report_intermittent(&res);
-        report_badbits(res.badbits);
-        report_comps(S_CG_CPU, ram_comp_mask(&res), IC(work_comps));
-        report_fails(&res);
-        return 0;
+    if (res.errors || (bus_bad & 0xFFFFFFFFu)) {
+        if (res.errors) {
+            report_intermittent(&res);
+            report_badbits(res.badbits);
+            report_comps(S_CG_CPU, ram_comp_mask(&res), IC(work_comps));
+            report_fails(&res);
+        }
+        /* the data bus test runs on an even word: its bits are even ones */
+        report_cut_lines(SDRAM_P2_BASE, len, res.badbits_e | dbus_bad,
+                         res.badbits_o);
+        if (res.errors)
+            return 0;
     }
     /* Cells that hold their values say nothing about the wires that reach
      * them: with a dead address line every pattern still reads back, just

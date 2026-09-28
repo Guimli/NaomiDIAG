@@ -71,7 +71,8 @@ form (`PCMS=2`), which decodes it in hardware. That is a straight 4:1 saving
 on the EPROM with no decompressor, no scratch buffer and no CPU cost — the
 bytes are copied into sound RAM exactly as they sit in the ROM. The full
 French build went from 98 % of the EPROM to 29 %; with the clips added since
-(Naomi 2 chips, JVS board) a full build sits at about 40 %.
+(Naomi 2 chips, JVS board, data-line reports) a full build sits at
+about 50 %.
 
 ## What it tests
 
@@ -189,6 +190,16 @@ take long enough that they have no business delaying the report.
 RAM faults are reported per component: a bit mask, the affected data lanes,
 and the silkscreen IC designator (e.g. `CPU RAM 1 (IC9) DEFECTIVE`). VRAM and
 Elan RAM chips are named as a *suspect lane (chip or connections)*.
+
+A CPU RAM fault is also checked for a **cut data line**. Each failing bit is
+probed on 64 addresses spread over the tested region, on the word parity it
+failed on: all written, then a decoy of the opposite polarity so a floating
+line cannot simply hold the last value driven, then all read back, with the
+bit at 0 and at 1. Wrong on 60 or more is a line, not a cell, and it gets
+its own line on screen and in speech — `Line D5 cut on IC9`, "Line D, five,
+cut on, I C nine" — with how it reads on serial (always 0, always 1, or
+floating). Lines are numbered as the SH-4's 64-bit bus carries them: an
+even word is D0-D31, an odd word D32-D63.
 
 The progress bar retires after the Naomi 2 memories: from there on nothing
 is being measured — the NVRAM, the RTC and the serial EEPROM answer yes or
@@ -464,7 +475,7 @@ have a probe in hand.
 **`AUDIO=0`** builds a silent ROM: the spoken-clip table is replaced by a
 stub and the image drops to 6 % of the EPROM. It was introduced when the
 clips were 16-bit PCM and left no room for anything else; since they became
-ADPCM a full build sits at about 40 %, so this is no longer a way of
+ADPCM a full build sits at about 50 %, so this is no longer a way of
 making room — it is for a bench where the speech is in the way, and it boots
 a little faster. `AUDIO=1` is the default.
 
