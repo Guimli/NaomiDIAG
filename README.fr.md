@@ -257,7 +257,7 @@ ce qui rejoint le BIOS d'origine, qui ne s'exécute jamais en cache depuis la
 ROM.
 
 L'exécution cachée depuis la SDRAM est tout autre chose : c'est là que tourne
-chaque jeu Naomi. Les quatre boucles de test mémoire — environ 300 octets, où
+chaque jeu Naomi. Les boucles de test mémoire et la relecture de localisation — environ 500 octets, où
 passe la quasi-totalité du temps — sont donc recopiées au démarrage dans les 8 Ko
 de RAM CPU et exécutées depuis là, en cache, le reste du programme demeurant
 en ROM.
@@ -329,12 +329,26 @@ concernée ; un sondage sans erreur n'annule pas un échec intermittent.
 
 ### Relecture après 90 %
 
-Après une différence dans la vérification rapide, une relecture complète
-localise les erreurs. Cette boucle C s'exécute depuis la ROM et peut prendre
-plusieurs minutes. Elle affiche « Erreur detectee, localisation VRAM » avec
-sa propre progression et vérifie l'arrêt tous les 1024 mots. Les essais
-réels avec DQ9 coupée atteignent le rapport final. Cette progression
-ne raccourcit pas la relecture et ne récupère pas un accès matériel bloqué.
+Les passes de vérification rapides disent seulement si quelque chose a
+différé. Si c'est le cas, une relecture de la région localise les mots
+fautifs ; elle affiche « Erreur detectee, localisation VRAM » (ou RAM CPU)
+avec sa propre progression et vérifie l'arrêt tous les 1024 mots.
+
+Cette relecture est écrite en assembleur et vit dans le bloc relogé : elle
+tourne en cache depuis la RAM CPU quand un bloc a été qualifié, depuis
+l'EPROM sinon. Elle enregistre en entier les huit premiers mots fautifs,
+pour les lignes de détail ; ensuite elle ne s'arrête que sur un mot qui
+apporte un bit de données pas encore vu dans sa moitié de 4 Mio et sur sa
+parité de mot — peut-être une autre puce — et se contente de compter les
+autres. Le total d'erreurs et les puces désignées restent exacts.
+
+C'est décisif pour une ligne de données coupée, qui fait échouer chaque mot
+de sa moitié. Sur une vraie Naomi 2 avec DQ9 coupée sur IC21, l'ancienne
+relecture — du C depuis la ROM, chaque mot fautif enregistré — prenait
+environ 3 min 20 s par passe en échec, et TEX1 durait 7 minutes au lieu de
+17 secondes. La relecture coûte maintenant à peu près une lecture de plus
+de la région : quelques secondes en cache, bien moins d'une minute depuis
+la ROM.
 
 ### Accès au PVR-B et RAM Elan
 

@@ -13,7 +13,7 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:00:07.993] Board: Naomi 1 (837-13544) ........ OK
 [00:00:11.348] 10% 20% 30% 40% 50% 60% 70% 80% 90% BIOS ROM (IC27) CRC32 ........ OK
 [00:00:14.786] Test loops relocated to CPU RAM ........ OK
-[00:00:14.982]   loops execute at 8DFFC0AA (CPU RAM, cached: fast mode)
+[00:00:14.983]   loops execute at 8DFFC0AA (CPU RAM, cached: fast mode)
 [00:00:15.222]   Estimated time left: 10:00
 [00:00:15.372]   MIE on maple port 0, resp cmd 0x00000083
 [00:00:15.565]   MIE version: "315-6149    COPYRIGHT SEGA E"
@@ -42,7 +42,7 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:00:35.290] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:36.947] SDRAM cell test ........ OK
 
-[00:00:40.187] PVR: enabling VRAM controller, testing texture RAM...
+[00:00:40.186] PVR: enabling VRAM controller, testing texture RAM...
 [00:00:40.416] VRAM TEX0 data bus ........ OK
 [00:00:40.570] VRAM TEX0 address bus ........ OK
 [00:00:40.734] pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
@@ -62,7 +62,7 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:00:50.285] Sound RAM data bus ........ OK
 [00:00:50.439] Sound RAM address bus ........ OK
 [00:00:50.603] pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:51.053] pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:51.052] pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:51.502] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:52.131] Sound RAM cell test ........ OK
 
@@ -71,7 +71,7 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:00:55.599] Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
 [00:00:55.849] Backup NVRAM IC29 (kept intact) ........ OK
 [00:01:01.258] RTC (AICA, must tick) ........ OK
-[00:01:04.853]   RTC date: 2026-09-28 03:04:40 (ticking)
+[00:01:04.853]   RTC date: 2026-09-28 03:50:19 (ticking)
 
 [00:01:05.077] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
 [00:01:05.389] Serial EEPROM (IC31, 93C46) ........ OK
@@ -96,7 +96,7 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:01:11.172] VRAM TEX0 (IC16/18/20/22): OK
 [00:01:11.323] VRAM TEX1 data bus: OK
 [00:01:11.451] VRAM TEX1 address bus: OK
-[00:01:11.589] VRAM TEX1 (IC17S/19S/21S/23S): OK
+[00:01:11.588] VRAM TEX1 (IC17S/19S/21S/23S): OK
 [00:01:11.752] Sound RAM data bus: OK
 [00:01:11.880] Sound RAM address bus: OK
 [00:01:12.018] Sound RAM cell test: OK
@@ -110,4 +110,4 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 
 [00:01:13.237] *** DIAG COMPLETE ***
 
-[00:01:15.322] Press TEST or SERVICE (on the board) for the operator menu.
+[00:01:15.321] Press TEST or SERVICE (on the board) for the operator menu.

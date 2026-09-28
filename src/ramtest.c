@@ -12,6 +12,7 @@
 #include "config.h"
 #include "reloc.h"
 #include "scif.h"
+#include "strings.h"
 
 void ram_result_clear(ram_result *r)
 {
@@ -24,22 +25,6 @@ void ram_result_clear(ram_result *r)
     r->crc_r = 0;
     r->unpinned = 0;
     r->vram_chips = 0;
-}
-
-static void note_fail(ram_result *r, u32 addr, u32 exp, u32 got)
-{
-    r->errors++;
-    r->badbits |= exp ^ got;
-    if (addr & 4)
-        r->badbits_o |= exp ^ got;
-    else
-        r->badbits_e |= exp ^ got;
-    if (r->nfails < RAM_MAX_FAILS) {
-        r->fail_addr[r->nfails] = addr;
-        r->fail_exp [r->nfails] = exp;
-        r->fail_got [r->nfails] = got;
-        r->nfails++;
-    }
 }
 
 u32 ram_test_databus(u32 addr)
@@ -79,19 +64,6 @@ u32 ram_test_addrbus(u32 base, u32 size)
         b[test] = pat;
     }
     return bad;
-}
-
-/* Slow, fully diagnostic pattern pass: reports every bad word with its
- * address. Only reached when the fast path has already proven the region is
- * faulty, so its cost is paid on broken boards and nowhere else. */
-static void pattern_locate(u32 base, u32 n, u32 pattern, ram_result *r)
-{
-    volatile u32 *p = (volatile u32 *)base;
-    for (u32 i = 0; i < n; i++) {
-        u32 got = p[i];
-        if (got != pattern)
-            note_fail(r, base + (i << 2), pattern, got);
-    }
 }
 
 /* Uncached execution from the boot EPROM makes instruction count very nearly
@@ -148,7 +120,7 @@ void ram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
     }
 
     if (diff_e | diff_o)
-        pattern_locate(base, n, pattern, r);
+        ram_locate(base, n, pattern, 0, r, S_SDRAM_SCAN);
 
     /* A difference the re-scan could not reproduce is an intermittent cell,
      * and it used to be discarded here: locate() found nothing, errors stayed
@@ -249,21 +221,6 @@ static inline u32 xorshift32(u32 x)
     return x;
 }
 
-/* Slow, fully diagnostic pseudo-random pass: regenerates the stream and
- * records every mismatching word with its address. Only reached once the
- * fast loop has already proved the region faulty. */
-static void prng_locate(u32 base, u32 n, u32 seed, ram_result *r)
-{
-    volatile u32 *p = (volatile u32 *)base;
-    u32 x = seed ? seed : 1;
-    for (u32 i = 0; i < n; i++) {
-        x = xorshift32(x);
-        u32 got = p[i];
-        if (got != x)
-            note_fail(r, base + (i << 2), x, got);
-    }
-}
-
 void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
 {
     u32 n = len >> 2;
@@ -308,7 +265,7 @@ void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
     r->crc_w = ~c.crc_w;
     r->crc_r = ~c.crc_r;
     if (c.diff_e | c.diff_o)
-        prng_locate(base, n, seed, r);
+        ram_locate(base, n, seed, 1, r, S_SDRAM_SCAN);
 #if CFG_RAM_CRC
     if (c.crc_w != c.crc_r && r->errors == 0) {
         /* The verify pass saw a difference the re-scan could not reproduce:

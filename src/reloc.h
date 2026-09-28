@@ -15,7 +15,8 @@
  * Cached execution from SDRAM is a different proposition entirely: it is
  * where every Naomi game runs. And the whole diagnostic does not need to
  * move, only the four memory-test loops, which is where essentially all the
- * time goes. They are about 300 bytes (more with CFG_RAM_CRC), position
+ * time goes. They are about 500 bytes with the failure scan (more with
+ * CFG_RAM_CRC), position
  * independent as written,
  * and the memory they test is still addressed through P2 -- so the data path
  * stays uncached and the test keeps exactly the coverage it has today.
@@ -39,6 +40,8 @@ extern u32  (*p_ram_verify_fast)(u32 *base, u32 nblocks8, u32 pattern,
 extern void (*p_ram_prng_fill_fast)(u32 *base, u32 nwords, prng_ctx *c);
 extern void (*p_ram_prng_verify_fast)(const u32 *base, u32 npairs,
                                       prng_ctx *c);
+extern u32  (*p_ram_find_pat_fast)(const u32 *p, u32 n, find_ctx *c);
+extern u32  (*p_ram_find_prng_fast)(const u32 *p, u32 n, find_ctx *c);
 
 void reloc_init(void);              /* point everything at the ROM copies */
 

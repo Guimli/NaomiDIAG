@@ -39,12 +39,12 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:00:36.501] SDRAM bus d'adresses ........ OK
 [00:00:36.662] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:37.133] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:37.605] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:37.604] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:39.278] SDRAM test cellules ........ OK
 
 [00:00:43.087] PVR : activation controleur VRAM, test RAM texture...
 [00:00:43.317] VRAM TEX0 bus de donnees ........ OK
-[00:00:43.491] VRAM TEX0 bus d'adresses ........ OK
+[00:00:43.490] VRAM TEX0 bus d'adresses ........ OK
 [00:00:43.664] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
 [00:00:43.952] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
 [00:00:44.239] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
@@ -53,13 +53,13 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:00:48.559] VRAM TEX1 bus de donnees ........ OK
 [00:00:48.732] VRAM TEX1 bus d'adresses ........ OK
 [00:00:48.906] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:00:49.203] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+[00:00:49.202] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
 [00:00:49.499] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 
 [00:00:50.145] VRAM TEX1 (IC17S/19S/21S/23S) ........ OK
 
 [00:00:53.847] AICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...
-[00:00:54.074] RAM son bus de donnees ........ OK
+[00:00:54.073] RAM son bus de donnees ........ OK
 [00:00:54.241] RAM son bus d'adresses ........ OK
 [00:00:54.408] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:54.864] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
@@ -68,16 +68,16 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 
 [00:00:59.356] Memoires Naomi 2 non testees : carte non identifiee comme Naomi 2.
 
-[00:00:59.636] NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
+[00:00:59.635] NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 [00:00:59.896] NVRAM sauvegarde IC29 (intacte) ........ OK
 [00:01:05.585] RTC (AICA, doit avancer) ........ OK
-[00:01:09.358]   Date RTC : 2026-09-28 03:03:57 (avance)
+[00:01:09.358]   Date RTC : 2026-09-28 03:49:37 (avance)
 
 [00:01:09.582] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
 [00:01:09.893] EEPROM serie (IC31, 93C46) ........ OK
 [00:01:13.677] Integrite du code reloge en RAM ........ OK
 
-[00:01:13.881] ==== RESUME ====
+[00:01:13.880] ==== RESUME ====
 [00:01:13.989] OC-RAM CPU (SH-4 IC1): OK
 [00:01:14.126] VRAM framebuffer (rapide): OK
 [00:01:14.277] RAM son zone clips (rapide): OK
@@ -88,7 +88,7 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:01:15.037] Auto-test MIE (Z80 ROM+RAM): OK
 [00:01:15.195] EEPROM reglages (93C46 via MIE): OK
 [00:01:15.365] Carte I/O JVS : presente: OK
-[00:01:15.513] SDRAM bus de donnees: OK
+[00:01:15.512] SDRAM bus de donnees: OK
 [00:01:15.647] SDRAM bus d'adresses: OK
 [00:01:15.781] SDRAM test cellules: OK
 [00:01:15.912] VRAM TEX0 bus de donnees: OK
@@ -104,7 +104,7 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:01:17.407] RTC (AICA, doit avancer): OK
 [00:01:17.554] EEPROM serie (IC31, 93C46): OK
 [00:01:17.708] Integrite du code reloge en RAM: OK
-[00:01:17.879] RAM principale utilisable.
+[00:01:17.878] RAM principale utilisable.
 [00:01:18.019] RAM son utilisable, rapports audio actifs.
 [00:01:18.213] VRAM utilisable, rapport a l'ecran actif.
 

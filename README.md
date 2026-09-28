@@ -238,7 +238,7 @@ refuses it outright -- black screen before the first visible instruction --
 which matches the original BIOS, that never executes cached from ROM either.
 
 Cached execution from SDRAM is a different matter: it is where every Naomi
-game runs. So the four memory-test loops -- about 300 bytes, where
+game runs. So the memory-test loops and the failure scan -- about 500 bytes, where
 essentially all the time goes -- are copied into an 8 KB block of CPU RAM at boot and run
 from there, cached, while everything else stays in ROM.
 
@@ -303,12 +303,23 @@ cancel an earlier intermittent failure.
 
 ### Rescanning after 90%
 
-After a fast verifier detects a mismatch, a complete rescan locates failures.
-This C loop executes from ROM and can take several minutes. It prints
-“Error detected, locating VRAM failures” with its own progress and checks
-abort input every 1024 words. Real-board DQ9-disconnection tests reach
-the final report. Progress reporting does not shorten the scan or recover
-a stalled hardware access.
+The fast verify passes only tell whether something differed. When it did, a
+rescan of the region locates the failing words; it prints “Error detected,
+locating VRAM failures” (or CPU RAM failures) with its own progress and
+checks abort input every 1024 words.
+
+The rescan is hand-written assembly and lives in the relocated block, so it
+runs cached from CPU RAM when a block was qualified, from the EPROM
+otherwise. It records the first eight failing words in full, for the detail
+lines; after that it stops only on a word that brings a data bit not yet
+seen in its 4 MiB half and on its word parity — possibly another chip — and
+merely counts the others. The error total and the chips named stay exact.
+
+This matters for a cut data line, which fails every word of its half. On a
+real Naomi 2 with DQ9 cut on IC21, the former rescan — C from ROM, every
+bad word recorded — took about 3 min 20 s per failing pass, and TEX1 took
+7 minutes instead of 17 seconds. The rescan now costs about one more read
+of the region: a few seconds cached, well under a minute from ROM.
 
 ### PVR-B access and the Elan RAM
 

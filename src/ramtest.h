@@ -37,6 +37,17 @@ void ram_prng_verify_fast(const u32 *base, u32 npairs, prng_ctx *c);
 void ram_fill_fast(u32 *base, u32 nblocks16, u32 pattern);
 u32  ram_verify_fast(u32 *base, u32 nblocks8, u32 pattern, u32 *diff_odd);
 
+/* Locating failing words after a verify pass saw a difference: see
+ * ramtest_fast.S. Offsets MUST match the assembly. */
+typedef struct {
+    u32 x;                       /* pattern, or PRNG state before the word */
+    u32 ign_e, ign_o;            /* bits to pass over, per word parity     */
+    u32 skipped;                 /* mismatches passed over (counted)       */
+    u32 exp, got;                /* the word reported                      */
+} find_ctx;
+u32 ram_find_pat_fast(const u32 *p, u32 n, find_ctx *c);
+u32 ram_find_prng_fast(const u32 *p, u32 n, find_ctx *c);
+
 #define RAM_MAX_FAILS 8
 
 typedef struct {
@@ -55,6 +66,16 @@ typedef struct {
 } ram_result;
 
 void ram_result_clear(ram_result *r);
+
+/* Locate the failing words of [base, base + 4n) after a verify pass saw a
+ * difference: value is the pattern, or the PRNG seed when random is set.
+ * The first RAM_MAX_FAILS words are recorded in full; after that only a
+ * word bringing a data bit not yet seen in its 4 MiB half and on its word
+ * parity (possibly another chip) is, the rest being counted. Runs the
+ * relocated scan when there is one. label: progress label and serial
+ * notice. Shared by CPU RAM and VRAM (vram_scan.c). */
+void ram_locate(u32 base, u32 n, u32 value, u32 random, ram_result *r,
+                const char *label);
 
 /* Walking-ones data bus test at a single address. Returns bitmask of
  * faulty data lines (0 = OK). */

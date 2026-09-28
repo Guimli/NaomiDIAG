@@ -366,5 +366,141 @@ _ram_prng_verify_fast:
     .align 4
 Lcrctab:    .long _crc32_tab8
 
+! =============================================================================
+! Locating the failing words, once a verify pass has seen a difference.
+!
+! This used to be a C loop from ROM calling note_fail() on every bad word.
+! A cut data line makes every word of its half fail -- a million of them in
+! 4 MB -- and that loop took three and a half minutes per pass on a real
+! Naomi 2. These scan at verify speed and stop only on a word the caller
+! still wants to see: any mismatch at all while the first details are being
+! collected, then only one that brings a data bit not yet seen on its word
+! parity (a bit the ignore masks do not cover). The words they pass over are
+! counted, so the error total stays exact.
+!
+! Context block (offsets MUST match find_ctx in ramtest.h):
+!     0  x       expected value (pattern), or PRNG state before the first word
+!     4  ign_e   bits to pass over on even-address words
+!     8  ign_o   bits to pass over on odd-address words
+!    12  skipped mismatches passed over, accumulated
+!    16  exp     expected value of the word reported
+!    20  got     value read there
+! Returns the index of the reported word, or n if none.
+! =============================================================================
+
+! u32 ram_find_pat_fast(const u32 *p, u32 n, find_ctx *c)
+    .global _ram_find_pat_fast
+_ram_find_pat_fast:
+    mov.l   r8, @-r15
+    mov.l   r9, @-r15
+    mov.l   r10, @-r15
+    mov.l   r11, @-r15
+    mov.l   @(0, r6), r8        ! expected
+    mov.l   @(4, r6), r9
+    not     r9, r9              ! bits still wanted, even words
+    mov.l   @(8, r6), r10
+    not     r10, r10            ! bits still wanted, odd words
+    mov.l   @(12, r6), r11      ! skipped so far
+    mov     #0, r3              ! index
+    tst     r5, r5
+    bt      8f
+1:  mov.l   @r4, r0
+    xor     r8, r0
+    tst     r0, r0
+    bf      3f
+2:  add     #4, r4
+    add     #1, r3
+    cmp/hs  r5, r3
+    bf      1b
+8:  bra     9f
+    mov     r5, r0              ! nothing to report
+3:  mov     r4, r1
+    mov     #4, r2
+    tst     r2, r1              ! T = even-address word
+    bt/s    4f
+    mov     r9, r2
+    mov     r10, r2
+4:  tst     r2, r0              ! T = no wanted bit in the difference
+    bf      5f
+    bra     2b
+    add     #1, r11             ! passed over, counted
+5:  mov.l   r8, @(16, r6)
+    xor     r8, r0              ! difference back to the value read
+    mov.l   r0, @(20, r6)
+    mov     r3, r0
+9:  mov.l   r11, @(12, r6)
+    mov.l   r8, @(0, r6)
+    mov.l   @r15+, r11
+    mov.l   @r15+, r10
+    mov.l   @r15+, r9
+    rts
+    mov.l   @r15+, r8
+
+! u32 ram_find_prng_fast(const u32 *p, u32 n, find_ctx *c)
+! Same, with the expected value regenerated per word (xorshift32 13/17/5,
+! as the fill wrote it). On return x is the state of the word reported,
+! or of the last word, so the caller resumes on the next one.
+    .global _ram_find_prng_fast
+_ram_find_prng_fast:
+    mov.l   r8, @-r15
+    mov.l   r9, @-r15
+    mov.l   r10, @-r15
+    mov.l   r11, @-r15
+    mov.l   @(0, r6), r8        ! state before the first word
+    mov.l   @(4, r6), r9
+    not     r9, r9
+    mov.l   @(8, r6), r10
+    not     r10, r10
+    mov.l   @(12, r6), r11
+    mov     #0, r3
+    tst     r5, r5
+    bt      8f
+1:  mov     r8, r1              ! x ^= x << 13
+    shll8   r1
+    shll2   r1
+    shll2   r1
+    shll    r1
+    xor     r1, r8
+    mov     r8, r1              ! x ^= x >> 17
+    shlr16  r1
+    shlr    r1
+    xor     r1, r8
+    mov     r8, r1              ! x ^= x << 5
+    shll2   r1
+    shll2   r1
+    shll    r1
+    xor     r1, r8
+    mov.l   @r4, r0
+    xor     r8, r0
+    tst     r0, r0
+    bf      3f
+2:  add     #4, r4
+    add     #1, r3
+    cmp/hs  r5, r3
+    bf      1b
+8:  bra     9f
+    mov     r5, r0
+3:  mov     r4, r1
+    mov     #4, r2
+    tst     r2, r1
+    bt/s    4f
+    mov     r9, r2
+    mov     r10, r2
+4:  tst     r2, r0
+    bf      5f
+    bra     2b
+    add     #1, r11
+5:  mov.l   r8, @(16, r6)
+    xor     r8, r0
+    mov.l   r0, @(20, r6)
+    mov     r3, r0
+9:  mov.l   r11, @(12, r6)
+    mov.l   r8, @(0, r6)
+    mov.l   @r15+, r11
+    mov.l   @r15+, r10
+    mov.l   @r15+, r9
+    rts
+    mov.l   @r15+, r8
+
     .global _reloc_blk_end
 _reloc_blk_end:
