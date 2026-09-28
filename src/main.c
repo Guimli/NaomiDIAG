@@ -1495,7 +1495,7 @@ static void test_vram_region_body(const char *name, const char *dbus, const char
     /* the framebuffer lives inside TEX0: while that region is under test,
      * the bar must not be drawn into it -- it would overwrite the pattern
      * being verified and report a fault that does not exist. */
-    u32 fbaddr = VRAM_TEX0_BASE + FB_VRAM_OFFSET;
+    u32 fbaddr = pvr_fb_addr();
     progress_screen_enable(base != VRAM_PVRB_BASE &&
                            !(base <= fbaddr && fbaddr < base + len));
 
@@ -1567,7 +1567,8 @@ static u32 test_vram(void)
                      S_L_VRAM_T1_DBUS, S_L_VRAM_T1_ABUS,
                      VRAM_TEX1_BASE, VRAM_TEX1_SIZE,
                      IC(tex1_comps), CLIP_VRAM, &tex1_ok);
-    return tex0_ok;                     /* the framebuffer lives in TEX0 */
+    /* the screen is usable if the bank holding the framebuffer is */
+    return pvr_fb_on_tex1() ? tex1_ok : tex0_ok;
 }
 
 /* Naomi 2 only: the slave PVR's 16MB VRAM (32-bit path) and the Elan
@@ -2486,27 +2487,50 @@ static void quick_audio_bringup(void)
     }
 }
 
-static void quick_video_bringup(void)
+/* The image area of one bank: its data bus, then the three patterns over
+ * the 600 KB the framebuffer occupies. */
+static t_status quick_fb_zone(u32 bank)
 {
-    pvr_vram_enable();
-
     ram_result res;
     ram_result_clear(&res);
-    u32 bad = vram_test_databus(VRAM_TEX0_BASE);
-    u32 fb = VRAM_TEX0_BASE + FB_VRAM_OFFSET;
+    u32 bad = vram_test_databus(bank);
     if (!bad) {
+        u32 fb = bank + FB_VRAM_OFFSET;
         vram_test_pattern(fb, FB_ZONE_LEN, 0x55555555, &res);
         vram_test_pattern(fb, FB_ZONE_LEN, 0xAAAAAAAA, &res);
         vram_test_prng(fb, FB_ZONE_LEN, 0x7EC0FFEE, &res);
     }
-    t_status st = (bad || res.errors) ? T_FAIL : T_OK;
+    if (res.errors)
+        scif_puts("\n");               /* end the rescan's progress line */
+    return (bad || res.errors) ? T_FAIL : T_OK;
+}
+
+static void quick_video_bringup(void)
+{
+    pvr_vram_enable();
+
+    /* TEX0 first, where the image has always lived. If its image area
+     * fails, the same area of TEX1 -- 8 MB further in the same window, on
+     * the other four chips -- can carry the screen instead: a dead chip on
+     * one bank does not take the display down with it. */
+    t_status st = quick_fb_zone(VRAM_TEX0_BASE);
     log_result(S_L_VIDEO_QUICK, CLIP_NONE, st, 0, 0);
+    if (st != T_OK) {
+        st = quick_fb_zone(VRAM_TEX1_BASE);
+        log_result(S_L_VIDEO_QUICK_T1, CLIP_NONE, st, 0, 0);
+        if (st == T_OK) {
+            pvr_fb_select_tex1(1);
+            eta_video_retried();        /* two quick checks, not one */
+        }
+    }
     if (st == T_OK) {
         pvr_display_init();
         g_screen_ready = 1;             /* channel 2 live, in seconds */
         progress_phase(PH_VIDEO_ON);    /* green */
         screen_render();
         scif_puts(S_SCREEN_ONLINE);
+        if (pvr_fb_on_tex1())
+            scif_puts(S_SCREEN_TEX1);
     } else {
         progress_phase(PH_FAILED);      /* red: no usable framebuffer */
     }
@@ -2655,7 +2679,7 @@ static void loop_regions(const loop_part *parts, u32 nparts, const char *what)
              * TEX0 is under test would write into the pattern being verified
              * and report a fault that does not exist -- the boot test guards
              * against this, the loop did not. */
-            u32 fbaddr = VRAM_TEX0_BASE + FB_VRAM_OFFSET;
+            u32 fbaddr = pvr_fb_addr();
             /* PVR-B's independence rests on a sample: draw nothing while
              * its whole range is being written, as the boot suite does. */
             progress_screen_enable(lp->base != VRAM_PVRB_BASE &&

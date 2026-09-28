@@ -89,6 +89,7 @@ static u32 g_step_t0;           /* its start, ms */
 static u32 g_phases_seen;       /* progress phases begun in this step */
 static u32 g_n2, g_rom, g_mie_late, g_audio;
 static u32 g_scale;             /* fast-loop steps, x/256; 0 = not measured */
+static u32 g_video_twice;       /* TEX1 fallback: two quick checks */
 static u32 g_romk;              /* ROM execution speed vs the table, x/256
                                    (set by eta_start: no .data in this ROM) */
 static u32 g_last_draw, g_last_ms, g_drawn;
@@ -141,6 +142,7 @@ void eta_start(void)
     g_phases_seen = 0;
     g_scale = 0;
     g_romk = 256;
+    g_video_twice = 0;
     g_drawn = 0;
 }
 
@@ -155,6 +157,7 @@ void eta_finish(void)
 void eta_set_board_n2(u32 n2)     { g_n2 = n2; }
 void eta_set_mie_early(u32 early) { g_mie_late = !early && !g_rom; }
 void eta_set_audio(u32 on)        { g_audio = on; }
+void eta_video_retried(void)      { g_video_twice = 1; }
 
 void eta_set_reloc(u32 cached)
 {
@@ -182,7 +185,8 @@ void eta_step(u32 step)
      * this board executes the loops from the EPROM, which is what every
      * memory step costs if no CPU RAM block takes them. */
     if (g_step == ETA_VIDEO && step > ETA_VIDEO)
-        g_romk = clamp_k(udiv(now - g_step_t0, udiv(est[ETA_VIDEO].ms, 256)));
+        g_romk = clamp_k(udiv((now - g_step_t0) >> (g_video_twice ? 1 : 0),
+                              udiv(est[ETA_VIDEO].ms, 256)));
     /* The CPU RAM test is the first step that runs the relocatable loops
      * over a known size: how long it really took against the estimate
      * rescales the later ones (VRAM, Naomi 2), cached or from ROM alike. */

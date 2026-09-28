@@ -51,7 +51,7 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:00:44.439] VRAM TEX0 (IC16/18/20/22) ........ OK
 
 [00:00:48.035] VRAM TEX1 bus de donnees ........ OK
-[00:00:48.209] VRAM TEX1 bus d'adresses ........ OK
+[00:00:48.208] VRAM TEX1 bus d'adresses ........ OK
 [00:00:48.382] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:48.689] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:48.995] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
@@ -70,8 +70,8 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:00:59.055] NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 [00:00:59.316] NVRAM sauvegarde IC29 (intacte) ........ OK
 [00:01:04.938] RTC (AICA, doit avancer) ........ OK
-[00:01:08.600]   Lectures RTC : 2421748743 -> 2421748745 (+2 s)
-[00:01:08.813]   Date RTC : 2026-09-28 11:59:05 (avance)
+[00:01:08.600]   Lectures RTC : 2421756308 -> 2421756310 (+2 s)
+[00:01:08.813]   Date RTC : 2026-09-28 14:05:10 (avance)
 [00:01:09.003] Date RTC (2026 ou apres) ........ OK
 
 [00:01:09.210] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
@@ -81,14 +81,14 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:01:13.529] ==== RESUME ====
 [00:01:13.637] OC-RAM CPU (SH-4 IC1): OK
 [00:01:13.775] VRAM framebuffer (rapide): OK
-[00:01:13.926] RAM son zone clips (rapide): OK
+[00:01:13.925] RAM son zone clips (rapide): OK
 [00:01:14.083] Carte : Naomi 1 (837-13544): OK
 [00:01:14.240] ROM BIOS (IC27) CRC32: OK
 [00:01:14.378] Boucles de test relogees en RAM: OK
 [00:01:14.548] Bus Maple / MIE (JVS): OK
 [00:01:14.686] Auto-test MIE (Z80 ROM+RAM): OK
 [00:01:14.843] EEPROM reglages (93C46 via MIE): OK
-[00:01:15.014] Carte I/O JVS : presente: OK
+[00:01:15.013] Carte I/O JVS : presente: OK
 [00:01:15.161] SDRAM bus de donnees: OK
 [00:01:15.295] SDRAM bus d'adresses: OK
 [00:01:15.430] SDRAM test cellules: OK
@@ -106,7 +106,7 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:01:17.203] Date RTC (2026 ou apres): OK
 [00:01:17.350] EEPROM serie (IC31, 93C46): OK
 [00:01:17.504] Integrite du code reloge en RAM: OK
-[00:01:17.675] RAM principale utilisable.
+[00:01:17.674] RAM principale utilisable.
 [00:01:17.815] RAM son utilisable, rapports audio actifs.
 [00:01:18.009] VRAM utilisable, rapport a l'ecran actif.
 

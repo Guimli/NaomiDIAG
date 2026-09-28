@@ -44,6 +44,7 @@ void eta_set_board_n2(u32 n2);
 void eta_set_reloc(u32 cached);         /* loops relocated into CPU RAM */
 void eta_set_mie_early(u32 early);      /* MIE stage ran before the RAM tests */
 void eta_set_audio(u32 on);             /* results are spoken */
+void eta_video_retried(void);           /* quick VRAM check ran twice */
 
 u32  eta_remaining_ms(void);
 u32  eta_format(char *buf, u32 ms);     /* "m:ss" / "h:mm:ss", buf >= 9 */

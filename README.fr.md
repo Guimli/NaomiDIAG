@@ -90,7 +90,12 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
 2. **Amorçage de l'écran et du haut-parleur** — contrôle rapide de la zone
    de VRAM qu'utilise l'image et de la zone de RAM son d'où jouent les
    clips. Chaque canal ne s'active que si sa zone passe ; le haut-parleur
-   rejoue alors tous les résultats déjà acquis.
+   rejoue alors tous les résultats déjà acquis. L'image vit dans TEX0 ; si
+   cette zone échoue, la même zone de TEX1 — les quatre autres puces, 8 Mo
+   plus loin dans la même fenêtre — est contrôlée et, si elle est saine,
+   porte l'écran à la place (`VRAM framebuffer TEX1 (secours)`). La bordure
+   témoin d'activité n'en dépend pas : sa couleur est un registre du
+   PowerVR, pas la VRAM.
 3. **Identification de la carte** — Naomi 1 ou Naomi 2 par l'identifiant de
    la puce Elan (`E1AD0000` sur Naomi 2, confirmé sur une vraie carte). Sur
    une Naomi 1, cette lecture tombe dans une zone non peuplée et est supposée

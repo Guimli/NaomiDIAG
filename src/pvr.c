@@ -209,6 +209,21 @@ void pvr_border(u32 rgb)
     PVR_VO_BORDER_COL = rgb;
 }
 
+/* Where the framebuffer lives: TEX0 normally, TEX1 when the quick check
+ * found TEX0's image area bad. Both are offsets in the PowerVR's 32-bit
+ * VRAM window, which is what FB_R_SOF1/2 take and what the CPU writes
+ * through; TEX1 is simply 8 MB further, on the other four chips.
+ * Zero-initialised on purpose (no .data): 0 means TEX0. */
+static u32 g_fb_tex1;
+
+void pvr_fb_select_tex1(u32 on) { g_fb_tex1 = on; }
+u32  pvr_fb_on_tex1(void)       { return g_fb_tex1; }
+
+u32 pvr_fb_addr(void)
+{
+    return 0xA5000000u + FB_VRAM_OFFSET + (g_fb_tex1 ? 0x00800000u : 0u);
+}
+
 void pvr_display_init(void)
 {
     PVR_FB_R_CTRL     = 0x00800000;      /* VGA clock, reads off while cfg */
@@ -217,8 +232,8 @@ void pvr_display_init(void)
     PVR_FB_W_CTRL     = 0x00000009;      /* dither + RGB565 (unused, TA path) */
     PVR_FB_BURSTCTRL  = 0x00093F39;
     PVR_FB_Y_COEFF    = 0x00008040;
-    PVR_FB_R_SOF1     = FB_VRAM_OFFSET;  /* both fields: no interlace */
-    PVR_FB_R_SOF2     = FB_VRAM_OFFSET;
+    PVR_FB_R_SOF1     = pvr_fb_addr() & 0x00FFFFFFu;  /* both fields: */
+    PVR_FB_R_SOF2     = pvr_fb_addr() & 0x00FFFFFFu;  /* no interlace */
     /* width in 32-bit units - 1, height - 1, line modulus 1 */
     PVR_FB_R_SIZE     = (1u << 20) | ((FB_H - 1) << 10) | (FB_W * 2 / 4 - 1);
     PVR_SPG_LOAD      = 0x020C0359;      /* 858 x 525 total (VGA) */
@@ -238,7 +253,7 @@ void pvr_display_init(void)
 
 static volatile u16 *fb(void)
 {
-    return (volatile u16 *)(0xA5000000u + FB_VRAM_OFFSET);
+    return (volatile u16 *)pvr_fb_addr();
 }
 
 void fb_clear(u16 color)

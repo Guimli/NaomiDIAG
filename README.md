@@ -86,7 +86,11 @@ are reported as they land.
 2. **Screen and speaker bring-up** — a quick check of the VRAM area the
    framebuffer uses and of the sound RAM area the clips play from. Each
    channel switches on only if its own area passes; the speaker then replays
-   every result acquired so far.
+   every result acquired so far. The framebuffer lives in TEX0; if that
+   area fails, the same area of TEX1 — the other four chips, 8 MB further
+   in the same window — is checked and, if sound, carries the screen
+   instead (`VRAM framebuffer TEX1 (fallback)`). The heartbeat border is
+   unaffected either way: its colour is a PowerVR register, not VRAM.
 3. **Board identification** — Naomi 1 vs Naomi 2 by the Elan chip's ID
    (`E1AD0000` on a Naomi 2, confirmed on a real board). On a Naomi 1 that
    read lands in an unpopulated area and is assumed to return open bus;

@@ -65,6 +65,13 @@ void pvr_border(u32 rgb);               /* 0x00RRGGBB */
 
 void pvr_display_init(void);            /* video_on + framebuffer reads on */
 
+/* The framebuffer's bank: TEX0 by default, TEX1 as a fallback when TEX0's
+ * image area is bad. Select before pvr_display_init(). pvr_fb_addr() is
+ * the P2 address of its first pixel. */
+void pvr_fb_select_tex1(u32 on);
+u32  pvr_fb_on_tex1(void);
+u32  pvr_fb_addr(void);
+
 /* progress bar at the bottom of the report; a no-op until the framebuffer
  * has been proven, so the test code may call it unconditionally */
 void fb_progress(const char *label, u32 pct);
