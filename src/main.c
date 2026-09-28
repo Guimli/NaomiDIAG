@@ -1440,7 +1440,7 @@ static void diagnose_vram(u32 base, u32 size)
     scif_puts("\n");
 }
 
-static void test_vram_region(const char *name, const char *dbus, const char *abus,
+static void test_vram_region_body(const char *name, const char *dbus, const char *abus,
                              u32 base, u32 size,
                              const comp_map *comps, u32 name_clip,
                              u32 *ok_flag)
@@ -1503,12 +1503,12 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
     phase_begin(S_P_VRAM, 1, S_PH_0101, words);
     vram_test_pattern(base, len, 0x55555555, &res);
     progress_end();
-    scif_puts("\n");
+    phase_mark(&res);
 
     phase_begin(S_P_VRAM, 2, S_PH_1010, words);
     vram_test_pattern(base, len, 0xAAAAAAAA, &res);
     progress_end();
-    scif_puts("\n");
+    phase_mark(&res);
 
     phase_begin(S_P_VRAM, 3, S_PH_PRNG, words);
     vram_test_prng(base, len, 0x7E0CBEEF ^ 0x9E3779B9u ^ base, &res);
@@ -1523,7 +1523,6 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
      * the screen is readable again */
     screen_render();
     progress_screen_enable(1);
-    scif_putc('\n');
 
     if (progress_aborted()) {           /* partial run: no verdict either way */
         *ok_flag = 0;
@@ -1540,6 +1539,19 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
         report_fails(&res);
         *ok_flag = 0;
     }
+}
+
+/* One region, one block on the serial log: its bus tests, passes, verdict
+ * and fault detail together, then a blank line before the next block --
+ * whichever way the region ended. */
+static void test_vram_region(const char *name, const char *dbus, const char *abus,
+                             u32 base, u32 size,
+                             const comp_map *comps, u32 name_clip,
+                             u32 *ok_flag)
+{
+    test_vram_region_body(name, dbus, abus, base, size, comps, name_clip,
+                          ok_flag);
+    scif_puts("\n");
 }
 
 static u32 test_vram(void)
@@ -1634,6 +1646,8 @@ static void test_naomi2_ram(void)
         g_screen_ready = screen_ready;
         screen_render();
     }
+
+    scif_puts("\n");                  /* PVR-B's block ends here, however it went */
 
     /* The Elan RAM is the Elan's own memory, not a window onto either GPU's:
      * testing it writes no VRAM, so a doubt about PVR-B's windows is no

@@ -39,75 +39,74 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:00:34.508] SDRAM address bus ........ OK
 [00:00:34.659] pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:35.124] pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:35.588] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:35.589] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 [00:00:37.245] SDRAM cell test ........ OK
 
 [00:00:40.521] PVR: enabling VRAM controller, testing texture RAM...
 [00:00:40.750] VRAM TEX0 data bus ........ OK
 [00:00:40.904] VRAM TEX0 address bus ........ OK
-[00:00:41.068] pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:00:41.349] pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:00:41.630] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:41.068] pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:41.359] pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:41.650] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:42.267] VRAM TEX0 (IC16/18/20/22) ........ OK
 
-[00:00:42.250] VRAM TEX0 (IC16/18/20/22) ........ OK
-[00:00:45.539] VRAM TEX1 data bus ........ OK
-[00:00:45.693] VRAM TEX1 address bus ........ OK
-[00:00:45.857] pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:00:46.147] pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:00:46.437] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:45.562] VRAM TEX1 data bus ........ OK
+[00:00:45.716] VRAM TEX1 address bus ........ OK
+[00:00:45.880] pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:46.180] pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:46.479] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:47.106] VRAM TEX1 (IC17S/19S/21S/23S) ........ OK
 
-[00:00:47.066] VRAM TEX1 (IC17S/19S/21S/23S) ........ OK
+[00:00:50.417] AICA: ARM7 held in reset, testing sound RAM (8MB, G2 bus)...
+[00:00:50.670] Sound RAM data bus ........ OK
+[00:00:50.824] Sound RAM address bus ........ OK
+[00:00:50.987] pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:51.437] pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:51.887] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:52.515] Sound RAM cell test ........ OK
 
-[00:00:50.375] AICA: ARM7 held in reset, testing sound RAM (8MB, G2 bus)...
-[00:00:50.627] Sound RAM data bus ........ OK
-[00:00:50.781] Sound RAM address bus ........ OK
-[00:00:50.945] pass 1/3 0101: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:51.395] pass 2/3 1010: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:51.844] pass 3/3 pseudo-random: 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:52.473] Sound RAM cell test ........ OK
+[00:00:55.894] Naomi 2 memories not tested: board not identified as Naomi 2.
 
-[00:00:55.851] Naomi 2 memories not tested: board not identified as Naomi 2.
+[00:00:56.157] Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
+[00:00:56.407] Backup NVRAM IC29 (kept intact) ........ OK
+[00:01:01.890] RTC (AICA, must tick) ........ OK
+[00:01:05.345]   RTC date: 2026-09-28 11:10:10 (ticking)
 
-[00:00:56.114] Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
-[00:00:56.364] Backup NVRAM IC29 (kept intact) ........ OK
-[00:01:01.847] RTC (AICA, must tick) ........ OK
-[00:01:05.302]   RTC date: 2026-09-28 10:44:17 (ticking)
+[00:01:05.569] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
+[00:01:05.881] Serial EEPROM (IC31, 93C46) ........ OK
+[00:01:09.260] Relocated code integrity ........ OK
 
-[00:01:05.526] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
-[00:01:05.838] Serial EEPROM (IC31, 93C46) ........ OK
-[00:01:09.217] Relocated code integrity ........ OK
+[00:01:09.440] ==== SUMMARY ====
+[00:01:09.552] CPU OC-RAM (SH-4 IC1): OK
+[00:01:09.689] VRAM framebuffer quick check: OK
+[00:01:09.850] Sound RAM clip zone quick check: OK
+[00:01:10.020] Board: Naomi 1 (837-13544): OK
+[00:01:10.174] BIOS ROM (IC27) CRC32: OK
+[00:01:10.312] Test loops relocated to CPU RAM: OK
+[00:01:10.482] Maple bus / MIE (JVS): OK
+[00:01:10.620] MIE self-test (Z80 ROM+RAM): OK
+[00:01:10.777] Settings EEPROM (93C46 via MIE): OK
+[00:01:10.948] JVS I/O board: present: OK
+[00:01:11.089] SDRAM data bus: OK
+[00:01:11.203] SDRAM address bus: OK
+[00:01:11.328] SDRAM cell test: OK
+[00:01:11.446] VRAM TEX0 data bus: OK
+[00:01:11.574] VRAM TEX0 address bus: OK
+[00:01:11.711] VRAM TEX0 (IC16/18/20/22): OK
+[00:01:11.862] VRAM TEX1 data bus: OK
+[00:01:11.990] VRAM TEX1 address bus: OK
+[00:01:12.127] VRAM TEX1 (IC17S/19S/21S/23S): OK
+[00:01:12.291] Sound RAM data bus: OK
+[00:01:12.419] Sound RAM address bus: OK
+[00:01:12.557] Sound RAM cell test: OK
+[00:01:12.688] Backup NVRAM IC29 (kept intact): OK
+[00:01:12.858] RTC (AICA, must tick): OK
+[00:01:12.996] Serial EEPROM (IC31, 93C46): OK
+[00:01:13.153] Relocated code integrity: OK
+[00:01:13.301] Main RAM usable.
+[00:01:13.409] Sound RAM usable, audio reports active.
+[00:01:13.592] VRAM usable, on-screen report active.
 
-[00:01:09.397] ==== SUMMARY ====
-[00:01:09.509] CPU OC-RAM (SH-4 IC1): OK
-[00:01:09.646] VRAM framebuffer quick check: OK
-[00:01:09.807] Sound RAM clip zone quick check: OK
-[00:01:09.977] Board: Naomi 1 (837-13544): OK
-[00:01:10.131] BIOS ROM (IC27) CRC32: OK
-[00:01:10.269] Test loops relocated to CPU RAM: OK
-[00:01:10.440] Maple bus / MIE (JVS): OK
-[00:01:10.577] MIE self-test (Z80 ROM+RAM): OK
-[00:01:10.734] Settings EEPROM (93C46 via MIE): OK
-[00:01:10.905] JVS I/O board: present: OK
-[00:01:11.046] SDRAM data bus: OK
-[00:01:11.160] SDRAM address bus: OK
-[00:01:11.285] SDRAM cell test: OK
-[00:01:11.403] VRAM TEX0 data bus: OK
-[00:01:11.531] VRAM TEX0 address bus: OK
-[00:01:11.668] VRAM TEX0 (IC16/18/20/22): OK
-[00:01:11.819] VRAM TEX1 data bus: OK
-[00:01:11.947] VRAM TEX1 address bus: OK
-[00:01:12.085] VRAM TEX1 (IC17S/19S/21S/23S): OK
-[00:01:12.248] Sound RAM data bus: OK
-[00:01:12.376] Sound RAM address bus: OK
-[00:01:12.514] Sound RAM cell test: OK
-[00:01:12.645] Backup NVRAM IC29 (kept intact): OK
-[00:01:12.815] RTC (AICA, must tick): OK
-[00:01:12.953] Serial EEPROM (IC31, 93C46): OK
-[00:01:13.110] Relocated code integrity: OK
-[00:01:13.258] Main RAM usable.
-[00:01:13.366] Sound RAM usable, audio reports active.
-[00:01:13.549] VRAM usable, on-screen report active.
+[00:01:13.776] *** DIAG COMPLETE ***
 
-[00:01:13.733] *** DIAG COMPLETE ***
-
-[00:01:15.877] Press TEST or SERVICE (on the board) for the operator menu.
+[00:01:15.919] Press TEST or SERVICE (on the board) for the operator menu.

@@ -37,6 +37,7 @@ static void scif_raw(char c)
  * the flag has to mean "mid-line" rather than "at a line start". */
 static u32 g_mid_line;
 static u32 g_stamping;
+static u32 g_newlines;          /* consecutive line ends just sent */
 
 static void scif_stamp(void)
 {
@@ -79,6 +80,15 @@ static void scif_stamp(void)
 
 void scif_putc(char c)
 {
+    /* One blank line separates blocks, never two: a block may end with its
+     * own blank line and the next section header begin with one. */
+    if (c == '\n') {
+        if (g_newlines >= 2)
+            return;
+        g_newlines++;
+    } else if (c != '\r') {
+        g_newlines = 0;
+    }
     if (!g_stamping) {
         if (!g_mid_line && c != '\n' && c != '\r') {
             scif_stamp();
