@@ -1,8 +1,7 @@
 # NaomiDiag
 
-> **Work in progress.** The Naomi 2 memory tests and the JVS master are
-> coded but not yet validated on real hardware. And other functions have not
-> been tested yet. But I am working on it as fast as I can :-)
+> **Work in progress.** Some functions have not been tested on real hardware
+> yet. But I am working on it as fast as I can :-)
 
 A replacement diagnostic BIOS ROM for the **SEGA Naomi** and **Naomi 2**
 arcade boards. It replaces the stock BIOS in the IC27 socket and tests the

@@ -1,9 +1,8 @@
 # NaomiDiag
 
-> **En cours de développement.** Les tests mémoire de la Naomi 2 et le
-> maître JVS sont codés mais pas encore validés sur du vrai matériel. Et
-> d'autres fonctions n'ont pas encore été testées. Mais je travaille dessus
-> aussi vite que je peux :-)
+> **En cours de développement.** Certaines fonctions n'ont pas encore été
+> testées sur du vrai matériel. Mais je travaille dessus aussi vite que je
+> peux :-)
 
 ROM de BIOS de diagnostic pour les cartes d'arcade **SEGA Naomi** et
 **Naomi 2**. Elle remplace le BIOS d'origine dans le support IC27 et teste
