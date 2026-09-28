@@ -36,7 +36,7 @@ qui pulse tant que la ROM est vivante.
 
 L'exécution complète est sur la page des releases :
 [**NaomiDIAG_EN_IC9_fault.mp4**](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_EN_IC9_fault.mp4)
-— 125 secondes, tous les tests, **avec le son**, pour entendre la panne
+— 95 secondes, tous les tests, **avec le son**, pour entendre la panne
 annoncée autant que la lire. GitHub ne lit pas une vidéo hébergée dans un
 dépôt (il supprime la balise `<video>`) : d'où le GIF muet ci-dessus et le
 téléchargement pour la version sonore.

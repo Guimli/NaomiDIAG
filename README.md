@@ -35,7 +35,7 @@ alive.
 
 The full run is on the release page:
 [**NaomiDIAG_EN_IC9_fault.mp4**](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_EN_IC9_fault.mp4)
-— 125 seconds, every test, **with the sound**, so you can hear the fault
+— 95 seconds, every test, **with the sound**, so you can hear the fault
 announced as well as read it. GitHub will not play a video that lives in a
 repository (it strips the `<video>` tag), hence the silent GIF above and the
 download for the real thing.

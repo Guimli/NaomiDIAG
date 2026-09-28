@@ -75,7 +75,7 @@ void ram_result_clear(ram_result *r);
  * relocated scan when there is one. label: progress label and serial
  * notice. Shared by CPU RAM and VRAM (vram_scan.c). */
 void ram_locate(u32 base, u32 n, u32 value, u32 random, ram_result *r,
-                const char *label);
+                const char *label, const char *bar);
 
 /* Walking-ones data bus test at a single address. Returns bitmask of
  * faulty data lines (0 = OK). */

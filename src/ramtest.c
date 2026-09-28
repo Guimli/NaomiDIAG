@@ -177,7 +177,7 @@ void ram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r)
     }
 
     if (diff_e | diff_o)
-        ram_locate(base, n, pattern, 0, r, S_SDRAM_SCAN);
+        ram_locate(base, n, pattern, 0, r, S_SDRAM_SCAN, S_SDRAM_SCAN_BAR);
 
     /* A difference the re-scan could not reproduce is an intermittent cell,
      * and it used to be discarded here: locate() found nothing, errors stayed
@@ -322,7 +322,7 @@ void ram_test_prng(u32 base, u32 len, u32 seed, ram_result *r)
     r->crc_w = ~c.crc_w;
     r->crc_r = ~c.crc_r;
     if (c.diff_e | c.diff_o)
-        ram_locate(base, n, seed, 1, r, S_SDRAM_SCAN);
+        ram_locate(base, n, seed, 1, r, S_SDRAM_SCAN, S_SDRAM_SCAN_BAR);
 #if CFG_RAM_CRC
     if (c.crc_w != c.crc_r && r->errors == 0) {
         /* The verify pass saw a difference the re-scan could not reproduce:

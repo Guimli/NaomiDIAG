@@ -65,7 +65,7 @@ static void note_fail(ram_result *r, u32 addr, u32 exp, u32 got)
 }
 
 void ram_locate(u32 base, u32 n, u32 value, u32 random, ram_result *r,
-                const char *label)
+                const char *label, const char *bar)
 {
     find_ctx c;
     c.x = random && !value ? 1 : value;
@@ -76,7 +76,7 @@ void ram_locate(u32 base, u32 n, u32 value, u32 random, ram_result *r,
     scif_puts("\n");
     scif_puts(label);
     scif_puts(" : ");
-    progress_begin(label, n);
+    progress_begin(bar, n);             /* short: the bar has a % column */
     for (u32 i = 0; i < n; ) {
         progress_tick(i);
         if (progress_aborted()) {
@@ -111,5 +111,5 @@ void ram_locate(u32 base, u32 n, u32 value, u32 random, ram_result *r,
 
 void vram_locate(u32 base, u32 n, u32 value, u32 random, ram_result *r)
 {
-    ram_locate(base, n, value, random, r, S_VRAM_SCAN);
+    ram_locate(base, n, value, random, r, S_VRAM_SCAN, S_VRAM_SCAN_BAR);
 }
