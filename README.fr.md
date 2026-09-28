@@ -258,27 +258,27 @@ oui ou par non — et les lignes qu'elle occupait reviennent au rapport.
 
 Le coin supérieur droit de l'écran décompte le temps jusqu'à la fin de la
 suite de démarrage, et le port série imprime l'estimation dès que le plan
-est connu. Chaque étape a une durée tirée du log série d'une vraie Naomi 2
-(celui joint à la PR #2), résultats parlés compris ; ce que ce log ne couvre
-pas est extrapolé :
+est connu. Chaque étape a une durée tirée du log série d'une vraie Naomi 2 en v0.16
+dont tous les tests fonctionnent (le log « après » de la PR #3), résultats
+parlés compris ; seul le cas sans RAM CPU pour les boucles est extrapolé :
 
 | Étape | Boucles relogées | Pas de RAM CPU pour les boucles |
 |---|---|---|
-| Amorçage écran + haut-parleur | 0:28 | 0:28 |
+| Amorçage écran + haut-parleur | 0:29 | 0:29 |
 | Carte, CRC du BIOS | 0:08 | 0:08 |
-| Relocalisation des boucles | 0:35 | 0:31 (jusqu'à 128 blocs balayés depuis la ROM) |
-| MIE, EEPROM des réglages, JVS | 0:20 | sautée |
-| RAM CPU | 0:44 | 12:39 |
-| VRAM TEX0 + TEX1 | 0:34 | 6:25 |
-| RAM son | 7:47 | 7:47 (jamais relogée) |
-| Naomi 2 : PVR-B + RAM Elan | 1:28 | 19:00 |
-| NVRAM, RTC, EEPROM série, fin | 0:35 | 0:35 |
-| **Total Naomi 1** | **11:11** | **28:34** |
-| **Total Naomi 2** | **12:40** | **47:34** |
+| Relocalisation des boucles | 0:37 | 0:31 (jusqu'à 128 blocs balayés depuis la ROM) |
+| MIE, EEPROM des réglages, JVS | 0:19 | sautée |
+| RAM CPU | 0:52 | 12:39 |
+| VRAM TEX0 + TEX1 | 0:53 | 6:25 |
+| RAM son | 8:22 | 8:22 (jamais relogée) |
+| Naomi 2 : PVR-B + RAM Elan | 1:31 | 19:00 |
+| NVRAM, RTC, EEPROM série, fin | 0:29 | 0:29 |
+| **Total Naomi 1** | **12:09** | **29:04** |
+| **Total Naomi 2** | **13:40** | **48:04** |
 
-- L'étape MIE (environ 20 s sous MAME), le PVR-B (16 Mo par la fenêtre
-  TEX : deux fois TEX0) et la RAM Elan (32 Mo, prise au rythme de la VRAM)
-  ne figurent pas dans ce log.
+- Cette exécution a duré 13:42. Le total Naomi 1 est la même exécution
+  sans le PVR-B ni la RAM Elan. TEX1 y est mesurée plus lente que TEX0,
+  8,9 s contre 4,1 s par passe.
 - Sans bloc de RAM CPU, les boucles tournent depuis l'EPROM de démarrage.
   Le contrôle rapide de la VRAM le fait toujours : 3 passes sur 600 Ko en
   14,5 s, soit 7,9 s par mégaoctet-passe, environ 14 fois le rythme en

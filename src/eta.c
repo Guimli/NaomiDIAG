@@ -9,28 +9,33 @@
 /* -------------------------------------------------------------------------
  * Step durations, in milliseconds, WITHOUT the speech.
  *
- * Measured: the serial log of a real Naomi 2 attached to PR #2 (57600
- * baud, audio on, loops relocated). Its timestamps give each step with the
- * speech included; one spoken result costs about SPEECH_MS (clip + the
- * one-second gap), taken out here and added back at run time only when
- * audio is on.
+ * Measured: the serial log of a real Naomi 2 running v0.16 with every
+ * test working, attached to PR #3 ("after" log: 57600 baud, audio on,
+ * loops relocated, MIE answering, a JVS I/O board present). Its
+ * timestamps give each step with the speech included; one spoken result
+ * costs about SPEECH_MS (clip + the one-second gap), taken out here and
+ * added back at run time only when audio is on.
  *
- *   quick VRAM check     0.03 ->  14.50 s   14.5 s, no audio yet
- *   quick sound check   16.65 ->  23.70 s    7.0 s, then a spoken replay
- *   board + BIOS CRC    30.96 ->  38.26 s    3.8 s + 1 result
- *   relocation          38.26 ->  73.54 s   27.6 s + 2 results
- *   CPU RAM             78.39 -> 118.57 s   40.2 s + 1 result
- *   TEX0                122.45 -> 135.95 s  13.5 s + 1 result (TEX1 alike)
- *   sound RAM           552.30 -> 1015.29 s 463 s + 1 result
- *   NVRAM + RTC                              5.9 s + 2 results
- *   serial EEPROM       1039.1 -> 1049.5 s  10.0 s + 1 result
+ *   step                 from -> to (s)        total   base + results
+ *   quick VRAM check       0.03 ->   14.56     14.5    14.5, no audio yet
+ *   quick sound + replay  16.71 ->   31.59     14.9     7.4 + 2
+ *   board + BIOS CRC      31.59 ->   39.24      7.6     3.9 + 1
+ *   relocation            39.24 ->   76.07     36.8    29.4 + 2
+ *   MIE, EEPROM, JVS      76.07 ->   95.34     19.3     4.5 + 4
+ *   CPU RAM               95.34 ->  147.15     51.8    48.1 + 1
+ *   VRAM TEX0 + TEX1     147.15 ->  199.83     52.7    45.3 + 2
+ *                        (TEX1 passes take 8.9 s, twice TEX0's 4.1 s)
+ *   sound RAM            199.83 ->  702.37    502.5   498.8 + 1
+ *   PVR-B + Elan RAM     702.37 ->  793.68     91.3    83.9 + 2
+ *   NVRAM + RTC          793.68 ->  807.27     13.6     6.2 + 2
+ *   serial EEPROM        807.27 ->  821.85     14.6    10.9 + 1
+ *   relocated-code check 821.85 ->  821.93      0.1     0.5
+ *   Naomi 2 total                             13:42   (this table: 13:40)
  *
- * Not in that log, estimated:
- *   MIE stage (this version runs it early): about 20 s with its speech
- *     under MAME -- upload, self-test, EEPROM, JVS wait.
- *   PVR-B, 16 MB through the same 32-bit window as TEX: twice TEX0, 27 s.
- *   Elan RAM, 32 MB, bus speed unknown: taken at the VRAM rate, 54 s.
- *   TEX1 of that board had a fault; its clean time is taken as TEX0's.
+ * The Naomi 1 has the same steps but the PVR-B and Elan RAM. The first
+ * version of this table came from the PR #2 log, which had a fault on
+ * TEX1, a MIE that did not answer and no Naomi 2 memories tested; it was
+ * a minute short.
  *
  * Loops from ROM (no CPU RAM block for them): the quick VRAM check runs
  * from ROM on every board, 3 passes over 600 KB in 14.5 s, which is
@@ -65,17 +70,17 @@ typedef struct {
 
 static const step_est est[ETA_STEPS] = {
     [ETA_VIDEO]   = { 14500, 14500, 0, 3, 0 },
-    [ETA_AUDIO]   = {  7000,  7000, 2, 3, 0 },
-    [ETA_BOARD]   = {  3800,  3800, 1, 1, 0 },
-    [ETA_RELOC]   = { 27600, 24000, 2, 0, 0 },
-    [ETA_MIE]     = {  9000,     0, 3, 0, 0 },
-    [ETA_SDRAM]   = { Q(40200, 32), Q(755000, 32), 1, 3, 1 },
-    [ETA_VRAM]    = { Q(27000, 8),  Q(378000, 8),  2, 6, 1 },
-    [ETA_ARAM]    = { Q(463000, 8), Q(463000, 8),  1, 3, 0 },
-    [ETA_N2]      = { Q(81000, 24), Q(1133000, 24), 2, 6, 1 },
-    [ETA_PERIPH]  = {  5900,  5900, 2, 0, 0 },
-    [ETA_SEEPROM] = { 10000, 10000, 1, 0, 0 },
-    [ETA_END]     = {   500,   500, 2, 0, 0 },
+    [ETA_AUDIO]   = {  7400,  7400, 2, 3, 0 },
+    [ETA_BOARD]   = {  3900,  3900, 1, 1, 0 },
+    [ETA_RELOC]   = { 29400, 24000, 2, 0, 0 },
+    [ETA_MIE]     = {  4500,     0, 4, 0, 0 },
+    [ETA_SDRAM]   = { Q(48100, 32), Q(755000, 32), 1, 3, 1 },
+    [ETA_VRAM]    = { Q(45300, 8),  Q(378000, 8),  2, 6, 1 },
+    [ETA_ARAM]    = { Q(498800, 8), Q(498800, 8),  1, 3, 0 },
+    [ETA_N2]      = { Q(83900, 24), Q(1133000, 24), 2, 6, 1 },
+    [ETA_PERIPH]  = {  6200,  6200, 2, 0, 0 },
+    [ETA_SEEPROM] = { 10900, 10900, 1, 0, 0 },
+    [ETA_END]     = {   500,   500, 0, 0, 0 },
 };
 
 static u32 g_on;                /* counting down */

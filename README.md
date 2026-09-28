@@ -236,27 +236,28 @@ no — and the rows it occupied go to the report instead.
 
 The top right corner of the screen counts down to the end of the boot
 suite, and the serial console prints the estimate once the plan is known.
-Each step has a duration taken from the serial log of a real Naomi 2 (the
-one attached to PR #2), spoken results included; what that log does not
-cover is extrapolated:
+Each step has a duration taken from the serial log of a real Naomi 2
+running v0.16 with every test working (the "after" log of PR #3), spoken
+results included; only the case without CPU RAM for the loops is
+extrapolated:
 
 | Step | Loops relocated | No CPU RAM for the loops |
 |---|---|---|
-| Screen + speaker bring-up | 0:28 | 0:28 |
+| Screen + speaker bring-up | 0:29 | 0:29 |
 | Board, BIOS CRC | 0:08 | 0:08 |
-| Loop relocation | 0:35 | 0:31 (up to 128 blocks scanned from ROM) |
-| MIE, settings EEPROM, JVS | 0:20 | skipped |
-| CPU RAM | 0:44 | 12:39 |
-| VRAM TEX0 + TEX1 | 0:34 | 6:25 |
-| Sound RAM | 7:47 | 7:47 (never relocated) |
-| Naomi 2: PVR-B + Elan RAM | 1:28 | 19:00 |
-| NVRAM, RTC, serial EEPROM, end | 0:35 | 0:35 |
-| **Naomi 1 total** | **11:11** | **28:34** |
-| **Naomi 2 total** | **12:40** | **47:34** |
+| Loop relocation | 0:37 | 0:31 (up to 128 blocks scanned from ROM) |
+| MIE, settings EEPROM, JVS | 0:19 | skipped |
+| CPU RAM | 0:52 | 12:39 |
+| VRAM TEX0 + TEX1 | 0:53 | 6:25 |
+| Sound RAM | 8:22 | 8:22 (never relocated) |
+| Naomi 2: PVR-B + Elan RAM | 1:31 | 19:00 |
+| NVRAM, RTC, serial EEPROM, end | 0:29 | 0:29 |
+| **Naomi 1 total** | **12:09** | **29:04** |
+| **Naomi 2 total** | **13:40** | **48:04** |
 
-- The MIE stage (about 20 s under MAME), PVR-B (16 MB through the TEX
-  window: twice TEX0) and the Elan RAM (32 MB, taken at the VRAM rate) are
-  not in that log.
+- That run took 13:42. The Naomi 1 total is the same run without the PVR-B
+  and Elan RAM. TEX1 is measured slower than TEX0 there, 8.9 s against
+  4.1 s per pass.
 - Without a CPU RAM block the loops run from the boot EPROM. The quick VRAM
   check always does: 3 passes over 600 KB in 14.5 s, 7.9 s per
   megabyte-pass, about 14 times the cached rate. Instruction fetch then
