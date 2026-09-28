@@ -123,6 +123,7 @@ CLIPS = {
     "w_50":        {"fr": "cinquante,",                       "en": "fifty,"},
     "w_60":        {"fr": "soixante,",                        "en": "sixty,"},
     "w_and_one":  {"fr": "et un,",                            "en": "one,"},
+    "dq":         {"fr": "D Q,",                              "en": "D Q,"},
 }
 
 RATE = 22050

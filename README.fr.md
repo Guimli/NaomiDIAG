@@ -214,11 +214,12 @@ testée, sur la parité de mot où il a échoué : toutes écrites, puis un leur
 de polarité opposée pour qu'une ligne flottante ne se contente pas de
 garder la dernière valeur envoyée, puis toutes relues, avec le bit à 0 puis
 à 1. Faux sur 60 ou plus, c'est une ligne et non une cellule : elle a sa
-propre ligne à l'écran et à la voix — `Ligne D5 coupee sur IC9`, « Ligne D,
-cinq, coupée sur, I C neuf » — et le port série précise comment elle se lit
-(toujours 0, toujours 1, ou flottante). Les lignes sont numérotées comme le
-bus 64 bits du SH-4 les porte : un mot pair est D0-D31, un mot impair
-D32-D63.
+propre ligne à l'écran et à la voix — `Ligne D5 coupee sur IC9 DQ5`,
+« Ligne D, cinq, coupée sur, I C neuf, D Q, cinq » — et le port série précise
+comment elle se lit (toujours 0, toujours 1, ou flottante). La ligne est
+nommée deux fois : d'abord comme le bus 64 bits du SH-4 la porte (un mot
+pair est D0-D31, un mot impair D32-D63), puis comme la broche de données
+de la puce elle-même, DQ0-DQ15, celle à sonder sur le boîtier.
 
 La barre de progression se retire après les mémoires Naomi 2 : à partir de
 là plus rien ne se mesure — la NVRAM, le RTC et l'EEPROM série répondent par

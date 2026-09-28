@@ -9,105 +9,105 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:00:00.892] Ecran actif : rapport affiche sur la sortie VGA.
 [00:00:01.117] RAM son zone clips (rapide) ........ OK
 [00:00:01.301] Audio actif : relecture des resultats acquis sur haut-parleur...
-[00:00:08.061] Board probe: SH4 ver 040205C1, HOLLY id 17FD11DB rev 00000011, Elan id 00000000, model override 0
-[00:00:08.435] Carte : Naomi 1 (837-13544) ........ OK
-[00:00:11.812] 10% 20% 30% 40% 50% 60% 70% 80% 90% ROM BIOS (IC27) CRC32 ........ OK
-[00:00:15.387] Boucles de test relogees en RAM ........ OK
-[00:00:15.583]   loops execute at 8DFFC0AA (RAM CPU, cache: mode rapide)
-[00:00:15.826]   Temps restant estime : 10:00
-[00:00:15.982]   MIE on maple port 0, resp cmd 0x00000083
-[00:00:16.176]   MIE version: "315-6149    COPYRIGHT SEGA E"
-[00:00:16.379] Bus Maple / MIE (JVS) ........ OK
-[00:00:20.925]   MIE self-test status word: 00000000
-[00:00:21.102] Auto-test MIE (Z80 ROM+RAM) ........ OK
-[00:00:25.822]   programme Z80 charge dans le MIE
-[00:00:25.991]   DIP SW1 : 1=15 kHz  2=OFF  3=OFF  4=OFF   (port brut 000000FE)
-[00:00:26.257]   Boutons carte : TEST relache, SERVICE relache
+[00:00:08.210] Board probe: SH4 ver 040205C1, HOLLY id 17FD11DB rev 00000011, Elan id 00000000, model override 0
+[00:00:08.584] Carte : Naomi 1 (837-13544) ........ OK
+[00:00:12.014] 10% 20% 30% 40% 50% 60% 70% 80% 90% ROM BIOS (IC27) CRC32 ........ OK
+[00:00:15.637] Boucles de test relogees en RAM ........ OK
+[00:00:15.833]   loops execute at 8DFFC0AA (RAM CPU, cache: mode rapide)
+[00:00:16.076]   Temps restant estime : 10:00
+[00:00:16.232]   MIE on maple port 0, resp cmd 0x00000083
+[00:00:16.426]   MIE version: "315-6149    COPYRIGHT SEGA E"
+[00:00:16.629] Bus Maple / MIE (JVS) ........ OK
+[00:00:21.025]   MIE self-test status word: 00000000
+[00:00:21.202] Auto-test MIE (Z80 ROM+RAM) ........ OK
+[00:00:25.772]   programme Z80 charge dans le MIE
+[00:00:25.941]   DIP SW1 : 1=15 kHz  2=OFF  3=OFF  4=OFF   (port brut 000000FE)
+[00:00:26.207]   Boutons carte : TEST relache, SERVICE relache
 
-[00:00:26.484] Settings EEPROM: crc1 00004822 ok, crc2 00004822 ok, copies match
-[00:00:26.753] EEPROM reglages (93C46 via MIE) ........ OK
+[00:00:26.434] Settings EEPROM: crc1 00004822 ok, crc2 00004822 ok, copies match
+[00:00:26.703] EEPROM reglages (93C46 via MIE) ........ OK
 
-[00:00:30.647] JVS : recherche d'une carte I/O...
-[00:00:30.833]   Identifiant : SEGA ENTERPRISES,LTD.;I/O BD JVS;837-13551
-[00:00:31.079]   Revisions commande / JVS / communication : 1.1 / 2.0 / 1.0
-[00:00:31.331]   Entrees : 2 joueur(s) x 13 contacts, 2 monnayeur(s), 8 voie(s) analogique(s) de 16 bits
-[00:00:31.678]   Ligne SENSE (port 91h) : 0000008E
-[00:00:31.849] Carte I/O JVS : presente ........ OK
+[00:00:30.525] JVS : recherche d'une carte I/O...
+[00:00:30.711]   Identifiant : SEGA ENTERPRISES,LTD.;I/O BD JVS;837-13551
+[00:00:30.957]   Revisions commande / JVS / communication : 1.1 / 2.0 / 1.0
+[00:00:31.209]   Entrees : 2 joueur(s) x 13 contacts, 2 monnayeur(s), 8 voie(s) analogique(s) de 16 bits
+[00:00:31.556]   Ligne SENSE (port 91h) : 0000008E
+[00:00:31.727] Carte I/O JVS : presente ........ OK
 
-[00:00:36.192] SDRAM : test RAM CPU, bus et cellules...
-[00:00:36.379] SDRAM bus de donnees ........ OK
-[00:00:36.539] SDRAM bus d'adresses ........ OK
-[00:00:36.700] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:37.171] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:37.643] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:39.316] SDRAM test cellules ........ OK
+[00:00:36.169] SDRAM : test RAM CPU, bus et cellules...
+[00:00:36.356] SDRAM bus de donnees ........ OK
+[00:00:36.516] SDRAM bus d'adresses ........ OK
+[00:00:36.677] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:37.148] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:37.619] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:39.293] SDRAM test cellules ........ OK
 
-[00:00:43.190] PVR : activation controleur VRAM, test RAM texture...
-[00:00:43.420] VRAM TEX0 bus de donnees ........ OK
-[00:00:43.593] VRAM TEX0 bus d'adresses ........ OK
-[00:00:43.767] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:00:44.055] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:00:44.342] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:43.110] PVR : activation controleur VRAM, test RAM texture...
+[00:00:43.340] VRAM TEX0 bus de donnees ........ OK
+[00:00:43.513] VRAM TEX0 bus d'adresses ........ OK
+[00:00:43.687] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+[00:00:43.975] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+[00:00:44.262] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 
-[00:00:44.979] VRAM TEX0 (IC16/18/20/22) ........ OK
-[00:00:48.691] VRAM TEX1 bus de donnees ........ OK
-[00:00:48.864] VRAM TEX1 bus d'adresses ........ OK
-[00:00:49.038] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:00:49.335] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
-[00:00:49.631] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:44.899] VRAM TEX0 (IC16/18/20/22) ........ OK
+[00:00:48.466] VRAM TEX1 bus de donnees ........ OK
+[00:00:48.640] VRAM TEX1 bus d'adresses ........ OK
+[00:00:48.814] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+[00:00:49.110] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90% 
+[00:00:49.407] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
 
-[00:00:50.277] VRAM TEX1 (IC17S/19S/21S/23S) ........ OK
+[00:00:50.053] VRAM TEX1 (IC17S/19S/21S/23S) ........ OK
 
-[00:00:54.008] AICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...
-[00:00:54.234] RAM son bus de donnees ........ OK
-[00:00:54.402] RAM son bus d'adresses ........ OK
-[00:00:54.569] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:55.025] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:55.481] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
-[00:00:56.126] RAM son test cellules ........ OK
+[00:00:53.640] AICA : ARM7 en reset, test RAM son (8 Mo, bus G2)...
+[00:00:53.866] RAM son bus de donnees ........ OK
+[00:00:54.034] RAM son bus d'adresses ........ OK
+[00:00:54.201] passe 1/3 0101 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:54.657] passe 2/3 1010 : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:55.113] passe 3/3 pseudo-aleatoire : 10% 20% 30% 40% 50% 60% 70% 80% 90%  ok
+[00:00:55.758] RAM son test cellules ........ OK
 
-[00:00:59.583] Memoires Naomi 2 non testees : carte non identifiee comme Naomi 2.
+[00:00:59.150] Memoires Naomi 2 non testees : carte non identifiee comme Naomi 2.
 
-[00:00:59.862] NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
-[00:01:00.123] NVRAM sauvegarde IC29 (intacte) ........ OK
-[00:01:05.737] RTC (AICA, doit avancer) ........ OK
-[00:01:09.497]   Date RTC : 2026-09-28 04:02:55 (avance)
+[00:00:59.429] NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
+[00:00:59.690] NVRAM sauvegarde IC29 (intacte) ........ OK
+[00:01:05.323] RTC (AICA, doit avancer) ........ OK
+[00:01:09.009]   Date RTC : 2026-09-28 04:23:06 (avance)
 
-[00:01:09.721] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
-[00:01:10.032] EEPROM serie (IC31, 93C46) ........ OK
-[00:01:13.903] Integrite du code reloge en RAM ........ OK
+[00:01:09.232] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
+[00:01:09.544] EEPROM serie (IC31, 93C46) ........ OK
+[00:01:13.343] Integrite du code reloge en RAM ........ OK
 
-[00:01:14.106] ==== RESUME ====
-[00:01:14.215] OC-RAM CPU (SH-4 IC1): OK
-[00:01:14.352] VRAM framebuffer (rapide): OK
-[00:01:14.503] RAM son zone clips (rapide): OK
-[00:01:14.660] Carte : Naomi 1 (837-13544): OK
-[00:01:14.818] ROM BIOS (IC27) CRC32: OK
-[00:01:14.955] Boucles de test relogees en RAM: OK
-[00:01:15.126] Bus Maple / MIE (JVS): OK
-[00:01:15.263] Auto-test MIE (Z80 ROM+RAM): OK
-[00:01:15.420] EEPROM reglages (93C46 via MIE): OK
-[00:01:15.591] Carte I/O JVS : presente: OK
-[00:01:15.738] SDRAM bus de donnees: OK
-[00:01:15.873] SDRAM bus d'adresses: OK
-[00:01:16.007] SDRAM test cellules: OK
-[00:01:16.138] VRAM TEX0 bus de donnees: OK
-[00:01:16.286] VRAM TEX0 bus d'adresses: OK
-[00:01:16.433] VRAM TEX0 (IC16/18/20/22): OK
-[00:01:16.584] VRAM TEX1 bus de donnees: OK
-[00:01:16.731] VRAM TEX1 bus d'adresses: OK
-[00:01:16.879] VRAM TEX1 (IC17S/19S/21S/23S): OK
-[00:01:17.043] RAM son bus de donnees: OK
-[00:01:17.184] RAM son bus d'adresses: OK
-[00:01:17.324] RAM son test cellules: OK
-[00:01:17.462] NVRAM sauvegarde IC29 (intacte): OK
-[00:01:17.633] RTC (AICA, doit avancer): OK
-[00:01:17.780] EEPROM serie (IC31, 93C46): OK
-[00:01:17.934] Integrite du code reloge en RAM: OK
-[00:01:18.104] RAM principale utilisable.
-[00:01:18.245] RAM son utilisable, rapports audio actifs.
-[00:01:18.439] VRAM utilisable, rapport a l'ecran actif.
+[00:01:13.546] ==== RESUME ====
+[00:01:13.654] OC-RAM CPU (SH-4 IC1): OK
+[00:01:13.792] VRAM framebuffer (rapide): OK
+[00:01:13.943] RAM son zone clips (rapide): OK
+[00:01:14.100] Carte : Naomi 1 (837-13544): OK
+[00:01:14.257] ROM BIOS (IC27) CRC32: OK
+[00:01:14.395] Boucles de test relogees en RAM: OK
+[00:01:14.565] Bus Maple / MIE (JVS): OK
+[00:01:14.703] Auto-test MIE (Z80 ROM+RAM): OK
+[00:01:14.860] EEPROM reglages (93C46 via MIE): OK
+[00:01:15.031] Carte I/O JVS : presente: OK
+[00:01:15.178] SDRAM bus de donnees: OK
+[00:01:15.313] SDRAM bus d'adresses: OK
+[00:01:15.447] SDRAM test cellules: OK
+[00:01:15.578] VRAM TEX0 bus de donnees: OK
+[00:01:15.725] VRAM TEX0 bus d'adresses: OK
+[00:01:15.873] VRAM TEX0 (IC16/18/20/22): OK
+[00:01:16.024] VRAM TEX1 bus de donnees: OK
+[00:01:16.171] VRAM TEX1 bus d'adresses: OK
+[00:01:16.319] VRAM TEX1 (IC17S/19S/21S/23S): OK
+[00:01:16.482] RAM son bus de donnees: OK
+[00:01:16.623] RAM son bus d'adresses: OK
+[00:01:16.764] RAM son test cellules: OK
+[00:01:16.902] NVRAM sauvegarde IC29 (intacte): OK
+[00:01:17.072] RTC (AICA, doit avancer): OK
+[00:01:17.220] EEPROM serie (IC31, 93C46): OK
+[00:01:17.374] Integrite du code reloge en RAM: OK
+[00:01:17.544] RAM principale utilisable.
+[00:01:17.685] RAM son utilisable, rapports audio actifs.
+[00:01:17.879] VRAM utilisable, rapport a l'ecran actif.
 
-[00:01:18.635] *** DIAGNOSTIC TERMINE ***
+[00:01:18.075] *** DIAGNOSTIC TERMINE ***
 
-[00:01:20.705] Appuyez sur TEST ou SERVICE (carte) pour le menu operateur.
+[00:01:20.148] Appuyez sur TEST ou SERVICE (carte) pour le menu operateur.

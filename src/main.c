@@ -233,6 +233,7 @@ typedef struct {
     u32 quiet_ok;                   /* screen+speech: only when it FAILS   */
     u32 pre;                        /* clip spoken first, or CLIP_NONE     */
     u32 line;                       /* cut data line: D number + 1, else 0 */
+    u32 dq;                         /* ...and the chip's own DQ pin       */
 } log_entry;
 
 static log_entry g_log[LOG_MAX];
@@ -384,12 +385,14 @@ static void say_entry(const log_entry *e)
 {
     if (!g_audio_ready || e->clip == CLIP_NONE)
         return;
-    /* "Line D, thirty seven, cut on, I C eleven S" */
+    /* "Line D, thirty seven, cut on, I C eleven S, D Q, five" */
     if (e->line) {
         say(CLIP_LINE_D, 0);
         say_number(e->line - 1);
         say(CLIP_CUT_ON, 0);
-        say(e->clip, 250);
+        say(e->clip, 0);
+        say(CLIP_DQ, 0);
+        say_number(e->dq);
         progress_wait_ms(REPORT_GAP_MS);
         return;
     }
@@ -467,6 +470,7 @@ static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
     e.quiet_ok = quiet_ok;
     e.pre = pre;
     e.line = 0;
+    e.dq = 0;
     log_store(&e);
 
     scif_puts(name);
@@ -912,16 +916,20 @@ static void report_cut_lines(u32 base, u32 len, u32 bits_even, u32 bits_odd)
 
             if (g_cut_n >= CUT_MAX)
                 continue;
-            /* "Line D37 cut on IC11S": a name the log can keep */
+            /* "Line D37 cut on IC11S DQ5": the SH-4 bus line, then the
+             * chip and its own pin -- a name the log can keep */
             char *d = g_cut_name[g_cut_n++];
-            const char *parts[4] = { S_CUT_PRE, 0, S_CUT_MID,
-                                     g_ic_valid ? work_comps[comp].name : "?" };
+            u32 dq = bit & 15u;
+            const char *parts[6] = { S_CUT_PRE, 0, S_CUT_MID,
+                                     g_ic_valid ? work_comps[comp].name : "?",
+                                     " DQ", 0 };
             u32 o = 0;
-            for (u32 i = 0; i < 4; i++) {
-                if (i == 1) {
-                    if (line >= 10)
-                        d[o++] = (char)('0' + line / 10);
-                    d[o++] = (char)('0' + line % 10);
+            for (u32 i = 0; i < 6; i++) {
+                if (!parts[i]) {
+                    u32 v = i == 1 ? line : dq;
+                    if (v >= 10)
+                        d[o++] = (char)('0' + v / 10);
+                    d[o++] = (char)('0' + v % 10);
                     continue;
                 }
                 for (const char *s = parts[i]; *s && o < 31; s++)
@@ -938,6 +946,7 @@ static void report_cut_lines(u32 base, u32 len, u32 bits_even, u32 bits_odd)
             e.quiet_ok = 0;
             e.pre = CLIP_NONE;
             e.line = line + 1;
+            e.dq = dq;
             log_store(&e);
             scif_puts(d);
             scif_puts(S_SUF_FAIL);

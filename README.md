@@ -196,10 +196,11 @@ probed on 64 addresses spread over the tested region, on the word parity it
 failed on: all written, then a decoy of the opposite polarity so a floating
 line cannot simply hold the last value driven, then all read back, with the
 bit at 0 and at 1. Wrong on 60 or more is a line, not a cell, and it gets
-its own line on screen and in speech — `Line D5 cut on IC9`, "Line D, five,
-cut on, I C nine" — with how it reads on serial (always 0, always 1, or
-floating). Lines are numbered as the SH-4's 64-bit bus carries them: an
-even word is D0-D31, an odd word D32-D63.
+its own line on screen and in speech — `Line D5 cut on IC9 DQ5`, "Line D,
+five, cut on, I C nine, D Q, five" — with how it reads on serial (always 0,
+always 1, or floating). The line is named twice: first as the SH-4's 64-bit
+bus carries it (an even word is D0-D31, an odd word D32-D63), then as the
+chip's own data pin, DQ0-DQ15, the one to probe on the package.
 
 The progress bar retires after the Naomi 2 memories: from there on nothing
 is being measured — the NVRAM, the RTC and the serial EEPROM answer yes or

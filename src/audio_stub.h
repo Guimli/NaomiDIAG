@@ -101,6 +101,7 @@ enum {
     CLIP_W_50,
     CLIP_W_60,
     CLIP_W_AND_ONE,
+    CLIP_DQ,
     CLIP_COUNT
 };
 
