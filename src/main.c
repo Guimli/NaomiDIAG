@@ -18,6 +18,7 @@
 /* hand-written CRC-32 of the boot EPROM, src/crc32_fast.S */
 u32 crc32_rom_block(const u32 *src, u32 nquads, u32 crc);
 #include "timer.h"
+#include "eta.h"
 #include "aica.h"
 #include "pvr.h"
 #include "periph.h"
@@ -2892,6 +2893,7 @@ static void suite_check_abort(void)
     progress_screen_enable(1);
     progress_retire();                  /* nothing is being measured any more */
     progress_phase(PH_DONE);
+    eta_finish();
     scif_puts(S_SUITE_STOPPED);
     screen_render();
     if (a >= ABORT_ACT(1) && a <= ABORT_ACT(ACT_COUNT)) {
@@ -2941,8 +2943,11 @@ void cmain(void)
 
     /* light up the audio and video channels within seconds, by proving
      * only the region each one needs (see quick_*_bringup above) */
+    eta_start();
     quick_video_bringup();   /* screen first: richest channel, no replay */
+    eta_step(ETA_AUDIO);
     quick_audio_bringup();   /* then audio, which replays the history */
+    eta_set_audio(g_audio_ready);
     suite_check_abort();
 
     /* Board identification, before the ROM checksum for two reasons.
@@ -2961,7 +2966,9 @@ void cmain(void)
      * probes addresses whose behaviour on real hardware is less certain
      * than plain memory, so it must run with screen and audio already up --
      * which the two bring-ups above have just done. */
+    eta_step(ETA_BOARD);
     test_board();
+    eta_set_board_n2(g_board_type == BOARD_NAOMI2);
     suite_check_abort();
     progress_phase(PH_BOARD_ID);        /* magenta */
 
@@ -2971,7 +2978,10 @@ void cmain(void)
     test_bios_rom();
     suite_check_abort();
 
+    eta_step(ETA_RELOC);
     relocate_fast_loops();
+    eta_set_reloc(reloc_active());
+    eta_set_mie_early(g_maple_safe);
     suite_check_abort();
 
     /* The MIE stage, as early as it can run. Its DMA buffers need RAM, and
@@ -2981,6 +2991,15 @@ void cmain(void)
      * board's TEST and SERVICE buttons can interrupt the long part of the
      * suite -- which is when an operator wants to. Without a qualified block
      * it stays where it was, behind the CPU RAM verdict. */
+    eta_step(ETA_MIE);
+    {
+        /* the plan is known from here: board, loops, MIE stage, audio */
+        char t[9];
+        eta_format(t, eta_remaining_ms());
+        scif_puts(S_ETA);
+        scif_puts(t);
+        scif_puts("\n");
+    }
     if (g_maple_safe) {
         test_maple_mie(1);
         test_settings_eeprom();
@@ -2996,14 +3015,18 @@ void cmain(void)
      * regions the screen and the speaker need, so every result is shown
      * and spoken as it lands whichever memory is under test -- which lets
      * the memory the rest of the board leans on go first. */
+    eta_step(ETA_SDRAM);
     u32 usable = test_sdram_cells();
     suite_check_abort();
+    eta_step(ETA_VRAM);
     u32 vram_ok = test_vram();
     suite_check_abort();
+    eta_step(ETA_ARAM);
     u32 aram_ok = test_aram();
     suite_check_abort();
 
     /* Naomi 2 extra memories (no-op on other boards) */
+    eta_step(ETA_N2);
     test_naomi2_ram();
     suite_check_abort();
 
@@ -3014,6 +3037,7 @@ void cmain(void)
      * all -- so it goes, and the report takes the rows it occupied. */
     progress_retire();
 
+    eta_step(ETA_PERIPH);
     test_sram_rtc();
     suite_check_abort();
     if (!g_maple_safe) {
@@ -3022,8 +3046,10 @@ void cmain(void)
         test_jvs_io();
     }
     suite_check_abort();
+    eta_step(ETA_SEEPROM);
     test_serial_eeprom();
     suite_check_abort();
+    eta_step(ETA_END);
 
     /* The loops have been executing out of CPU RAM on a board whose CPU RAM
      * is what we just spent the whole suite testing. A cell that passed the
@@ -3064,6 +3090,7 @@ void cmain(void)
     if (vram_ok)
         scif_puts(S_VRAM_OK_MSG);
 
+    eta_finish();
     scif_puts(S_COMPLETE);
     say(CLIP_TESTS_DONE, REPORT_GAP_MS);
     scif_flush();

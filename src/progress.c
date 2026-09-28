@@ -2,6 +2,7 @@
 #include "pvr.h"
 #include "scif.h"
 #include "timer.h"
+#include "eta.h"
 
 /* border colour per phase, 0x00RRGGBB as VO_BORDER_COL wants it */
 static const u32 phase_col[] = {
@@ -22,6 +23,8 @@ static u32 g_hb_dim;                /* currently showing the dim half */
 
 #define HB_TICKS   ((TIMER_HZ / 10u) * 7u)      /* 0.7 s */
 
+static void eta_redraw(void);
+
 void progress_heartbeat(void)
 {
     timer_ms();                     /* keeps the elapsed clock past its wrap */
@@ -32,6 +35,7 @@ void progress_heartbeat(void)
     g_hb_dim ^= 1u;
     u32 c = phase_col[g_phase];
     pvr_border(g_hb_dim ? ((c >> 2) & 0x003F3F3Fu) : c);
+    eta_redraw();
 }
 
 void progress_wait_ms(u32 ms)
@@ -64,6 +68,13 @@ static u32 g_in_loop;        /* a soak run: only the TEST button ends it */     
 
 void progress_screen_enable(u32 on) { g_screen_off = !on; }
 
+/* the time-left counter shares the bar's rule: nothing drawn while the
+ * framebuffer is unproven or is itself the memory under test */
+static void eta_redraw(void)
+{
+    eta_tick(fb_progress_enabled() && !g_screen_off, g_active ? g_pct : 0);
+}
+
 void progress_request_abort(u32 what)  { g_abort = what ? what : ABORT_PLAIN; }
 u32  progress_aborted(void)            { return g_abort; }
 u32  progress_abort_action(void)       { return g_abort; }
@@ -89,6 +100,7 @@ static u32 udiv32(u32 a, u32 b)
 
 void progress_begin(const char *label, u32 total)
 {
+    eta_phase();
     g_label = label;
     g_pct = 0;
     g_active = 1;

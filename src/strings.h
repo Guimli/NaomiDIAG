@@ -246,6 +246,7 @@
 #define S_CG_ELAN           "RAM Elan"
 
 /* phase headers / narrative */
+#define S_ETA               "  Temps restant estime : "
 #define S_SCIF_UP           "Console SCIF active, " SCIF_BAUD_STR " 8N1\n"
 #define S_SDRAM_INIT        "\nInit SDRAM (valeurs BSC du BIOS d'origine)...\n"
 #define S_SDRAM_SIZE        "Taille SDRAM detectee : "
@@ -539,6 +540,7 @@
 #define S_CG_PVRB           "PVR-B VRAM"
 #define S_CG_ELAN           "ELAN RAM"
 
+#define S_ETA               "  Estimated time left: "
 #define S_SCIF_UP           "SCIF console up, " SCIF_BAUD_STR " 8N1\n"
 #define S_SDRAM_INIT        "\nSDRAM init (BSC values from original BIOS)...\n"
 #define S_SDRAM_SIZE        "SDRAM detected size: "

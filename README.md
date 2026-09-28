@@ -194,6 +194,40 @@ The progress bar retires after the Naomi 2 memories: from there on nothing
 is being measured — the NVRAM, the RTC and the serial EEPROM answer yes or
 no — and the rows it occupied go to the report instead.
 
+### Time left
+
+The top right corner of the screen counts down to the end of the boot
+suite, and the serial console prints the estimate once the plan is known.
+Each step has a duration taken from the serial log of a real Naomi 2 (the
+one attached to PR #2), spoken results included; what that log does not
+cover is extrapolated:
+
+| Step | Loops relocated | No CPU RAM for the loops |
+|---|---|---|
+| Screen + speaker bring-up | 0:28 | 0:28 |
+| Board, BIOS CRC | 0:08 | 0:08 |
+| Loop relocation | 0:35 | 0:31 (up to 128 blocks scanned from ROM) |
+| MIE, settings EEPROM, JVS | 0:20 | skipped |
+| CPU RAM | 0:44 | 12:39 |
+| VRAM TEX0 + TEX1 | 0:34 | 6:25 |
+| Sound RAM | 7:47 | 7:47 (never relocated) |
+| Naomi 2: PVR-B + Elan RAM | 1:28 | 19:00 |
+| NVRAM, RTC, serial EEPROM, end | 0:35 | 0:35 |
+| **Naomi 1 total** | **11:11** | **28:34** |
+| **Naomi 2 total** | **12:40** | **47:34** |
+
+- The MIE stage (about 20 s under MAME), PVR-B (16 MB through the TEX
+  window: twice TEX0) and the Elan RAM (32 MB, taken at the VRAM rate) are
+  not in that log.
+- Without a CPU RAM block the loops run from the boot EPROM. The quick VRAM
+  check always does: 3 passes over 600 KB in 14.5 s, 7.9 s per
+  megabyte-pass, about 14 times the cached rate. Instruction fetch then
+  dominates, so that rate is applied to every memory the loops test.
+- The count corrects itself as it goes: inside a memory step it follows the
+  passes' progress, the measured duration of the quick VRAM check rescales
+  the ROM case, and the CPU RAM test rescales the later memory steps.
+  Without audio, the speech time is left out.
+
 
 ### Where the test loops execute
 

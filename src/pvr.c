@@ -301,6 +301,13 @@ void fb_fill_rows(u32 y0, u32 y1, u16 color)
             p[y * (FB_W / 2) + i] = v;
 }
 
+static void fb_rect(u32 x, u32 y, u32 w, u32 h, u16 color);
+
+void fb_fill_rect(u32 x, u32 y, u32 w, u32 h, u16 color)
+{
+    fb_rect(x, y, w, h, color);
+}
+
 static void fb_rect(u32 x, u32 y, u32 w, u32 h, u16 color)
 {
     volatile u16 *p = fb();
