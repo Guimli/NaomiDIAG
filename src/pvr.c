@@ -305,6 +305,7 @@ void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax)
 #define BAR_H   20
 
 static u32 g_bar_filled;
+static u32 g_banner;                     /* idle banner owns the last line */
 static u32 g_bar_retired;                /* bar gone: its rows are the report's */                 /* pixels currently painted green */
 
 void fb_fill_rows(u32 y0, u32 y1, u16 color)
@@ -420,7 +421,30 @@ void fb_progress_retire(void)
  * screen once the bar has been retired. */
 u32 fb_report_ymax(void)
 {
+    if (g_banner)
+        return BAR_Y - 4;               /* the banner keeps the bar's rows */
     return g_bar_retired ? (FB_H - 8) : (BAR_Y - 30);
+}
+
+/* The last line once the suite is over: white on blue, where the progress
+ * bar was, saying how to reach the operator menu. fb_banner_reserve()
+ * first, so the report is laid out clear of it, then fb_banner(). */
+void fb_banner_reserve(void)
+{
+    g_banner = 1;
+}
+
+void fb_banner(const char *text)
+{
+    if (!fb_progress_enabled())
+        return;
+    g_banner = 1;
+    u32 n = 0;
+    while (text[n])
+        n++;
+    fb_rect(0, BAR_Y, FB_W, BAR_H, RGB565(0, 18, 28));
+    u32 x = n * 16 < FB_W ? (FB_W - n * 16) >> 1 : 0;
+    fb_text(x, BAR_Y + 2, text, COL_WHITE, FB_W);
 }
 
 /* after a full-screen repaint nothing of the bar is left on screen: forget

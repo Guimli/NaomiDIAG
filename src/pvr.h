@@ -96,6 +96,8 @@ void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax);
  * that is one line short of the suite. */
 u32  fb_report_ymax(void);
 void fb_progress_retire(void);
+void fb_banner_reserve(void);            /* keep the last line for fb_banner */
+void fb_banner(const char *text);        /* white on blue, last line */
 
 #define RGB565(r, g, b) (u16)(((r) & 0x1F) << 11 | ((g) & 0x3F) << 5 | ((b) & 0x1F))
 #define COL_WHITE   RGB565(31, 63, 31)

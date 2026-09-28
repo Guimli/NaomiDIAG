@@ -447,6 +447,11 @@ serial entry includes its direct key (`c`, `v`, `s`, `d`, `g`, `f`, `j`, `m`); `
 the current selection. TEST prints the list again with the next selection,
 and SERVICE runs it. Navigation needs neither a VGA monitor nor ANSI support.
 
+Once the suite is over, the last line of the screen — where the progress
+bar was — says how to get there, white on blue: `TEST or START: operator
+menu` (the board's TEST, PSW1, or the cabinet's player 1 START; the
+board's SERVICE, PSW2, and the cabinet's TEST work too).
+
 The boot suite is not the end of it. `a` or a menu key on the serial port,
 a board button (**TEST** or **SERVICE**), or the cabinet's **TEST** or player
 1 **START** once the JVS board has answered, stops the suite: the test running

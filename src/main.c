@@ -3307,15 +3307,26 @@ static void run_action(u32 act)
 }
 
 /* Idle on the report until the operator asks for something. */
+/* The report again, with the way to the operator menu on its last line. */
+static void idle_screen(void)
+{
+    if (!g_screen_ready)
+        return;
+    fb_banner_reserve();
+    screen_render();
+    fb_banner(S_IDLE_BANNER);
+}
+
 static void console_idle(void)
 {
+    idle_screen();
     scif_puts(S_WAIT_TEST);
     for (;;) {
         input_event ev;
         if (input_poll(&ev)) {
             if (ev.kind == INPUT_SELECT || ev.kind == INPUT_CONFIRM) {
                 menu_run();
-                screen_render();
+                idle_screen();
                 scif_puts(S_WAIT_TEST);
             } else if (ev.kind == INPUT_KEY) {
                 if (ev.key == 'h' || ev.key == 'H') {
@@ -3324,7 +3335,7 @@ static void console_idle(void)
                     for (u32 i = 0; i < ACT_COUNT; i++) {
                         if (ev.key == menu_key[i]) {
                             run_action(i + 1);
-                            screen_render();
+                            idle_screen();
                             scif_puts(S_WAIT_TEST);
                             break;
                         }

@@ -489,6 +489,12 @@ le repère `>` désigne le choix courant. Chaque appui sur TEST réaffiche la
 liste avec la nouvelle sélection, et SERVICE la lance. Aucun écran VGA ni
 support des séquences ANSI n'est nécessaire pour suivre la navigation.
 
+Une fois la suite terminée, la dernière ligne de l'écran — là où était la
+barre de progression — indique comment y accéder, en blanc sur bleu :
+`TEST ou START : menu operateur` (le TEST de la carte, PSW1, ou le START du
+joueur 1 de la borne ; le SERVICE de la carte, PSW2, et le TEST de la borne
+marchent aussi).
+
 La suite de démarrage n'est pas la fin. `a` ou une touche du menu au port
 série, un bouton de la carte (**TEST** ou **SERVICE**), ou le **TEST** de la
 borne et le **START** du joueur 1 dès que la carte JVS a répondu, arrêtent la
