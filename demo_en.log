@@ -70,7 +70,7 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:00:55.448] Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
 [00:00:55.699] Backup NVRAM IC29 (kept intact) ........ OK
 [00:01:01.107] RTC (AICA, must tick) ........ OK
-[00:01:04.702]   RTC date: 2026-09-28 00:40:29 (ticking)
+[00:01:04.702]   RTC date: 2026-09-28 02:21:48 (ticking)
 
 [00:01:04.926] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
 [00:01:05.238] Serial EEPROM (IC31, 93C46) ........ OK
@@ -109,4 +109,4 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 
 [00:01:13.086] *** DIAG COMPLETE ***
 
-[00:01:15.170] Press TEST or SERVICE (on the board) for the menu.
+[00:01:15.170] Press TEST or SERVICE (on the board) for the operator menu.

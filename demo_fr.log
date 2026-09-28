@@ -70,7 +70,7 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:00:59.478] NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 [00:00:59.738] NVRAM sauvegarde IC29 (intacte) ........ OK
 [00:01:05.427] RTC (AICA, doit avancer) ........ OK
-[00:01:09.200]   Date RTC : 2026-09-28 00:39:46 (avance)
+[00:01:09.200]   Date RTC : 2026-09-28 02:21:05 (avance)
 
 [00:01:09.424] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
 [00:01:09.735] EEPROM serie (IC31, 93C46) ........ OK
@@ -109,4 +109,4 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 
 [00:01:18.251] *** DIAGNOSTIC TERMINE ***
 
-[00:01:20.358] Appuyez sur TEST ou SERVICE (carte) pour le menu.
+[00:01:20.358] Appuyez sur TEST ou SERVICE (carte) pour le menu operateur.

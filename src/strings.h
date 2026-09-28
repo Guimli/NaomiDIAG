@@ -157,7 +157,8 @@
 #define S_DIMM_MEM_TIMEOUT  "  DMA sans reponse (DIMM non amorce ?)\n"
 #define S_DIMM_SCRATCH_BAD  "  RAM tampon inutilisable, test cellules ignore\n"
 #define S_L_DIMM_MEM_PAT    "DIMM : test cellules + CRC"
-#define S_MENU_TITLE        "MENU  --  TEST : choisir   SERVICE : lancer"
+#define S_MENU_TITLE        "MENU OPERATEUR"
+#define S_MENU_HINT         "TEST : choisir   SERVICE/START : lancer"
 #define S_M_CPU             "Test RAM CPU en boucle"
 #define S_M_VRAM            "Test RAM video en boucle"
 #define S_M_ARAM            "Test RAM son en boucle"
@@ -177,8 +178,8 @@
 #define S_L_ABORTED         "Test interrompu par l'operateur"
 #define S_LOOP_PASS         "passe "
 #define S_LOOP_ERR          "  erreurs cumulees : "
-#define S_WAIT_TEST         "\nAppuyez sur TEST ou SERVICE (carte) pour le menu.\n"
-#define S_HELP              "\nTouches :\n"\
+#define S_WAIT_TEST         "\nAppuyez sur TEST ou SERVICE (carte) pour le menu operateur.\n"
+#define S_HELP              "\nMenu operateur -- touches :\n"\
                             "  h  cette aide (n'interrompt pas)\n"\
                             "  a  interrompre le test en cours (et une boucle, si les\n"\
                             "     boutons de la carte ne repondent pas)\n"\
@@ -188,8 +189,24 @@
                             "  d  test complet de la carte DIMM\n"\
                             "  g  integrite des flash du jeu (SHA1)\n"\
                             "  f  identifier la flash du DIMM (ecriture non armee)\n"\
-                            "  j  test des entrees JVS (boutons, monnayeurs, analogiques)\n"
+                            "  j  test des entrees JVS (boutons, monnayeurs, analogiques)\n"\
+                            "  m  mire video (barres, quadrillage, gris, purete...)\n"
 #define S_M_JVS             "Test des entrees JVS"
+#define S_M_PATTERN         "Mire video"
+#define S_PAT_HINT          "TEST : suivante   SERVICE : quitter"
+#define S_PAT_SERIAL        "\nMire video -- TEST ou une touche : suivante ; SERVICE, START, a ou q : quitter.\n"
+#define S_PAT_NOSCREEN      "\nMire impossible : l'ecran n'est pas actif (VRAM non validee).\n"
+#define S_PAT_END           "Fin de la mire.\n"
+#define S_PAT_0             "barres de couleur"
+#define S_PAT_1             "quadrillage (geometrie, convergence)"
+#define S_PAT_2             "echelle de gris, 16 pas"
+#define S_PAT_3             "rampes rouge, vert, bleu, blanc (bits du DAC)"
+#define S_PAT_4             "blanc (purete)"
+#define S_PAT_5             "rouge (purete)"
+#define S_PAT_6             "vert (purete)"
+#define S_PAT_7             "bleu (purete)"
+#define S_PAT_8             "noir"
+#define S_PAT_9             "damier d'un pixel (bande passante)"
 #define S_L_JVS_READY       "Carte I/O JVS : presente"
 #define S_L_JVS_ABSENT      "Carte I/O JVS : absente"
 #define S_L_JVS_ERROR       "Carte I/O JVS : dialogue en echec"
@@ -434,7 +451,8 @@
 #define S_DIMM_MEM_TIMEOUT  "  DMA no response (DIMM not booted?)\n"
 #define S_DIMM_SCRATCH_BAD  "  scratch RAM unusable, cell test skipped\n"
 #define S_L_DIMM_MEM_PAT    "DIMM: cell test + CRC"
-#define S_MENU_TITLE        "MENU  --  TEST: select   SERVICE: run"
+#define S_MENU_TITLE        "OPERATOR MENU"
+#define S_MENU_HINT         "TEST: select   SERVICE/START: run"
 #define S_M_CPU             "CPU RAM test, looping"
 #define S_M_VRAM            "Video RAM test, looping"
 #define S_M_ARAM            "Sound RAM test, looping"
@@ -454,8 +472,8 @@
 #define S_L_ABORTED         "Test interrupted by the operator"
 #define S_LOOP_PASS         "pass "
 #define S_LOOP_ERR          "  errors so far: "
-#define S_WAIT_TEST         "\nPress TEST or SERVICE (on the board) for the menu.\n"
-#define S_HELP              "\nKeys:\n"\
+#define S_WAIT_TEST         "\nPress TEST or SERVICE (on the board) for the operator menu.\n"
+#define S_HELP              "\nOperator menu -- keys:\n"\
                             "  h  this help (does not interrupt)\n"\
                             "  a  abort the running test (and a loop, when the board\n"\
                             "     buttons do not answer)\n"\
@@ -465,8 +483,24 @@
                             "  d  full DIMM board test\n"\
                             "  g  game flash integrity (SHA1)\n"\
                             "  f  identify the DIMM flash (writing not armed)\n"\
-                            "  j  JVS input test (buttons, coin slots, analog)\n"
+                            "  j  JVS input test (buttons, coin slots, analog)\n"\
+                            "  m  video test pattern (bars, crosshatch, grey, purity...)\n"
 #define S_M_JVS             "JVS input test"
+#define S_M_PATTERN         "Video test pattern"
+#define S_PAT_HINT          "TEST: next   SERVICE: quit"
+#define S_PAT_SERIAL        "\nVideo test pattern -- TEST or a key: next; SERVICE, START, a or q: quit.\n"
+#define S_PAT_NOSCREEN      "\nNo test pattern: the screen is not active (VRAM not validated).\n"
+#define S_PAT_END           "Test pattern over.\n"
+#define S_PAT_0             "colour bars"
+#define S_PAT_1             "crosshatch (geometry, convergence)"
+#define S_PAT_2             "grey scale, 16 steps"
+#define S_PAT_3             "red, green, blue, white ramps (DAC bits)"
+#define S_PAT_4             "white (purity)"
+#define S_PAT_5             "red (purity)"
+#define S_PAT_6             "green (purity)"
+#define S_PAT_7             "blue (purity)"
+#define S_PAT_8             "black"
+#define S_PAT_9             "one-pixel checkerboard (bandwidth)"
 #define S_L_JVS_READY       "JVS I/O board: present"
 #define S_L_JVS_ABSENT      "JVS I/O board: not present"
 #define S_L_JVS_ERROR       "JVS I/O board: exchange failing"

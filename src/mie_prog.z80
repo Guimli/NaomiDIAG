@@ -6,7 +6,7 @@
 ; EEPROM, and it has no 0x86 handler either, which is why the board's push
 ; buttons never reached the diagnostic: every JVS read was answered with
 ; "unknown command". So this is not only how the EEPROM is read, it is what
-; makes the operator console's buttons work at all.
+; makes the operator menu's buttons work at all.
 ;
 ; Uploaded 24 bytes at a time by Maple command 0x80 and entered at 0x8010
 ; by the execute packet (address field 0xFFFF). Once running it OWNS the

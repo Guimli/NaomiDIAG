@@ -407,3 +407,76 @@ void fb_progress_invalidate(void)
 {
     g_bar_filled = 0;
 }
+
+/* ---- test patterns (operator menu) --------------------------------------
+ * Full-screen images for the monitor and the video output stage, not for
+ * the VRAM: colour bars, a crosshatch for geometry and convergence, a grey
+ * step scale, per-component ramps that show a stuck DAC bit as banding,
+ * plain fields for purity, and a one-pixel checkerboard for bandwidth. */
+
+static u16 grey(u32 k, u32 steps)       /* 0 .. steps-1 -> black .. white */
+{
+    return RGB565(k * 31 / (steps - 1), k * 63 / (steps - 1),
+                  k * 31 / (steps - 1));
+}
+
+u32 fb_pattern_count(void)
+{
+    return 10;
+}
+
+void fb_pattern(u32 n)
+{
+    volatile u16 *p = fb();
+    static const u16 bars[8] = {
+        RGB565(31, 63, 31), RGB565(31, 63, 0), RGB565(0, 63, 31),
+        RGB565(0, 63, 0), RGB565(31, 0, 31), RGB565(31, 0, 0),
+        RGB565(0, 0, 31), RGB565(0, 0, 0)
+    };
+
+    switch (n) {
+    case 0:                             /* colour bars, 80 px each */
+        for (u32 y = 0; y < FB_H; y++)
+            for (u32 x = 0; x < FB_W; x++)
+                p[y * FB_W + x] = bars[x / 80];
+        break;
+    case 1:                             /* crosshatch, 40 px cells + edges */
+        fb_clear(0);
+        for (u32 y = 0; y < FB_H; y++)
+            for (u32 x = 0; x < FB_W; x++)
+                if (x % 40 == 0 || y % 40 == 0 || x == FB_W - 1 || y == FB_H - 1)
+                    p[y * FB_W + x] = COL_WHITE;
+        break;
+    case 2:                             /* 16-step grey scale */
+        for (u32 y = 0; y < FB_H; y++)
+            for (u32 x = 0; x < FB_W; x++)
+                p[y * FB_W + x] = grey(x / 40, 16);
+        break;
+    case 3:                             /* red, green, blue, white ramps */
+        for (u32 y = 0; y < FB_H; y++)
+            for (u32 x = 0; x < FB_W; x++) {
+                u32 r5 = x * 32 / FB_W, g6 = x * 64 / FB_W;
+                u32 band = y / 120;
+                p[y * FB_W + x] = band == 0 ? RGB565(r5, 0, 0) :
+                                  band == 1 ? RGB565(0, g6, 0) :
+                                  band == 2 ? RGB565(0, 0, r5) :
+                                              RGB565(r5, g6, r5);
+            }
+        break;
+    case 4: fb_clear(RGB565(31, 63, 31)); break;   /* purity fields */
+    case 5: fb_clear(RGB565(31, 0, 0)); break;
+    case 6: fb_clear(RGB565(0, 63, 0)); break;
+    case 7: fb_clear(RGB565(0, 0, 31)); break;
+    case 8: fb_clear(0); break;
+    default: {                          /* one-pixel checkerboard */
+        volatile u32 *q = (volatile u32 *)p;
+        for (u32 y = 0; y < FB_H; y++) {
+            u32 v = (y & 1) ? 0x0000FFFFu : 0xFFFF0000u;
+            for (u32 i = 0; i < FB_W / 2; i++)
+                q[y * (FB_W / 2) + i] = v;
+        }
+        break;
+    }
+    }
+    fb_progress_invalidate();
+}

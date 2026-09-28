@@ -157,8 +157,8 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
     RAM même qu'on testait : elles sont relues et comparées à la copie en
     ROM.
 
-Les **actions opérateur** sont au menu (voir
-[Console opérateur](#console-opérateur)) : soit elles écrivent quelque part,
+Les **actions opérateur** sont au menu opérateur (voir
+[Menu opérateur](#menu-opérateur)) : soit elles écrivent quelque part,
 soit elles durent assez pour n'avoir rien à faire devant le rapport.
 
 - **Boucles RAM** (`c`, `v`, `s`) — le test RAM CPU, vidéo ou son, passe
@@ -167,6 +167,9 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
   lecture, puis le test destructif de la SDRAM par DMA G1 ; `f` identifie
   la flash du firmware DIMM (voir [Carte DIMM](#carte-dimm)).
 - **Test des entrées JVS** (`j`) — chaque entrée de la carte I/O, en direct.
+- **Mire vidéo** (`m`) — barres de couleur, quadrillage, échelle de gris,
+  rampes par composante, plages de pureté et damier d'un pixel, pour le
+  moniteur et l'étage de sortie vidéo.
 - **Cartouche** (`g`) :
   - **Puce de sécurité** (X76F100) — présence par response-to-reset.
   - **Contenu** — identifie le jeu dans une base embarquée de tous
@@ -320,7 +323,7 @@ des 16 derniers = **IC108S** et **IC109S** — voir
 RAM Elan sur Naomi 2, aux mêmes conditions. Voir
 [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) pour la séquence et tous les codes.
 
-## Console opérateur
+## Menu opérateur
 
 La suite de démarrage n'est pas la fin. `a` ou une touche du menu au port
 série, un bouton de la carte (**TEST** ou **SERVICE**), ou le **TEST** de la
@@ -328,8 +331,8 @@ borne et le **START** du joueur 1 dès que la carte JVS a répondu, arrêtent la
 suite : le test en cours s'arrête au bloc suivant et **ne rend aucun
 verdict** sur la partie effectuée — ses phases se terminent par
 `interrompue`, pas par `ok` — et la suite ne reprend pas. `a` mène au
-rapport, un bouton ouvre le menu, et une touche du menu (`c`, `v`, `s`, `d`,
-`g`, `f`, `j`) lance directement son action. `h` affiche l'aide sans rien
+rapport, un bouton ouvre le **menu opérateur**, et une touche du menu (`c`,
+`v`, `s`, `d`, `g`, `f`, `j`, `m`) lance directement son action. `h` affiche l'aide sans rien
 interrompre ; les autres touches sont ignorées.
 
 Les boutons exigent d'abord le téléversement d'un petit programme Z80 dans le
@@ -363,8 +366,11 @@ Touches sur la console série :
 | `g` | intégrité SHA-1 des flash du jeu |
 | `f` | flash du firmware DIMM — identification, et choix d'une version |
 | `j` | test des entrées JVS — chaque contact, monnayeur et voie analogique, en direct |
+| `m` | mire vidéo |
 
-**TEST** parcourt le menu en bouclant ; **SERVICE** lance la sélection. Les
+À l'écran, le menu opérateur liste les mêmes actions : **TEST** (ou le TEST
+de la borne) les parcourt en bouclant ; **SERVICE** (ou le **START** du
+joueur 1) lance la sélection. Les
 trois boucles RAM tournent jusqu'à l'appui sur un bouton et rien d'autre ne
 les arrête — c'est le but, une panne intermittente se montrant à la dixième
 passe et non à la première. Une seule exception : quand les boutons sont
@@ -375,7 +381,16 @@ nomme une puce défaillante comme le fait la suite de démarrage.
 
 Les actions DIMM, cartouche et flash ouvrent chacune un rapport qui leur est
 propre, l'affichent, et attendent **TEST** ou **SERVICE** pour ramener le
-menu.
+menu opérateur.
+
+La mire vidéo montre dix images plein écran à la suite : barres de couleur,
+quadrillage pour la géométrie et la convergence, échelle de gris en 16 pas,
+rampes rouge, verte, bleue et blanche (un bit du DAC figé s'y voit en
+bandes), plages blanche, rouge, verte, bleue et noire pour la pureté, et un
+damier d'un pixel pour la bande passante. **TEST** ou une touche série
+passe à la suivante ; **SERVICE**, **START**, `a` ou `q` en sort. La bordure
+cesse de battre pendant ce temps. La sortie est le 640x480 à 31 kHz de la
+ROM : un moniteur 15 kHz n'affiche rien.
 
 Le test des entrées JVS montre chaque entrée que la carte I/O a déclarée :
 les contacts système (TEST, TILT1-3), le START, le SERVICE, les quatre
@@ -563,7 +578,7 @@ Ce qui marche passe à côté, par le bus G1 :
 - **`d` — test SDRAM du DIMM.** Le GD-DMA de Holly a un bit de sens ; avec
   `SB_GDDIR = 1` la Naomi écrit la RAM système vers le DIMM. La ROM s'en sert
   pour un vrai test mémoire (`0x01010101`, `0x10101010`, CRC-32, délai de
-  garde d'une seconde sur le DMA). Il écrase le jeu chargé : réservé au menu.
+  garde d'une seconde sur le DMA). Il écrase le jeu chargé : réservé au menu opérateur.
 - **`f` — flash du firmware DIMM.** La flash s'atteint par le PIO ROM-board
   du G1 avec des commandes AMD. La ROM fait un read-ID, non destructeur, et
   propose un choix entre 3.17, 4.01 et 4.03. **La gravure n'est

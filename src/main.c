@@ -62,7 +62,7 @@ u32 g_mie_prog;                     /* our Z80 program is resident   */
 
 
 /* ========================================================================
- * Operator console: keys on the serial line, buttons on the board or the
+ * Operator menu: keys on the serial line, buttons on the board or the
  * cabinet. Both drive the same set of actions.
  * ===================================================================== */
 
@@ -74,12 +74,14 @@ u32 g_mie_prog;                     /* our Z80 program is resident   */
 #define ACT_GAME    5
 #define ACT_FLASH   6
 #define ACT_JVS     7
-#define ACT_COUNT   7
+#define ACT_PATTERN 8
+#define ACT_COUNT   8
 
 static const char *const menu_label[ACT_COUNT] = {
-    S_M_CPU, S_M_VRAM, S_M_ARAM, S_M_DIMM, S_M_GAME, S_M_FLASH, S_M_JVS
+    S_M_CPU, S_M_VRAM, S_M_ARAM, S_M_DIMM, S_M_GAME, S_M_FLASH, S_M_JVS,
+    S_M_PATTERN
 };
-static const char menu_key[ACT_COUNT] = { 'c', 'v', 's', 'd', 'g', 'f', 'j' };
+static const char menu_key[ACT_COUNT] = { 'c', 'v', 's', 'd', 'g', 'f', 'j', 'm' };
 
 
 /* Called from progress_tick, once per test block. Decides whether what the
@@ -1555,7 +1557,7 @@ static void test_settings_eeprom(void)
     /* The MIE's factory firmware cannot read this EEPROM, and cannot read
      * the push buttons either -- it answers four Maple commands and none of
      * them is either. So a small Z80 program goes in first, and it stays
-     * resident: from here on it is what serves the operator console. */
+     * resident: from here on it is what serves the operator menu. */
     u32 bad = maple_mie_upload(g_mie_port1 - 1);
     if (bad) {
         scif_puts(S_MIE_UP_FAIL);
@@ -2249,6 +2251,7 @@ static void menu_draw(u32 sel)
         fb_text(16, y, i == sel ? ">" : " ", COL_TITLE, FB_W);
         fb_text(48, y, menu_label[i], i == sel ? COL_TITLE : COL_WHITE, FB_W);
     }
+    fb_text(16, 456, S_MENU_HINT, COL_WHITE, FB_W);
 }
 
 static void run_action(u32 act);
@@ -2260,6 +2263,8 @@ static void menu_run(void)
     u32 sel = 0;
     menu_draw(sel);
     scif_puts(S_MENU_TITLE);
+    scif_puts(" -- ");
+    scif_puts(S_MENU_HINT);
     scif_puts("\n");
 
     for (;;) {
@@ -2645,6 +2650,65 @@ static void jvs_input_test(void)
     scif_puts(S_JT_END);
 }
 
+/* ---- video test pattern ---------------------------------------------
+ * TEST (board or cabinet) or any serial key shows the next image; SERVICE,
+ * START, 'a' or 'q' leaves. The border stops pulsing while an image is up:
+ * it is part of the picture the operator is judging. */
+static void test_pattern(void)
+{
+    static const char *const name[] = {
+        S_PAT_0, S_PAT_1, S_PAT_2, S_PAT_3, S_PAT_4,
+        S_PAT_5, S_PAT_6, S_PAT_7, S_PAT_8, S_PAT_9
+    };
+    if (!g_screen_ready) {
+        scif_puts(S_PAT_NOSCREEN);
+        return;
+    }
+    scif_puts(S_PAT_SERIAL);
+    pvr_border(0);
+
+    u32 n = 0, count = fb_pattern_count(), shown = 0xFF;
+    u32 hint_until = 0;
+    for (;;) {
+        if (n != shown) {
+            fb_pattern(n);
+            shown = n;
+            scif_puts("  ");
+            scif_putdec(n + 1);
+            scif_puts("/");
+            scif_putdec(count);
+            scif_puts(" ");
+            scif_puts(name[n]);
+            scif_puts("\n");
+            /* the controls, on the first image only, for three seconds */
+            if (n == 0) {
+                fb_fill_rows(456, 474, 0);
+                fb_text(16, 458, S_PAT_HINT, COL_WHITE, FB_W);
+                hint_until = timer_ms() + 3000;
+            }
+        }
+        if (hint_until && (int)(timer_ms() - hint_until) >= 0) {
+            hint_until = 0;
+            if (n == 0)
+                fb_pattern(0);
+        }
+
+        input_event ev;
+        if (input_poll(&ev)) {
+            if (ev.kind == INPUT_CONFIRM)
+                break;
+            if (ev.kind == INPUT_KEY &&
+                (ev.key == 'a' || ev.key == 'A' || ev.key == 'q' || ev.key == 'Q'))
+                break;
+            if (ev.kind == INPUT_SELECT || ev.kind == INPUT_KEY)
+                n = n + 1 < count ? n + 1 : 0;  /* no libgcc: no runtime divide */
+        }
+        delay_ms(10);
+        timer_ms();                     /* keeps the serial clock past its wrap */
+    }
+    scif_puts(S_PAT_END);
+}
+
 static void run_action(u32 act)
 {
     progress_clear_abort();
@@ -2711,6 +2775,9 @@ static void run_action(u32 act)
         break;
     case ACT_JVS:
         jvs_input_test();
+        break;
+    case ACT_PATTERN:
+        test_pattern();
         break;
     default:
         break;

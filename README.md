@@ -144,8 +144,8 @@ are reported as they land.
 16. **Relocated code integrity** — the relocated loops ran from the very RAM
     under test, so they are read back and compared with the ROM copy.
 
-The **operator actions** are on the menu (see
-[Operator console](#operator-console)): they either write to something or
+The **operator actions** are on the operator menu (see
+[Operator menu](#operator-menu)): they either write to something or
 take long enough that they have no business delaying the report.
 
 - **RAM loops** (`c`, `v`, `s`) — the CPU, video or sound RAM test, pass
@@ -154,6 +154,9 @@ take long enough that they have no business delaying the report.
   destructive SDRAM test over the G1 DMA; `f` identifies the DIMM's firmware
   flash (see [DIMM board](#dimm-board)).
 - **JVS input test** (`j`) — every input of the I/O board, live.
+- **Video test pattern** (`m`) — colour bars, crosshatch, grey scale,
+  per-component ramps, purity fields and a one-pixel checkerboard, for the
+  monitor and the video output stage.
 - **Cartridge** (`g`):
   - **Security chip** (X76F100) — presence via response-to-reset.
   - **Content** — identifies the game against an embedded
@@ -294,15 +297,16 @@ The `v` loop covers PVR-B and the Elan RAM on a Naomi 2, under the same
 conditions. See [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md) for the sequence
 and all access codes.
 
-## Operator console
+## Operator menu
 
 The boot suite is not the end of it. `a` or a menu key on the serial port,
 a board button (**TEST** or **SERVICE**), or the cabinet's **TEST** or player
 1 **START** once the JVS board has answered, stops the suite: the test running
 at the time stops at its next block and draws **no** verdict from the part it
 did — its phases end in `interrupted`, not `ok` — and the suite does not
-resume. `a` goes to the report, a button opens the menu, and a menu key (`c`,
-`v`, `s`, `d`, `g`, `f`, `j`) runs that action straight away. `h` prints the
+resume. `a` goes to the report, a button opens the **operator menu**, and a
+menu key (`c`, `v`, `s`, `d`, `g`, `f`, `j`, `m`) runs that action straight
+away. `h` prints the
 help without interrupting anything; other keys are ignored.
 
 The buttons need a small Z80 program uploaded into the MIE first — the
@@ -334,8 +338,11 @@ Keys on the serial console:
 | `g` | game flash SHA-1 integrity |
 | `f` | DIMM firmware flash — identify, and choose a version |
 | `j` | JVS input test — every switch, coin count and analog channel, live |
+| `m` | video test pattern |
 
-**TEST** steps through the menu and wraps; **SERVICE** runs the selection. The
+On screen, the operator menu lists the same actions: **TEST** (or the
+cabinet's TEST) steps through them and wraps; **SERVICE** (or player 1
+**START**) runs the selection. The
 three RAM loops run until a button is pressed and nothing else stops them —
 that is the point, since an intermittent fault shows up on the tenth pass,
 not the first. The one exception: when the buttons are unavailable (the MIE
@@ -345,7 +352,16 @@ the Elan RAM on a Naomi 2, and every loop names a failing chip the way the
 boot suite does.
 
 The DIMM, cartridge and flash actions each start a report of its own, print
-it, and wait for **TEST** or **SERVICE** to bring the menu back.
+it, and wait for **TEST** or **SERVICE** to bring the operator menu back.
+
+The video test pattern shows ten full-screen images in turn: colour bars, a
+crosshatch for geometry and convergence, a 16-step grey scale, red, green,
+blue and white ramps (a stuck DAC bit shows as banding), white, red, green,
+blue and black fields for purity, and a one-pixel checkerboard for
+bandwidth. **TEST** or any serial key shows the next one; **SERVICE**,
+**START**, `a` or `q` leaves. The border stops pulsing while they are up. The
+output is the ROM's own 640x480 at 31 kHz, so a 15 kHz monitor shows
+nothing.
 
 The JVS input test shows each input the I/O board declared: the system
 switches (TEST, TILT1-3), each player's START, SERVICE, four directions
@@ -525,7 +541,7 @@ What does work goes around it, on the G1 bus:
 - **`d` — DIMM SDRAM test.** Holly's GD-DMA has a direction bit; with
   `SB_GDDIR = 1` the Naomi writes system RAM into the DIMM. The ROM uses it
   for a real memory test (`0x01010101`, `0x10101010`, CRC-32, one-second DMA
-  timeout). It overwrites the loaded game, so it is menu-only.
+  timeout). It overwrites the loaded game, so it is on the operator menu only.
 - **`f` — DIMM firmware flash.** The flash is reachable through the G1
   ROM-board PIO with AMD commands. The ROM performs a read-ID, which is
   non-destructive, and offers a 3.17 / 4.01 / 4.03 selection. **Writing is

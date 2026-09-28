@@ -73,6 +73,9 @@ void fb_progress_invalidate(void);      /* call after a full-screen repaint */
 u32  fb_progress_enabled(void);
 void fb_fill_rows(u32 y0, u32 y1, u16 color);
 void fb_clear(u16 color);
+/* operator-menu test patterns, 0 .. fb_pattern_count()-1 */
+u32  fb_pattern_count(void);
+void fb_pattern(u32 n);
 /* 8x8 font at x2 scale. Drawing stops before xmax so a long label can
  * never run into the status column on the right. */
 void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax);
