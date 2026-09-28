@@ -1,4 +1,4 @@
-/* Maple bus scan: send a Device Request (command 1) to the primary
+/* Maple bus scan: send a MIE version request (0x82) to the primary
  * device address of each port and collect the response.
  * Register/protocol references: KallistiOS maple driver, MAME maple-dc. */
 #include "maple.h"
@@ -12,6 +12,34 @@
 #define SB_MDST     REG32(0xA05F6C18)   /* DMA start / busy              */
 #define SB_MSYS     REG32(0xA05F6C80)   /* timeout / bitrate             */
 #define SB_MDAPRO   REG32(0xA05F6C8C)   /* address protection window     */
+#define SB_ISTERR   REG32(0xA05F6908)   /* latched system-bus errors     */
+
+/* Override memory access only in the host regression harness. */
+#ifndef MAPLE_BUFFER
+#define MAPLE_BUFFER(a) ((volatile u32 *)(uintptr_t)(a))
+#endif
+#define MAPLE_WAIT_TICKS (TIMER_HZ / 10u)
+
+static u32 g_dma_protection;
+static const char *g_transaction_status;
+static u32 g_error_before, g_error_after, g_last_mdst;
+
+static u32 maple_wait_idle(void)
+{
+    u32 start = timer_ticks();
+    while (SB_MDST & 1u)
+        if ((u32)(timer_ticks() - start) >= MAPLE_WAIT_TICKS)
+            return 0;
+    return 1;
+}
+
+static u32 maple_finish(const char *status, u32 header)
+{
+    g_transaction_status = status;
+    g_last_mdst = SB_MDST;
+    g_error_after = SB_ISTERR;
+    return header;
+}
 
 /* scratch area in validated main RAM (P2 view / physical for the DMA) */
 /* Maple DMA descriptors and receive buffer live in main RAM, which is also
@@ -44,8 +72,30 @@ static u32 maple_txn(u32 port, u32 cmd, u32 nwords, const u32 *payload)
     if (!g_desc_p2)
         maple_set_buffers(0xAC0FF000u);     /* before anything reserved one */
 
-    volatile u32 *desc = (volatile u32 *)MAPLE_DESC_P2;
-    volatile u32 *rx   = (volatile u32 *)MAPLE_RX_P2;
+    g_error_before = SB_ISTERR;
+    g_dma_protection = 0;
+    /* Validate the entire 512-byte reservation before touching it. */
+    if ((MAPLE_DESC_P2 & 0xE000001Fu) != 0xA0000000u ||
+        MAPLE_DESC_PHY < 0x0C000000u || MAPLE_DESC_PHY > 0x0DFFFE00u ||
+        port > 3 || nwords > 61 || (nwords && !payload))
+        return maple_finish("invalid-request", 0xFFFFFFFFu);
+
+    /* Never overwrite buffers that an earlier DMA might still be using. */
+    if (!maple_wait_idle()) {
+        SB_MDEN = 0;
+        return maple_finish("busy-timeout", 0xFFFFFFFFu);
+    }
+    SB_MDEN = 0;
+    /* MDAPRO uses inclusive 1 MiB bounds, encoded as (physical >> 20)-0x80.
+     * 0x6155404F only covered the first 16 MiB, excluding our high-RAM buffers.
+     * Cover both buffers, including a reservation crossing a MiB boundary. */
+    u32 low = (MAPLE_DESC_PHY >> 20) - 0x80u;
+    u32 high = ((MAPLE_RX_PHY + 0xFFu) >> 20) - 0x80u;
+    g_dma_protection = 0x61550000u | (low << 8) | high;
+    SB_MDAPRO = g_dma_protection;
+
+    volatile u32 *desc = MAPLE_BUFFER(MAPLE_DESC_P2);
+    volatile u32 *rx   = MAPLE_BUFFER(MAPLE_RX_P2);
 
     for (int i = 0; i < 64; i++)
         rx[i] = 0xDEADDEAD;
@@ -60,23 +110,23 @@ static u32 maple_txn(u32 port, u32 cmd, u32 nwords, const u32 *payload)
         desc[3 + i] = payload[i];
 
     SB_MDTSEL = 0;
-    SB_MDEN   = 1;
     SB_MSYS   = 0xC3500000;                     /* 50000 timeout, 2 Mbps */
-    SB_MDAPRO = 0x6155404F;                     /* allow whole RAM       */
     SB_MDSTAR = MAPLE_DESC_PHY;
+    SB_MDEN   = 1;
     SB_MDST   = 1;
 
-    for (u32 spin = 0; spin < 1000000; spin++)
-        if (!(SB_MDST & 1))
-            break;
+    if (!maple_wait_idle()) {
+        SB_MDEN = 0;
+        return maple_finish("dma-timeout", 0xFFFFFFFFu);
+    }
     delay_ms(2);
-    return rx[0];
+    u32 header = rx[0];
+    return maple_finish(header == 0xDEADDEADu ? "rx-unchanged" :
+                        (header & 0xFFu) == 0xFFu ? "no-response" : "reply", header);
 }
 
 void maple_scan(maple_result *mr)
 {
-    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
-
     mr->found_port = 0xFFFFFFFF;
     mr->response_cmd = 0xFF;
     mr->func_codes = 0;
@@ -87,13 +137,30 @@ void maple_scan(maple_result *mr)
         /* MIE protocol (libnaomi): 0x82 = version request -> 0x83 */
         u32 hdr = maple_txn(port, 0x82, 0, 0);
         u32 cmd = hdr & 0xFF;
-        if (hdr == 0xFFFFFFFF || hdr == 0xDEADDEAD || cmd == 0xFF)
+        if (hdr == 0xFFFFFFFF || hdr == 0xDEADDEAD || cmd != 0x83 ||
+            !(hdr >> 24) || (hdr >> 24) > 63) {
+            /* Preserve raw status: ISTERR may include older/unrelated faults.
+             * Do not clear global error bits owned by other diagnostics. */
+            scif_puts("  Maple port="); scif_putdec(port);
+            scif_puts(" status=");
+            scif_puts(cmd == 0xFF || hdr == 0xDEADDEAD ?
+                      g_transaction_status : "invalid-version-reply");
+            scif_puts(" header="); scif_puthex(hdr);
+            scif_puts(" desc="); scif_puthex(MAPLE_DESC_PHY);
+            scif_puts(" rx="); scif_puthex(MAPLE_RX_PHY);
+            scif_puts(" mdapro="); scif_puthex(g_dma_protection);
+            scif_puts(" mdst="); scif_puthex(g_last_mdst);
+            scif_puts(" isterr_before="); scif_puthex(g_error_before);
+            scif_puts(" isterr_after="); scif_puthex(g_error_after);
+            scif_puts("\n");
             continue;                            /* no device / timeout  */
+        }
+        volatile u32 *rx = MAPLE_BUFFER(MAPLE_RX_P2);
         mr->found_port = port;
         mr->response_cmd = cmd;
         mr->func_codes = rx[1];
         /* 0x83 response: ASCII version string in the payload words */
-        const volatile u8 *blk = (const volatile u8 *)(MAPLE_RX_P2 + 4);
+        const volatile u8 *blk = (const volatile u8 *)&rx[1];
         u32 words = (hdr >> 24) & 0xFF;
         u32 nbytes = words * 4;
         if (nbytes > sizeof mr->id - 1)
@@ -110,7 +177,7 @@ void maple_scan(maple_result *mr)
 
 u32 maple_mie_selftest(u32 port, u32 *status)
 {
-    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    volatile u32 *rx = MAPLE_BUFFER(MAPLE_RX_P2);
     *status = 0xFFFFFFFF;
     for (u32 tries = 0; tries < 100; tries++) {
         u32 hdr = maple_txn(port, 0x84, 0, 0);
@@ -141,7 +208,7 @@ u32 maple_mie_selftest(u32 port, u32 *status)
  * Returns 0 on success, or the 1-based number of the packet that failed. */
 u32 maple_mie_upload(u32 port)
 {
-    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    volatile u32 *rx = MAPLE_BUFFER(MAPLE_RX_P2);
     u32 pay[7];
 
     for (u32 off = 0; off < MIE_PROG_LEN; off += 24) {
@@ -180,7 +247,7 @@ u32 maple_mie_upload(u32 port)
  * 0xE0, payload byte 0 = which 28-byte slice, answered by 0xE1. */
 u32 maple_eeprom_read(u32 port, u8 *out128)
 {
-    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    volatile u32 *rx = MAPLE_BUFFER(MAPLE_RX_P2);
 
     for (u32 blk = 0; blk < 5; blk++) {
         u32 pay = blk;
@@ -201,7 +268,7 @@ u32 maple_eeprom_read(u32 port, u8 *out128)
  * SERVICE1/2 in bits 5-6, all active low. Command 0xE2 -> 0xE3. */
 u32 maple_mie_inputs(u32 port, u8 *state)
 {
-    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    volatile u32 *rx = MAPLE_BUFFER(MAPLE_RX_P2);
     u32 pay = 0;
     u32 hdr = maple_txn(port, 0xE2, 1, &pay);
     if ((hdr & 0xFF) != 0xE3)
@@ -216,7 +283,7 @@ u32 maple_mie_inputs(u32 port, u8 *state)
  * on the JVS bus. */
 u32 maple_jvs_info(u32 port, u32 idx, u8 *out28)
 {
-    volatile u32 *rx = (volatile u32 *)MAPLE_RX_P2;
+    volatile u32 *rx = MAPLE_BUFFER(MAPLE_RX_P2);
     u32 pay = idx;
     u32 hdr = maple_txn(port, 0xE4, 1, &pay);
     if ((hdr & 0xFF) != 0xE5)

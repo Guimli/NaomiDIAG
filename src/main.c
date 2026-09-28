@@ -1907,11 +1907,11 @@ static void test_maple_mie(u32 ram_ok)
         log_result(S_L_MIE_NORESP, CLIP_JVS, T_FAIL, 0, 0);
         return;
     }
-    scif_puts("  MIE on maple port ");
+    scif_puts("MIE on maple port ");
     scif_putdec(mr.found_port);
     scif_puts(", resp cmd 0x");
     scif_puthex(mr.response_cmd);
-    scif_puts("\n  MIE version: \"");
+    scif_puts("\nMIE version: \"");
     scif_puts(mr.id);
     scif_puts("\"\n");
     /* 0x83 = version response from the 315-6146 firmware */
@@ -2661,6 +2661,21 @@ static void loop_regions(const loop_part *parts, u32 nparts, const char *what)
  * out, from the log, which is still intact. */
 static void menu_draw(u32 sel)
 {
+    /* The serial console must remain usable without a connected monitor.
+     * Repeat the small menu after each selection change: plain terminals
+     * and saved logs both retain the selected entry without ANSI escapes. */
+    scif_puts("\n");
+    scif_puts(S_MENU_TITLE);
+    scif_puts(" -- ");
+    scif_puts(S_MENU_HINT);
+    scif_puts("\n");
+    for (u32 i = 0; i < ACT_COUNT; i++) {
+        scif_puts(i == sel ? "> [" : "  [");
+        scif_putc(menu_key[i]);
+        scif_puts("] ");
+        scif_puts(menu_label[i]);
+        scif_puts("\n");
+    }
     if (!g_screen_ready)
         return;
     fb_clear(0);
@@ -2675,16 +2690,12 @@ static void menu_draw(u32 sel)
 
 static void run_action(u32 act);
 
-/* TEST steps through the entries and wraps at the end; START runs the one
+/* TEST steps through the entries and wraps at the end; SERVICE runs the one
  * shown. A serial key jumps straight to its action without the menu. */
 static void menu_run(void)
 {
     u32 sel = 0;
     menu_draw(sel);
-    scif_puts(S_MENU_TITLE);
-    scif_puts(" -- ");
-    scif_puts(S_MENU_HINT);
-    scif_puts("\n");
 
     for (;;) {
         input_event ev;
