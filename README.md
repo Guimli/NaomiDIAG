@@ -202,6 +202,32 @@ always 1, or floating). The line is named twice: first as the SH-4's 64-bit
 bus carries it (an even word is D0-D31, an odd word D32-D63), then as the
 chip's own data pin, DQ0-DQ15, the one to probe on the package.
 
+**Address lines** are walked chip by chip on every memory: a step counts
+only when a whole 16-bit lane of some cell reads back the value written at
+the other address — two addresses landing on one cell — so a data fault is
+not taken for an address line. On the CPU RAM the walk also covers the odd
+32-bit word, which the classic address test never touches, and the CPU bit
+is named as the SDRAM pin it travels on, from the SH-4's multiplexing table
+(Renesas SH7750 hardware manual, appendix F: table 9 for 32 MB, table 13
+for 16 MB). One pin carries a column bit and a row bit:
+
+| CPU byte-address bit | SDRAM pin (32 MB) | SH-4 pin |
+|---|---|---|
+| 3-10 | A0-A7, column | A3-A10 |
+| 11-20 | A0-A9, row | A3-A12 |
+| 21, 22 | A10, A11, row | A13, A14 |
+| 23, 24 | BA0, BA1, bank | A15, A16 |
+
+Address lines are common to the four chips: `Address A5 cut on IC10`
+("Address line A, five, cut on, I C ten") points at that chip's pin,
+`Address BA0 cut, all 4 chips` at the shared trace or the SH-4. The serial
+console adds the SH-4 pin and the CPU bits behind the SDRAM pin. VRAM, Elan
+RAM and sound RAM sit behind controllers whose multiplexing is not
+documented, so for them the report names the CPU bit and the chips it
+touched: `Address bit 12 faulty on IC21`. A chip that aliases on many bits
+at once is left to the data and cell tests: that is a dead chip or lane,
+not cut address lines.
+
 The progress bar retires after the Naomi 2 memories: from there on nothing
 is being measured — the NVRAM, the RTC and the serial EEPROM answer yes or
 no — and the rows it occupied go to the report instead.

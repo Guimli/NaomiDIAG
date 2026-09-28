@@ -124,6 +124,11 @@ CLIPS = {
     "w_60":        {"fr": "soixante,",                        "en": "sixty,"},
     "w_and_one":  {"fr": "et un,",                            "en": "one,"},
     "dq":         {"fr": "D Q,",                              "en": "D Q,"},
+    "addr_line":  {"fr": "Ligne d'adresse A,",                "en": "Address line A,"},
+    "bank_line":  {"fr": "Ligne de banque B A,",              "en": "Bank line B A,"},
+    "addr_bit":   {"fr": "Bit d'adresse,",                    "en": "Address bit,"},
+    "faulty_on":  {"fr": "fautif sur",                        "en": "faulty on"},
+    "cut_all":    {"fr": "coupée, commune à toutes les puces.", "en": "cut, common to all chips."},
 }
 
 RATE = 22050

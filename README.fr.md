@@ -221,6 +221,35 @@ nommée deux fois : d'abord comme le bus 64 bits du SH-4 la porte (un mot
 pair est D0-D31, un mot impair D32-D63), puis comme la broche de données
 de la puce elle-même, DQ0-DQ15, celle à sonder sur le boîtier.
 
+Les **lignes d'adresse** sont parcourues puce par puce sur chaque mémoire :
+une étape ne compte que si une voie entière de 16 bits d'une cellule relit
+la valeur écrite à l'autre adresse — deux adresses qui tombent sur une même
+cellule — si bien qu'une panne de données n'est pas prise pour une ligne
+d'adresse. Sur la RAM CPU, le parcours couvre aussi le mot impair de
+32 bits, que le test d'adresses classique ne touche jamais, et le bit CPU
+est nommé par la broche de SDRAM qu'il emprunte, d'après la table de
+multiplexage du SH-4 (manuel matériel Renesas SH7750, annexe F : table 9
+pour 32 Mo, table 13 pour 16 Mo). Une même broche porte un bit de colonne
+et un bit de ligne :
+
+| Bit d'adresse CPU (octets) | Broche SDRAM (32 Mo) | Broche SH-4 |
+|---|---|---|
+| 3-10 | A0-A7, colonne | A3-A10 |
+| 11-20 | A0-A9, ligne | A3-A12 |
+| 21, 22 | A10, A11, ligne | A13, A14 |
+| 23, 24 | BA0, BA1, banque | A15, A16 |
+
+Les lignes d'adresse sont communes aux quatre puces :
+`Adresse A5 coupee sur IC10` (« Ligne d'adresse A, cinq, coupée sur, I C
+dix ») désigne la broche de cette puce, `Adresse BA0 coupee, 4 puces` la
+piste commune ou le SH-4. Le port série ajoute la broche du SH-4 et les
+bits CPU derrière la broche de SDRAM. La VRAM, la RAM Elan et la RAM son
+sont derrière des contrôleurs dont le multiplexage n'est pas documenté :
+pour elles, le rapport nomme le bit CPU et les puces touchées :
+`Bit d'adresse 12 fautif sur IC21`. Une puce qui se replie sur de nombreux
+bits à la fois est laissée aux tests de données et de cellules : c'est une
+puce ou une voie morte, pas des lignes d'adresse coupées.
+
 La barre de progression se retire après les mémoires Naomi 2 : à partir de
 là plus rien ne se mesure — la NVRAM, le RTC et l'EEPROM série répondent par
 oui ou par non — et les lignes qu'elle occupait reviennent au rapport.

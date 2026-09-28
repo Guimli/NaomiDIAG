@@ -86,6 +86,19 @@ u32 ram_test_databus(u32 addr);
  * it is not proof of defective address lines. */
 u32 ram_test_addrbus(u32 base, u32 size);
 
+/* Address lines, chip by chip. The same walk as ram_test_addrbus, but a
+ * step only counts when a whole 16-bit lane of some cell reads back the
+ * value written at the other address -- the signature of two addresses
+ * landing on one cell. A data fault flips a bit or two and is not taken
+ * for an address line. For each byte-address bit b (from lo_bit, 1 << b
+ * below size), out[b] gets the chips it aliased on, as chip(addr, xor)
+ * names them from the cell and the lanes that flipped. passes = 2 repeats
+ * the walk on the odd 32-bit word (base + 4), for memories where word
+ * parity picks the chip. g2 paces every access for the sound RAM. */
+typedef u32 (*addr_chip_fn)(u32 addr, u32 lanes_xor);
+void ram_addr_alias(u32 base, u32 size, u32 lo_bit, u32 passes, u32 g2,
+                    addr_chip_fn chip, u32 out[32]);
+
 /* Fixed-pattern pass: fill [base, base+len) with pattern, verify. */
 void ram_test_pattern(u32 base, u32 len, u32 pattern, ram_result *r);
 

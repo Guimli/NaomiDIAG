@@ -102,6 +102,11 @@ enum {
     CLIP_W_60,
     CLIP_W_AND_ONE,
     CLIP_DQ,
+    CLIP_ADDR_LINE,
+    CLIP_BANK_LINE,
+    CLIP_ADDR_BIT,
+    CLIP_FAULTY_ON,
+    CLIP_CUT_ALL,
     CLIP_COUNT
 };
 

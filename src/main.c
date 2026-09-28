@@ -52,6 +52,12 @@ u32 crc32_rom_block(const u32 *src, u32 nquads, u32 crc);
 #else
 #define LANG_IS_FR 0
 #endif
+/* what a line report names (log_entry.kind) */
+#define LK_NONE 0
+#define LK_DATA 1           /* cut data line: D number, chip, DQ     */
+#define LK_ADDR 2           /* SDRAM address pin A0-A11              */
+#define LK_BANK 3           /* SDRAM bank pin BA0/BA1                */
+#define LK_ABIT 4           /* CPU address bit, no pin map known     */
 #define REPORT_GAP_MS 1000          /* >= 1 s between spoken reports */
 
 #define CLIP_NONE   0xFFFFFFFFu
@@ -232,8 +238,9 @@ typedef struct {
     const comp_map *comps;          /* NULL, or 4-entry position->IC table */
     u32 quiet_ok;                   /* screen+speech: only when it FAILS   */
     u32 pre;                        /* clip spoken first, or CLIP_NONE     */
-    u32 line;                       /* cut data line: D number + 1, else 0 */
-    u32 dq;                         /* ...and the chip's own DQ pin       */
+    u32 kind;                       /* LK_*: what a line report names     */
+    u32 line;                       /* D number, SDRAM pin, or CPU bit    */
+    u32 dq;                         /* data line: the chip's own DQ pin   */
 } log_entry;
 
 static log_entry g_log[LOG_MAX];
@@ -278,7 +285,7 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
         fb_text(FB_W - 16 * 3, y, S_SCR_OK, COL_GREEN, FB_W);
     } else {
         fb_text(FB_W - 16 * 6, y, S_SCR_FAIL, COL_RED, FB_W);
-        if (e->detail && e->comps) {
+        if (e->detail && e->comps && e->kind == LK_NONE) {
             y += 20;
             u32 x = 32;
             const char *last = 0;
@@ -386,13 +393,38 @@ static void say_entry(const log_entry *e)
     if (!g_audio_ready || e->clip == CLIP_NONE)
         return;
     /* "Line D, thirty seven, cut on, I C eleven S, D Q, five" */
-    if (e->line) {
+    if (e->kind == LK_DATA) {
         say(CLIP_LINE_D, 0);
-        say_number(e->line - 1);
+        say_number(e->line);
         say(CLIP_CUT_ON, 0);
         say(e->clip, 0);
         say(CLIP_DQ, 0);
         say_number(e->dq);
+        progress_wait_ms(REPORT_GAP_MS);
+        return;
+    }
+    /* "Address line A, five, cut on, I C ten" / "Bank line B A, one, ..."
+     * / "Address bit, twelve, faulty on, I C twenty one"; every chip it
+     * touched, or "cut, common to all chips" */
+    if (e->kind == LK_ADDR || e->kind == LK_BANK || e->kind == LK_ABIT) {
+        say(e->kind == LK_ADDR ? CLIP_ADDR_LINE :
+            e->kind == LK_BANK ? CLIP_BANK_LINE : CLIP_ADDR_BIT, 0);
+        say_number(e->line);
+        if (e->kind != LK_ABIT && e->detail == 0xFu) {
+            say(CLIP_CUT_ALL, 0);
+        } else {
+            say(e->kind == LK_ABIT ? CLIP_FAULTY_ON : CLIP_CUT_ON, 0);
+            u32 spoken = CLIP_NONE;
+            for (u32 i = 0; i < 8; i++) {
+                if (!(e->detail & (1u << i)) || !e->comps)
+                    continue;
+                u32 c = e->comps[i].clip != CLIP_NONE ? e->comps[i].clip
+                                                      : CLIP_NUM_1 + i;
+                if (c != spoken)
+                    say(c, 0);
+                spoken = c;
+            }
+        }
         progress_wait_ms(REPORT_GAP_MS);
         return;
     }
@@ -469,6 +501,7 @@ static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
     e.comps = comps;
     e.quiet_ok = quiet_ok;
     e.pre = pre;
+    e.kind = LK_NONE;
     e.line = 0;
     e.dq = 0;
     log_store(&e);
@@ -858,9 +891,9 @@ static void relocate_fast_loops(void)
  * carry: an even word is D0-D31, an odd word D32-D63. */
 #define LINE_SAMPLES    64u
 #define LINE_THRESHOLD  60u
-#define CUT_MAX         4u
+#define CUT_MAX         8u
 
-static char g_cut_name[CUT_MAX][32];
+static char g_cut_name[CUT_MAX][32];         /* shared by data and address reports */
 static u32  g_cut_n;
 
 static u32 line_probe(u32 base, u32 len, u32 odd, u32 bit, u32 set)
@@ -945,7 +978,8 @@ static void report_cut_lines(u32 base, u32 len, u32 bits_even, u32 bits_odd)
             e.comps = 0;
             e.quiet_ok = 0;
             e.pre = CLIP_NONE;
-            e.line = line + 1;
+            e.kind = LK_DATA;
+            e.line = line;
             e.dq = dq;
             log_store(&e);
             scif_puts(d);
@@ -954,6 +988,209 @@ static void report_cut_lines(u32 base, u32 len, u32 bits_even, u32 bits_odd)
             say_entry(&e);
         }
     }
+}
+
+
+/* ---- address lines -----------------------------------------------------
+ * ram_addr_alias() finds, for each CPU byte-address bit, the chips on which
+ * two addresses land on one cell. On the CPU RAM that bit is then named as
+ * the SDRAM pin it travels on, from the SH-4's own multiplexing table
+ * (Renesas SH7750 hardware manual, appendix F, for the MCR this ROM
+ * programs): table 9 for 32 MB (AMX 2, four 1M x 16 x 4-bank chips),
+ * table 13 for 16 MB (AMX 4). One pin carries a column bit and a row bit,
+ * so both are gathered on it:
+ *
+ *   CPU bit   3..10   column, SDRAM A0..A7       (SH-4 pins A3..A10)
+ *   CPU bit  11..20   row,    SDRAM A0..A9       (SH-4 pins A3..A12)
+ *   CPU bit  21, 22   row,    SDRAM A10, A11     (32 MB; A10 on 16 MB)
+ *   CPU bit  23, 24   bank,   SDRAM BA0, BA1     (32 MB; 22, 23 on 16 MB)
+ *
+ * Address lines are common to the four chips: a fault on all of them is
+ * the shared trace or the SH-4 ball, on one of them that chip's own pin.
+ * The other memories sit behind controllers whose multiplexing is not
+ * documented; for them the CPU bit is named, and the chips it touched. */
+#define PIN_NONE 0xFFu
+
+static u32 sdram_pin(u32 b)
+{
+    u32 big = g_ram_size > 0x01000000u;
+    if (b < 3)
+        return PIN_NONE;
+    if (b <= 10)
+        return b - 3;                   /* column */
+    if (b <= (big ? 22u : 21u))
+        return b - 11;                  /* row */
+    if (b == (big ? 23u : 22u))
+        return 12;                      /* BA0 */
+    if (b == (big ? 24u : 23u))
+        return 13;                      /* BA1 */
+    return PIN_NONE;
+}
+
+static u32 addr_chip_sdram(u32 addr, u32 l)
+{
+    u32 p = (addr & 4) ? 2u : 0u;
+    return ((l & 0xFFFFu) ? 1u << p : 0) | ((l >> 16) ? 2u << p : 0);
+}
+
+static u32 addr_chip_vram(u32 addr, u32 l) { return vram_chip_mask(addr, l); }
+static u32 addr_chip_one(u32 addr, u32 l)  { (void)addr; (void)l; return 1u; }
+
+/* A chip that aliases on many address bits at once is dead or its data
+ * lane is -- the cell and data tests report that; it is not four cut
+ * address lines. Drop it from the address report. */
+static void addr_drop_dead(u32 *byline, u32 n, u32 nchips)
+{
+    for (u32 c = 0; c < nchips; c++) {
+        u32 hits = 0;
+        for (u32 i = 0; i < n; i++)
+            if (byline[i] & (1u << c))
+                hits++;
+        if (hits > 3) {
+            for (u32 i = 0; i < n; i++)
+                byline[i] &= ~(1u << c);
+            scif_puts(S_ADDR_DEAD);
+        }
+    }
+}
+
+static void put_num(char *d, u32 *o, u32 v)
+{
+    if (v >= 10)
+        d[(*o)++] = (char)('0' + v / 10);
+    d[(*o)++] = (char)('0' + v % 10);
+}
+
+static void put_str(char *d, u32 *o, const char *s)
+{
+    while (*s && *o < 31)
+        d[(*o)++] = *s++;
+}
+
+static void addr_report(u32 kind, u32 num, u32 chips, const comp_map *comps,
+                        u32 ncomps, u32 clip)
+{
+    if (g_cut_n >= CUT_MAX || !chips)
+        return;
+    char *d = g_cut_name[g_cut_n++];
+    u32 o = 0;
+    put_str(d, &o, kind == LK_ADDR ? S_ADDR_PRE : kind == LK_BANK ? S_BANK_PRE
+                                               : S_ABIT_PRE);
+    put_num(d, &o, num);
+    if (kind != LK_ABIT && chips == 0xFu) {
+        put_str(d, &o, S_ADDR_ALL);     /* all four: the shared trace */
+    } else {
+        put_str(d, &o, kind == LK_ABIT ? S_ABIT_MID : S_CUT_MID);
+        u32 named = 0;
+        const char *last = 0;
+        u32 distinct = 0;
+        for (u32 i = 0; i < ncomps; i++)
+            if ((chips & (1u << i)) && comps && comps[i].name != last)
+                distinct++, last = comps[i].name;
+        last = 0;
+        for (u32 i = 0; i < ncomps && comps; i++) {
+            if (!(chips & (1u << i)) || comps[i].name == last)
+                continue;
+            last = comps[i].name;
+            if (distinct > 2) {         /* no room: say how many */
+                put_num(d, &o, distinct);
+                put_str(d, &o, S_ADDR_CHIPS);
+                break;
+            }
+            if (named++)
+                put_str(d, &o, "/");
+            put_str(d, &o, comps[i].name);
+        }
+    }
+    d[o] = 0;
+
+    log_entry e;
+    e.name = d;
+    e.clip = clip;
+    e.status = T_FAIL;
+    e.detail = chips;
+    e.comps = comps;
+    e.quiet_ok = 0;
+    e.pre = CLIP_NONE;
+    e.kind = kind;
+    e.line = num;
+    e.dq = 0;
+    log_store(&e);
+    scif_puts(d);
+    scif_puts(S_SUF_FAIL);
+    screen_append(&e);
+    say_entry(&e);
+}
+
+/* CPU RAM: which SDRAM pins alias, and on which chips. byline[0..13] =
+ * A0..A11, BA0, BA1. Returns 1 if any. */
+static u32 sdram_addr_scan(u32 byline[14], u32 out[32])
+{
+    ram_addr_alias(SDRAM_P2_BASE, g_ram_size, 3, 2, 0, addr_chip_sdram, out);
+    for (u32 i = 0; i < 14; i++)
+        byline[i] = 0;
+    for (u32 b = 0; b < 32; b++) {
+        u32 pin = sdram_pin(b);
+        if (out[b] && pin != PIN_NONE)
+            byline[pin] |= out[b];
+    }
+    addr_drop_dead(byline, 14, 4);
+    u32 any = 0;
+    for (u32 i = 0; i < 14; i++)
+        any |= byline[i];
+    return any != 0;
+}
+
+static void sdram_addr_report(const u32 byline[14], const u32 out[32])
+{
+    u32 big = g_ram_size > 0x01000000u;
+    for (u32 pin = 0; pin < 14; pin++) {
+        if (!byline[pin])
+            continue;
+        /* serial: the SDRAM pin, the SH-4 pin, and the CPU bits behind it */
+        scif_puts(S_ADDR_SERIAL);
+        if (pin < 12) {
+            scif_puts("A");
+            scif_putdec(pin);
+            scif_puts(" (SH-4 A");
+            scif_putdec(pin + 3);
+        } else {
+            scif_puts("BA");
+            scif_putdec(pin - 12);
+            scif_puts(" (SH-4 A");
+            scif_putdec(pin - 12 + (big ? 15u : 14u));
+        }
+        scif_puts(")");
+        scif_puts(S_ADDR_BITS);
+        for (u32 b = 0; b < 32; b++) {
+            if (!out[b] || sdram_pin(b) != pin)
+                continue;
+            scif_putc(' ');
+            scif_putdec(b);
+            scif_puts(b <= 10 ? S_ADDR_COL : pin >= 12 ? S_ADDR_BANK : S_ADDR_ROW);
+        }
+        scif_puts("\n");
+        addr_report(pin < 12 ? LK_ADDR : LK_BANK, pin < 12 ? pin : pin - 12,
+                    byline[pin], IC(work_comps), 4, CLIP_CPU_RAM);
+    }
+}
+
+/* VRAM, Elan RAM, sound RAM: the CPU bit and the chips. Returns 1 if any. */
+static u32 addr_bits_report(u32 base, u32 size, u32 passes, u32 g2,
+                            addr_chip_fn chip, const comp_map *comps,
+                            u32 ncomps, u32 clip)
+{
+    u32 out[32];
+    ram_addr_alias(base, size, 2, passes, g2, chip, out);
+    addr_drop_dead(out, 32, ncomps);
+    u32 any = 0;
+    for (u32 b = 0; b < 32; b++) {
+        if (!out[b])
+            continue;
+        any = 1;
+        addr_report(LK_ABIT, b, out[b], comps, ncomps, clip);
+    }
+    return any;
 }
 
 static u32 test_sdram_cells(void)
@@ -974,14 +1211,20 @@ static u32 test_sdram_cells(void)
     }
 
     bad = ram_test_addrbus(SDRAM_P2_BASE, size);
-    bus_bad |= bad;
-    log_result_q(S_L_SDRAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1,
-                 CLIP_CPU_RAM);
+    /* the chip-by-chip walk covers the odd word too, which the classic one
+     * never touches: either finding fails the address bus */
+    u32 byline[14], aout[32];
+    u32 alines = sdram_addr_scan(byline, aout);
+    bus_bad |= bad | alines;
+    log_result_q(S_L_SDRAM_ABUS, CLIP_ADDR_BUS, (bad || alines) ? T_FAIL : T_OK,
+                 0, 0, 1, CLIP_CPU_RAM);
     if (bad) {
         scif_puts(S_BAD_ABITS);
         scif_puthex(bad);
         scif_puts("\n");
     }
+    if (alines)
+        sdram_addr_report(byline, aout);
 
 #if QUICK_TEST
     u32 len = 0x00100000;
@@ -1083,6 +1326,9 @@ static u32 test_aram(void)
         scif_puts(S_BAD_ABITS);
         scif_puthex(bad);
         scif_puts("\n");
+        /* one chip, IC35: which CPU bits alias, through the AICA */
+        addr_bits_report(ARAM_P2_BASE, ARAM_SIZE, 1, 1, addr_chip_one,
+                         IC(aram_comps), 4, CLIP_SOUND_RAM);
     }
 
     ram_result res;
@@ -1227,6 +1473,11 @@ static void test_vram_region(const char *name, const char *dbus, const char *abu
         scif_puts(S_BAD_ABITS);
         scif_puthex(bad);
         scif_puts("\n");
+        /* which CPU bits alias, and on which chips; the Elan RAM's chips
+         * also depend on word parity, so it is walked on both */
+        addr_bits_report(base, size, elan_is_mapped(base) ? 2u : 1u, 0,
+                         addr_chip_vram, comps, comps == pvrb_comps ? 8u : 4u,
+                         name_clip);
         *ok_flag = 0;
         diagnose_vram(base, size);
         return;

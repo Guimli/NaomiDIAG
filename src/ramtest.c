@@ -66,6 +66,63 @@ u32 ram_test_addrbus(u32 base, u32 size)
     return bad;
 }
 
+void aica_g2_wait(void);
+
+static u32 aa_rd(u32 a, u32 g2)
+{
+    if (g2)
+        aica_g2_wait();
+    return *(volatile u32 *)a;
+}
+
+static void aa_wr(u32 a, u32 v, u32 g2)
+{
+    if (g2)
+        aica_g2_wait();
+    *(volatile u32 *)a = v;
+}
+
+/* the lanes of d that flipped as a whole: 0xFFFF per 16-bit lane, else 0 */
+static u32 full_lanes(u32 d)
+{
+    return ((d & 0xFFFFu) == 0xFFFFu ? 0x0000FFFFu : 0) |
+           ((d >> 16) == 0xFFFFu ? 0xFFFF0000u : 0);
+}
+
+void ram_addr_alias(u32 base, u32 size, u32 lo_bit, u32 passes, u32 g2,
+                    addr_chip_fn chip, u32 out[32])
+{
+    const u32 pat = 0xAAAAAAAAu, anti = 0x55555555u;
+    for (u32 b = 0; b < 32; b++)
+        out[b] = 0;
+    for (u32 p = 0; p < passes; p++) {
+        u32 w = base + (p ? 4u : 0u);
+        for (u32 b = lo_bit; (1u << b) < size; b++)
+            aa_wr(w + (1u << b), pat, g2);
+        aa_wr(w, anti, g2);                 /* a bit stuck high aliases here */
+        for (u32 b = lo_bit; (1u << b) < size; b++) {
+            u32 l = full_lanes(aa_rd(w + (1u << b), g2) ^ pat);
+            if (l)
+                out[b] |= chip(w + (1u << b), l);
+        }
+        aa_wr(w, pat, g2);
+        for (u32 t = lo_bit; (1u << t) < size; t++) {
+            aa_wr(w + (1u << t), anti, g2);
+            u32 l = full_lanes(aa_rd(w, g2) ^ pat);   /* stuck low */
+            if (l)
+                out[t] |= chip(w, l);
+            for (u32 b = lo_bit; (1u << b) < size; b++) {
+                if (b == t)
+                    continue;
+                l = full_lanes(aa_rd(w + (1u << b), g2) ^ pat);  /* shorted */
+                if (l)
+                    out[t] |= chip(w + (1u << b), l);
+            }
+            aa_wr(w + (1u << t), pat, g2);
+        }
+    }
+}
+
 /* Uncached execution from the boot EPROM makes instruction count very nearly
  * proportional to elapsed time, so these two loops are hand-written assembly
  * (see ramtest_fast.S): 7 -> 1.19 instructions per word to fill, 11 -> 3.25
