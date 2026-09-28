@@ -512,9 +512,10 @@ The JVS input test shows each input the I/O board declared: the system
 switches (TEST, TILT1-3), each player's START, SERVICE, four directions
 and buttons, lit while pressed; coin counters; analog channels in hex; and
 the raw switch bytes for a board whose layout differs. The serial console
-prints a line whenever a switch or a coin count changes. The cabinet's own
-TEST is one of the inputs under test, so the way out is a board button or
-any serial key.
+prints a line whenever a switch or a coin count changes. TEST is one of
+the inputs under test, the cabinet's and the board's alike (a `BOARD TEST`
+line shows the latter), so only the board's **SERVICE** or a serial key
+leaves.
 
 Two of these are operator-initiated precisely because they are not safe to
 run unattended: the DIMM SDRAM test overwrites whatever game is loaded in the

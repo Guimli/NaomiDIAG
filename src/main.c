@@ -3042,6 +3042,16 @@ static void jt_draw(const u8 *info, u32 full)
     }
 }
 
+/* The board's own TEST button, from the MIE port (active low): an input
+ * under test like the others, since only SERVICE leaves this screen. */
+static void jt_draw_board(u8 in5)
+{
+    u32 y = 222;
+    jt_line_clear(y);
+    u32 x = jt_tok(16, y, S_JT_BOARD, 1);
+    jt_tok(x, y, "TEST", !(in5 & 0x10));
+}
+
 static void jvs_input_test(void)
 {
     if (!g_mie_prog) {
@@ -3056,18 +3066,28 @@ static void jvs_input_test(void)
     for (u32 i = 0; i < sizeof shown; i++)
         shown[i] = 0xFF;
     u32 have_id = 0, drawn_state = 0xFF;
-    u8 in5, prev_btn = 0x30;            /* both board buttons released */
+    u8 in5 = 0x30, prev_in5 = 0xFF;     /* both board buttons released */
+    u32 board_drawn = 0;
 
     for (;;) {
-        /* Way out: any serial key, or a press of either board button. */
+        /* Way out: any serial key, or a press of the board's SERVICE. The
+         * board's TEST is one of the inputs under test, like the cabinet's:
+         * it lights up here and leaves nothing. */
         if (scif_getc() >= 0)
             break;
         if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0) {
-            u8 btn = in5 & 0x30;
-            u8 pressed = prev_btn & ~btn;   /* active low: 1 -> 0 */
-            prev_btn = btn;
-            if (pressed)
-                break;
+            if (prev_in5 != 0xFF && (prev_in5 & 0x20) && !(in5 & 0x20))
+                break;                  /* SERVICE: 1 -> 0, active low */
+            if (prev_in5 != 0xFF && ((prev_in5 ^ in5) & 0x10)) {
+                scif_puts(S_JT_BOARD_SER);
+                scif_puts(in5 & 0x10 ? S_BTN_UP : S_BTN_DOWN);
+                scif_puts("\n");
+            }
+            if (g_screen_ready && (!board_drawn || ((prev_in5 ^ in5) & 0x10))) {
+                jt_draw_board(in5);
+                board_drawn = 1;
+            }
+            prev_in5 = in5;
         }
 
         if (jvs_read(info, 2) == 0) {
@@ -3080,8 +3100,11 @@ static void jvs_input_test(void)
                 have_id = 0;
             u32 full = state != drawn_state;
             drawn_state = state;
-            if (g_screen_ready)
+            if (g_screen_ready) {
                 jt_draw(info, full);
+                if (full)
+                    jt_draw_board(in5);  /* a full repaint cleared it */
+            }
 
             /* Serial: one line whenever a switch or a coin count moves.
              * Analog is left out; it would print on every jitter. */
@@ -3115,7 +3138,8 @@ static void jvs_input_test(void)
         progress_heartbeat();
     }
     /* The press that ended the test must not also open the menu the
-     * console goes back to: wait for the board buttons to be let go. */
+     * console goes back to: wait for the board buttons to be let go --
+     * TEST included, which may be held while SERVICE is pressed. */
     for (u32 t = 0; t < 100; t++) {
         if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0 && (in5 & 0x30) == 0x30)
             break;

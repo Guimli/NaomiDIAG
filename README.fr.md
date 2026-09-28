@@ -558,8 +558,9 @@ directions et les boutons de chaque joueur, allumés tant qu'ils sont
 appuyés ; les compteurs des monnayeurs ; les voies analogiques en
 hexadécimal ; et les octets bruts des contacts, pour une carte dont la
 disposition diffère. Le port série imprime une ligne dès qu'un contact ou
-un compteur change. Le TEST de la borne fait partie des entrées testées :
-on sort donc par un bouton de la carte ou une touche série.
+un compteur change. TEST fait partie des entrées testées, celui de la
+borne comme celui de la carte (une ligne `CARTE TEST` montre ce dernier) :
+seul le **SERVICE** de la carte, ou une touche série, en fait sortir.
 
 Deux d'entre elles sont à l'initiative de l'opérateur précisément parce
 qu'elles ne sont pas sûres sans surveillance : le test SDRAM du DIMM écrase
