@@ -248,7 +248,7 @@ void eta_tick(u32 screen_ok, u32 pct)
     char buf[9];
     u32 n = eta_format(buf, left);
     fb_fill_rect(FB_W - 16 * 8, 8, 16 * 8, 16, 0);
-    fb_text(FB_W - 16 * n - 8, 8, buf, COL_TITLE, FB_W);
+    fb_text(FB_W - 16 * n - 8, 8, buf, COL_WHITE, FB_W);
     g_drawn = 1;
 }
 
