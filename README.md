@@ -162,7 +162,15 @@ The **operator actions** are on the operator menu (see
 take long enough that they have no business delaying the report.
 
 - **RAM loops** (`c`, `v`, `s`) — the CPU, video or sound RAM test, pass
-  after pass, for intermittent faults.
+  after pass, for intermittent faults. The screen shows the pass, the time
+  running and the errors so far, and for each memory OK or FAIL with the
+  pass of its first error and the failing chips; it stays there, so a fault
+  seen once overnight is still on screen in the morning. The first failure
+  of each memory is also spoken. The video loop moves the image to the
+  other bank (TEX0 ↔ TEX1) while it tests the one it sits in. TEST or
+  START stops the loop (key `a` on the console when the MIE program is not
+  running). The CPU RAM loop stops below the 8 KB block the relocated code
+  runs from.
 - **DIMM board** (`d`) — register dump and read stability, then the
   destructive SDRAM test over the G1 DMA; `f` identifies the DIMM's firmware
   flash (see [DIMM board](#dimm-board)).

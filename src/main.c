@@ -3001,11 +3001,172 @@ static void lane_beacon(void)
 typedef struct {
     u32 base, len;
     region_desc d;
+    u32 clip;                       /* spoken name of the memory */
 } loop_part;
+
+/* What the screen shows of a soak run, per part: it accumulates, so a
+ * fault seen once at 3 a.m. is still on screen in the morning. */
+#define LOOP_MAX_PARTS 4
+typedef struct {
+    u32 errors;                     /* mismatching words, all passes */
+    u32 chips;                      /* OR of the failing positions   */
+    u32 first_pass;                 /* first pass that failed, 0 = none */
+    u32 done;                       /* passes completed on this part */
+} loop_stat;
+
+static u32 dec_into(char *d, u32 v)
+{
+    char t[10];
+    u32 n = 0, k = 0;
+    do {
+        u32 q = udiv(v, 10);
+        t[n++] = (char)('0' + (v - q * 10));
+        v = q;
+    } while (v && n < 10);
+    while (n)
+        d[k++] = t[--n];
+    d[k] = 0;
+    return k;
+}
+
+/* "h:mm:ss", hours as many as it takes: a soak can run for days */
+static void hms_into(char *d, u32 ms)
+{
+    u32 s = udiv(ms, 1000);
+    u32 h = udiv(s, 3600);
+    s -= h * 3600;
+    u32 m = udiv(s, 60);
+    s -= m * 60;
+    u32 n = dec_into(d, h);
+    d[n++] = ':';
+    d[n++] = (char)('0' + udiv(m, 10));
+    d[n++] = (char)('0' + m - udiv(m, 10) * 10);
+    d[n++] = ':';
+    d[n++] = (char)('0' + udiv(s, 10));
+    d[n++] = (char)('0' + s - udiv(s, 10) * 10);
+    d[n] = 0;
+}
+
+static u32 loop_chip_mask(const region_desc *d, const ram_result *r)
+{
+    u32 is_vram = r->vram_chips || d->comps == tex0_comps ||
+                  d->comps == tex1_comps || d->comps == pvrb_comps ||
+                  d->comps == elan_comps;
+    return is_vram ? r->vram_chips : ram_comp_mask(r);
+}
+
+static void loop_screen(const loop_part *parts, u32 nparts, const char *what,
+                        const loop_stat *st, u32 pass, u32 errors, u32 t0)
+{
+    if (!g_screen_ready)
+        return;
+    char buf[48];
+    u32 ymax = fb_hint_y() - 4;
+    fb_clear(0);
+    fb_progress_invalidate();
+    fb_text(16, 8, what, COL_TITLE, FB_W);
+
+    u32 n = 0;
+    for (const char *t = S_LP_PASS; *t; t++)
+        buf[n++] = *t;
+    dec_into(buf + n, pass);
+    fb_text(16, 40, buf, COL_WHITE, 320);
+    n = 0;
+    for (const char *t = S_LP_TIME; *t; t++)
+        buf[n++] = *t;
+    hms_into(buf + n, timer_ms() - t0);
+    fb_text(320, 40, buf, COL_WHITE, FB_W);
+    n = 0;
+    for (const char *t = S_LP_ERRS; *t; t++)
+        buf[n++] = *t;
+    dec_into(buf + n, errors);
+    fb_text(16, 60, buf, errors ? COL_RED : COL_GREEN, FB_W);
+
+    u32 y = 96;
+    for (u32 k = 0; k < nparts && y < ymax; k++) {
+        const loop_stat *s = &st[k];
+        fb_text(16, y, parts[k].d.group, COL_WHITE, FB_W - 16 * 7);
+        if (s->errors)
+            fb_text(FB_W - 16 * 6, y, S_SCR_FAIL, COL_RED, FB_W);
+        else if (s->done)
+            fb_text(FB_W - 16 * 3, y, S_SCR_OK, COL_GREEN, FB_W);
+        else
+            fb_text(FB_W - 16 * 3, y, S_SCR_IC_NOHASH, COL_WHITE, FB_W);
+        y += 20;
+        if (!s->errors || y >= ymax)
+            continue;
+        /* "  1234 err., passe 3" then the chips, five to a row */
+        n = 0;
+        buf[n++] = ' ';
+        buf[n++] = ' ';
+        n += dec_into(buf + n, s->errors);
+        for (const char *t = S_LP_FIRST; *t; t++)
+            buf[n++] = *t;
+        dec_into(buf + n, s->first_pass);
+        fb_text(16, y, buf, COL_RED, FB_W);
+        y += 20;
+        const comp_map *c = parts[k].d.comps;
+        u32 ncomps = c == pvrb_comps ? 8u : 4u;
+        const char *last = 0;
+        u32 inrow = 0;
+        n = 0;
+        for (u32 b = 0; b < ncomps && c; b++) {
+            if (!(s->chips & (1u << b)) || c[b].name == last)
+                continue;
+            last = c[b].name;
+            if (inrow == 5 && y < ymax) {
+                buf[n] = 0;
+                fb_text(16, y, buf, COL_RED, FB_W);
+                y += 20;
+                n = 0;
+                inrow = 0;
+            }
+            buf[n++] = ' ';
+            buf[n++] = ' ';
+            for (const char *t = c[b].name; *t; t++)
+                buf[n++] = *t;
+            inrow++;
+        }
+        if (inrow && y < ymax) {
+            buf[n] = 0;
+            fb_text(16, y, buf, COL_RED, FB_W);
+            y += 20;
+        }
+        y += 4;
+    }
+    fb_text(16, fb_hint_y(), g_mie_prog ? S_LP_HINT : S_LP_HINT_KEY,
+            COL_HINT, FB_W);
+}
+
+/* The spoken report of a part's first failure, the words the boot suite
+ * would use: "Video memory, I C sixteen, defective." */
+static void loop_say(const loop_part *lp, u32 chips)
+{
+    log_entry e;
+    e.name = lp->d.group;
+    e.clip = lp->clip;
+    e.status = T_FAIL;
+    e.detail = chips;
+    e.comps = lp->d.comps;
+    e.quiet_ok = 0;
+    e.pre = CLIP_NONE;
+    e.kind = LK_NONE;
+    e.line = 0;
+    e.dq = 0;
+    say_entry(&e);
+}
 
 static void loop_regions(const loop_part *parts, u32 nparts, const char *what)
 {
     u32 pass = 0, errors = 0;
+    loop_stat st[LOOP_MAX_PARTS];
+    for (u32 k = 0; k < LOOP_MAX_PARTS; k++)
+        st[k].errors = st[k].chips = st[k].first_pass = st[k].done = 0;
+    if (nparts > LOOP_MAX_PARTS)
+        nparts = LOOP_MAX_PARTS;
+    u32 t0 = timer_ms();
+    u32 bank0 = pvr_fb_on_tex1();       /* where the image goes back to */
+    u32 retired = fb_progress_set_retired(0);
     progress_set_loop(1);
     while (!progress_aborted()) {
         pass++;
@@ -3016,6 +3177,18 @@ static void loop_regions(const loop_part *parts, u32 nparts, const char *what)
             const loop_part *lp = &parts[k];
             ram_result res;
             ram_result_clear(&res);
+            /* The image cannot stay in the bank about to be tested: the
+             * patterns would overwrite it, and drawing would corrupt the
+             * patterns. It moves to the other bank for the part, repainted
+             * there -- a bad bank shows as a garbled screen, not a false
+             * result. */
+            if (g_screen_ready && (lp->base == VRAM_TEX0_BASE ||
+                                   lp->base == VRAM_TEX1_BASE)) {
+                u32 fa = pvr_fb_addr();
+                if (lp->base <= fa && fa < lp->base + lp->len)
+                    pvr_fb_set_bank(!pvr_fb_on_tex1());
+            }
+            loop_screen(parts, nparts, what, st, pass, errors, t0);
             u32 stalls = aica_g2_stalled();
             /* The framebuffer lives in TEX0. Drawing the bar into it while
              * TEX0 is under test would write into the pattern being verified
@@ -3049,15 +3222,29 @@ static void loop_regions(const loop_part *parts, u32 nparts, const char *what)
                 res.errors++;
             }
             errors += res.errors;
+            if (!progress_aborted())
+                st[k].done++;
             if (res.errors) {
                 scif_puts("\n");       /* off the progress line */
                 report_region(&lp->d, &res);
+                u32 chips = loop_chip_mask(&lp->d, &res);
+                u32 first = !st[k].errors;
+                st[k].errors += res.errors;
+                st[k].chips |= chips;
+                if (first) {
+                    st[k].first_pass = pass;
+                    loop_screen(parts, nparts, what, st, pass, errors, t0);
+                    loop_say(lp, chips);
+                }
             }
         }
         scif_puts(S_LOOP_ERR);
         scif_putdec(errors);
         scif_puts("\n");
     }
+    if (pvr_fb_on_tex1() != bank0)
+        pvr_fb_set_bank(bank0);         /* the caller repaints the report */
+    fb_progress_set_retired(retired);
     progress_screen_enable(1);
     progress_set_loop(0);
     progress_clear_abort();
@@ -3580,14 +3767,14 @@ static void run_action(u32 act)
     case ACT_CPU: {
         loop_part p = { SDRAM_P2_BASE,
                         g_reloc_win ? g_reloc_win - SDRAM_P2_BASE : g_ram_size,
-                        { S_CG_CPU, IC(work_comps), 0 } };
+                        { S_CG_CPU, IC(work_comps), 0 }, CLIP_CPU_RAM };
         loop_regions(&p, 1, S_M_CPU);
         break;
     }
     case ACT_VRAM: {
         loop_part p[4] = {
-            { VRAM_TEX0_BASE, VRAM_TEX0_SIZE, { S_L_VRAM_TEX0, IC(tex0_comps), 0 } },
-            { VRAM_TEX1_BASE, VRAM_TEX1_SIZE, { S_L_VRAM_TEX1, IC(tex1_comps), 0 } },
+            { VRAM_TEX0_BASE, VRAM_TEX0_SIZE, { S_L_VRAM_TEX0, IC(tex0_comps), 0 }, CLIP_VRAM },
+            { VRAM_TEX1_BASE, VRAM_TEX1_SIZE, { S_L_VRAM_TEX1, IC(tex1_comps), 0 }, CLIP_VRAM },
         };
         u32 n = 2;
         /* A Naomi 2 loops its other graphics memories too, under the same
@@ -3599,7 +3786,7 @@ static void run_action(u32 act)
             pvr2_access a = pvr2_prepare();
             if (a == PVR2_READY) {
                 loop_part b = { VRAM_PVRB_BASE, VRAM_PVRB_SIZE,
-                                { S_CG_PVRB, IC(pvrb_comps), 0 } };
+                                { S_CG_PVRB, IC(pvrb_comps), 0 }, CLIP_VRAM_B };
                 p[n++] = b;
             } else {
                 scif_puts(S_PVRB_SKIP);
@@ -3608,7 +3795,7 @@ static void run_action(u32 act)
             }
             if (a != PVR2_NO_ELAN && a != PVR2_CONTROL) {
                 loop_part e = { ELAN_RAM_BASE, ELAN_RAM_SIZE,
-                                { S_CG_ELAN, IC(elan_comps), 0 } };
+                                { S_CG_ELAN, IC(elan_comps), 0 }, CLIP_ELAN };
                 p[n++] = e;
             } else {
                 scif_puts(S_ELAN_SKIP);
@@ -3618,7 +3805,8 @@ static void run_action(u32 act)
         break;
     }
     case ACT_ARAM: {
-        loop_part p = { ARAM_P2_BASE, ARAM_SIZE, { S_CG_SOUND, IC(aram_comps), 1 } };
+        loop_part p = { ARAM_P2_BASE, ARAM_SIZE, { S_CG_SOUND, IC(aram_comps), 1 },
+                        CLIP_SOUND_RAM };
         aica_arm_halt();                /* the loop writes offset 0: issue #1 */
         loop_regions(&p, 1, S_M_ARAM);
         aica_arm_park();

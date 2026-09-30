@@ -71,6 +71,10 @@ void pvr_display_init(void);            /* video_on + framebuffer reads on */
 void pvr_fb_select_tex1(u32 on);
 u32  pvr_fb_on_tex1(void);
 u32  pvr_fb_addr(void);
+/* Move the displayed image to the other bank while the display runs, for a
+ * loop that is about to test the bank it sits in. The new bank holds
+ * whatever it held: the caller repaints. */
+void pvr_fb_set_bank(u32 tex1);
 
 /* progress bar at the bottom of the report; a no-op until the framebuffer
  * has been proven, so the test code may call it unconditionally */
@@ -96,6 +100,7 @@ void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax);
  * that is one line short of the suite. */
 u32  fb_report_ymax(void);
 void fb_progress_retire(void);
+u32  fb_progress_set_retired(u32 on);   /* returns the previous state */
 u32  fb_hint_y(void);                    /* the button hint's line */
 void fb_banner_reserve(void);            /* keep the last line for fb_banner */
 void fb_banner(const char *text);        /* white on blue, last line */

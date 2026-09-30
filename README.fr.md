@@ -176,7 +176,15 @@ Les **actions opérateur** sont au menu opérateur (voir
 soit elles durent assez pour n'avoir rien à faire devant le rapport.
 
 - **Boucles RAM** (`c`, `v`, `s`) — le test RAM CPU, vidéo ou son, passe
-  après passe, pour les pannes intermittentes.
+  après passe, pour les pannes intermittentes. L'écran affiche la passe, la
+  durée écoulée et le cumul d'erreurs, et pour chaque mémoire OK ou ECHEC
+  avec la passe de la première erreur et les puces fautives ; l'affichage
+  reste, une panne vue une fois dans la nuit est encore à l'écran le matin.
+  La première panne de chaque mémoire est aussi annoncée à la voix. La
+  boucle vidéo déplace l'image dans l'autre banque (TEX0 ↔ TEX1) pendant
+  qu'elle teste celle où elle se trouve. TEST ou START arrête la boucle
+  (touche `a` sur la console si le programme du MIE ne tourne pas). La
+  boucle RAM CPU s'arrête sous le bloc de 8 Ko où tourne le code relogé.
 - **Carte DIMM** (`d`) — vidage des registres et contrôle de stabilité en
   lecture, puis le test destructif de la SDRAM par DMA G1 ; `f` identifie
   la flash du firmware DIMM (voir [Carte DIMM](#carte-dimm)).

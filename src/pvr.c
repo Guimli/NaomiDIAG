@@ -219,6 +219,14 @@ static u32 g_fb_tex1;
 void pvr_fb_select_tex1(u32 on) { g_fb_tex1 = on; }
 u32  pvr_fb_on_tex1(void)       { return g_fb_tex1; }
 
+void pvr_fb_set_bank(u32 tex1)
+{
+    g_fb_tex1 = tex1;
+    PVR_FB_R_SOF1 = pvr_fb_addr() & 0x00FFFFFFu;
+    PVR_FB_R_SOF2 = pvr_fb_addr() & 0x00FFFFFFu;
+    fb_progress_invalidate();
+}
+
 u32 pvr_fb_addr(void)
 {
     return 0xA5000000u + FB_VRAM_OFFSET + (g_fb_tex1 ? 0x00800000u : 0u);
@@ -415,6 +423,16 @@ void fb_progress_retire(void)
     if (fb_progress_enabled())
         fb_fill_rows(BAR_Y - 24, FB_H, 0);
     g_bar_retired = 1;
+}
+
+/* A soak run from the menu brings the bar back for its duration -- there is
+ * a percentage to count again -- and puts things back as they were. */
+u32 fb_progress_set_retired(u32 on)
+{
+    u32 was = g_bar_retired;
+    g_bar_retired = on;
+    g_bar_filled = 0;
+    return was;
 }
 
 /* Bottom of the report area: just above the bar, or near the bottom of the
