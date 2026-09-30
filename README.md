@@ -96,10 +96,13 @@ are reported as they land.
    read lands in an unpopulated area and is assumed to return open bus;
    `CFG_BOARD_MODEL=1` avoids it, `=2` selects a known Naomi 2 — see
    [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md).
-4. **BIOS EPROM (IC27)** — CRC32 self-check.
-5. **Test-loop relocation** — the memory-test loops are copied into an 8 KB
+4. **Test-loop relocation** — the memory-test loops are copied into an 8 KB
    block of CPU RAM, tested first, and run from there cached (see
    [Where the test loops execute](#where-the-test-loops-execute)).
+5. **BIOS EPROM (IC27)** — CRC32 self-check. It runs right after the
+   relocation so that its loop, too, executes cached from CPU RAM: only the
+   2 MB of data still cross the EPROM bus. Without a proven block it runs
+   from the EPROM as before.
 6. **Maple bus / MIE** (315-6146 Z80) — version request + factory
    self-test.
 7. **Settings EEPROM** (93C46 via MIE) — read and both CRC-checked copies
@@ -272,16 +275,17 @@ extrapolated:
 | Step | Loops relocated | No CPU RAM for the loops |
 |---|---|---|
 | Screen + speaker bring-up | 0:29 | 0:29 |
-| Board, BIOS CRC | 0:08 | 0:08 |
+| Board identification | 0:04 | 0:04 |
 | Loop relocation | 0:37 | 0:31 (up to 128 blocks scanned from ROM) |
+| BIOS CRC | 0:02 (estimate, to be measured) | 0:04 |
 | MIE, settings EEPROM, JVS | 0:19 | skipped |
 | CPU RAM | 0:52 | 12:39 |
 | VRAM TEX0 + TEX1 | 0:53 | 6:25 |
 | Sound RAM | 8:22 | 8:22 (never relocated) |
 | Naomi 2: PVR-B + Elan RAM | 1:31 | 19:00 |
 | NVRAM, RTC, serial EEPROM, end | 0:29 | 0:29 |
-| **Naomi 1 total** | **12:09** | **29:04** |
-| **Naomi 2 total** | **13:40** | **48:04** |
+| **Naomi 1 total** | **12:07** | **29:04** |
+| **Naomi 2 total** | **13:38** | **48:04** |
 
 - That run took 13:42. The Naomi 1 total is the same run without the PVR-B
   and Elan RAM. TEX1 is measured slower than TEX0 there, 8.9 s against

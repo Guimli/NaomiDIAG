@@ -20,8 +20,9 @@
 enum {
     ETA_VIDEO,          /* quick VRAM check, screen on (runs from ROM)   */
     ETA_AUDIO,          /* quick sound RAM check, audio on, replay        */
-    ETA_BOARD,          /* board identification + BIOS CRC                */
+    ETA_BOARD,          /* board identification                           */
     ETA_RELOC,          /* test-loop relocation                           */
+    ETA_BIOS,           /* boot EPROM CRC (relocated loop when possible)  */
     ETA_MIE,            /* Maple / MIE, settings EEPROM, JVS              */
     ETA_SDRAM,          /* CPU RAM                                        */
     ETA_VRAM,           /* TEX0 + TEX1                                    */

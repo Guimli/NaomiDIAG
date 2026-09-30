@@ -15,8 +15,6 @@
 #include "sdram.h"
 #include "ramtest.h"
 
-/* hand-written CRC-32 of the boot EPROM, src/crc32_fast.S */
-u32 crc32_rom_block(const u32 *src, u32 nquads, u32 crc);
 #include "timer.h"
 #include "eta.h"
 #include "aica.h"
@@ -764,14 +762,15 @@ static void test_bios_rom(void)
     progress_begin(S_P_BIOS, n);
     /* crc32_rom_block eats groups of four words; the odd tail (n is 0x7FFFF,
      * not a multiple of four) goes through the same table one word at a
-     * time. See src/crc32_fast.S for why this loop is hand-written. */
+     * time. See crc32_rom_block in src/ramtest_fast.S for why this loop is
+     * hand-written; it runs from the relocated block when there is one. */
     u32 nq = n >> 2, done = 0;
     while (done < nq) {
         u32 q = nq - done;
         if (q > BIOS_CRC_CHUNK / 4u)
             q = BIOS_CRC_CHUNK / 4u;
         progress_tick(done << 2);
-        crc = crc32_rom_block(rom + (done << 2), q, crc);
+        crc = p_crc32_rom_block(rom + (done << 2), q, crc);
         done += q;
         if (progress_aborted()) {       /* a checksum cut short is not a bad EPROM */
             progress_end();
@@ -3724,16 +3723,19 @@ void cmain(void)
     suite_check_abort();
     progress_phase(PH_BOARD_ID);        /* magenta */
 
-    /* Only now the 2 MB ROM checksum: it is the single longest test in the
-     * whole suite (4.2 M table steps) and it must never run while the
-     * operator is still staring at a black screen. */
-    test_bios_rom();
-    suite_check_abort();
-
     eta_step(ETA_RELOC);
     relocate_fast_loops();
     eta_set_reloc(reloc_active());
     eta_set_mie_early(g_maple_safe);
+    suite_check_abort();
+
+    /* Only now the 2 MB ROM checksum: it is the single longest test in the
+     * whole suite (4.2 M table steps), it must never run while the operator
+     * is still staring at a black screen, and it waits for the relocation so
+     * that, with a proven CPU RAM window, its loop runs cached from there and
+     * only the data still comes off the EPROM. */
+    eta_step(ETA_BIOS);
+    test_bios_rom();
     suite_check_abort();
 
     /* The MIE stage, as early as it can run. Its DMA buffers need RAM, and

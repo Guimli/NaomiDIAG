@@ -21,6 +21,10 @@
  *   quick sound + replay  16.71 ->   31.59     14.9     7.4 + 2
  *   board + BIOS CRC      31.59 ->   39.24      7.6     3.9 + 1
  *   relocation            39.24 ->   76.07     36.8    29.4 + 2
+ *   (v0.18 runs the BIOS CRC after the relocation, its loop cached: the
+ *   3.9 s above split into 0.3 s of board identification and 3.6 s of CRC
+ *   from ROM; cached, only the 2 MB of EPROM data remain -- 2.0 s is a
+ *   guess until a real board's log gives the figure)
  *   MIE, EEPROM, JVS      76.07 ->   95.34     19.3     4.5 + 4
  *   CPU RAM               95.34 ->  147.15     51.8    48.1 + 1
  *   VRAM TEX0 + TEX1     147.15 ->  199.83     52.7    45.3 + 2
@@ -30,7 +34,7 @@
  *   NVRAM + RTC          793.68 ->  807.27     13.6     6.2 + 2
  *   serial EEPROM        807.27 ->  821.85     14.6    10.9 + 1
  *   relocated-code check 821.85 ->  821.93      0.1     0.5
- *   Naomi 2 total                             13:42   (this table: 13:40)
+ *   Naomi 2 total                             13:42   (this table: 13:38)
  *
  * The Naomi 1 has the same steps but the PVR-B and Elan RAM. The first
  * version of this table came from the PR #2 log, which had a fault on
@@ -71,8 +75,9 @@ typedef struct {
 static const step_est est[ETA_STEPS] = {
     [ETA_VIDEO]   = { 14500, 14500, 0, 3, 0 },
     [ETA_AUDIO]   = {  7400,  7400, 2, 3, 0 },
-    [ETA_BOARD]   = {  3900,  3900, 1, 1, 0 },
+    [ETA_BOARD]   = {   300,   300, 1, 1, 0 },
     [ETA_RELOC]   = { 29400, 24000, 2, 0, 0 },
+    [ETA_BIOS]    = {  2000,  3600, 0, 0, 0 },
     [ETA_MIE]     = {  4500,     0, 4, 0, 0 },
     [ETA_SDRAM]   = { Q(48100, 32), Q(755000, 32), 1, 3, 1 },
     [ETA_VRAM]    = { Q(45300, 8),  Q(378000, 8),  2, 6, 1 },

@@ -101,11 +101,14 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
    une Naomi 1, cette lecture tombe dans une zone non peuplée et est supposée
    rendre le bus flottant ; `CFG_BOARD_MODEL=1` l'évite, `=2` sélectionne
    une Naomi 2 connue — voir [PVR_B_ACCESS.md](docs/PVR_B_ACCESS.md).
-4. **EPROM BIOS (IC27)** — auto-contrôle CRC32.
-5. **Relocalisation des boucles de test** — les boucles de test mémoire sont
+4. **Relocalisation des boucles de test** — les boucles de test mémoire sont
    recopiées dans un bloc de 8 Ko de RAM CPU, testé d'abord, et exécutées
    de là en cache (voir
    [Où s'exécutent les boucles de test](#où-sexécutent-les-boucles-de-test)).
+5. **EPROM BIOS (IC27)** — auto-contrôle CRC32. Il s'exécute juste après la
+   relocalisation pour que sa boucle tourne elle aussi en cache depuis la
+   RAM CPU : seuls les 2 Mo de données traversent encore le bus de l'EPROM.
+   Sans bloc validé, il s'exécute depuis l'EPROM comme avant.
 6. **Bus Maple / MIE** (Z80 315-6146) — requête de version + auto-test
    d'usine.
 7. **EEPROM des réglages** (93C46 via MIE) — lue, et ses deux copies
@@ -295,16 +298,17 @@ parlés compris ; seul le cas sans RAM CPU pour les boucles est extrapolé :
 | Étape | Boucles relogées | Pas de RAM CPU pour les boucles |
 |---|---|---|
 | Amorçage écran + haut-parleur | 0:29 | 0:29 |
-| Carte, CRC du BIOS | 0:08 | 0:08 |
+| Identification de la carte | 0:04 | 0:04 |
 | Relocalisation des boucles | 0:37 | 0:31 (jusqu'à 128 blocs balayés depuis la ROM) |
+| CRC du BIOS | 0:02 (estimation, à mesurer) | 0:04 |
 | MIE, EEPROM des réglages, JVS | 0:19 | sautée |
 | RAM CPU | 0:52 | 12:39 |
 | VRAM TEX0 + TEX1 | 0:53 | 6:25 |
 | RAM son | 8:22 | 8:22 (jamais relogée) |
 | Naomi 2 : PVR-B + RAM Elan | 1:31 | 19:00 |
 | NVRAM, RTC, EEPROM série, fin | 0:29 | 0:29 |
-| **Total Naomi 1** | **12:09** | **29:04** |
-| **Total Naomi 2** | **13:40** | **48:04** |
+| **Total Naomi 1** | **12:07** | **29:04** |
+| **Total Naomi 2** | **13:38** | **48:04** |
 
 - Cette exécution a duré 13:42. Le total Naomi 1 est la même exécution
   sans le PVR-B ni la RAM Elan. TEX1 y est mesurée plus lente que TEX0,

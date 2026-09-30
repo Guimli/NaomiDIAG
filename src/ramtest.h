@@ -49,6 +49,8 @@ u32 ram_find_pat_fast(const u32 *p, u32 n, find_ctx *c);
 u32 ram_find_prng_fast(const u32 *p, u32 n, find_ctx *c);
 /* SHA-1 of nblocks x 64 bytes read from the cartridge port (sha1.c) */
 void sha1_pio_blocks(u32 h[5], u32 nblocks, u32 w[80]);
+/* CRC-32 of nquads x 4 words of the boot EPROM (P1 pointer) */
+u32  crc32_rom_block(const u32 *src, u32 nquads, u32 crc);
 void sha1_mem_blocks(u32 h[5], u32 nblocks, u32 w[80], const u32 *src);
 
 #define RAM_MAX_FAILS 8
