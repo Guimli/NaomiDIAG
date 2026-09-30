@@ -24,6 +24,11 @@ void cart_read(u32 offset, u8 *buf, u32 len);
 /* 1 if something answers with plausible data (not stuck all-0/all-1) */
 u32 cart_present(void);
 
+/* Offset of the first chip: 0 on Sega boards, 0x800000 on the Namco ones
+ * whose socket 2F is empty; CART_NONE if nothing answers at either. */
+#define CART_NONE 0xFFFFFFFFu
+u32 cart_base(void);
+
 /* Presence probe for one mask ROM: samples words spread over the chip's
  * address range. A chip that is missing, unseated or not driving the bus
  * answers a constant 0xFFFF (pull-ups) or 0x0000 (floating low) at every

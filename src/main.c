@@ -2387,7 +2387,7 @@ lost:
  * is written to them, and 8 KB fetched by DMA must equal the same 8 KB read
  * through the port. Anything else -- a board that does not answer the DMA,
  * a buffer cell that fails -- and the check runs on the port alone. */
-static u32 cart_dma_probe(void)
+static u32 cart_dma_probe(u32 base)
 {
     volatile u32 *b = CART_DMA_BUF(0);
     const u32 nw = 2 * CART_HASH_CHUNK / 4;
@@ -2402,14 +2402,15 @@ static u32 cart_dma_probe(void)
     for (u32 i = 0; i < CART_HASH_CHUNK / 4; i++)
         b[i] = 0x5A5A5A5Au;
     u32 t0 = timer_ticks();
-    if (cart_dma_start(0, CART_DMA_PHYS, CART_HASH_CHUNK) || cart_dma_wait())
+    if (cart_dma_start(base, CART_DMA_PHYS, CART_HASH_CHUNK) ||
+        cart_dma_wait())
         return 0;
     g_cart_t_dma = timer_ticks() - t0;
     /* the port read is timed on its own, compared afterwards: the two
      * figures go in the log, for the real speed of both paths */
     u32 *pio = (u32 *)CART_DMA_BUF(1);
     t0 = timer_ticks();
-    cart_seek(0);
+    cart_seek(base);
     for (u32 i = 0; i < CART_HASH_CHUNK / 4; i++) {
         u32 lo = CART_ROM_DATA;
         pio[i] = lo | ((u32)CART_ROM_DATA << 16);
@@ -2490,7 +2491,9 @@ static u32 udiv(u32 n, u32 d)
     return q;
 }
 
-static void test_cart_pins(void)
+/* base: the first chip's offset, so the sample is real data and not the
+ * 0xFF of an empty socket 2F on a Namco board */
+static void test_cart_pins(u32 base)
 {
     cart_pin_stats st;
 #if QUICK_TEST
@@ -2499,7 +2502,7 @@ static void test_cart_pins(void)
     const u32 span = 0x00100000;        /* 1 MB sample */
 #endif
     progress_begin(S_P_CART_PINS, span);
-    cart_pin_scan(0, span, &st);
+    cart_pin_scan(base, span, &st);
     progress_end();
 
     scif_puts(S_PINS_HDR);
@@ -2534,7 +2537,7 @@ static void test_cart_pins(void)
 
 /* Stream the first chip and snapshot the SHA-1 at every size a first chip
  * has in the database: the game, or 0xFFFFFFFF. */
-static u32 cart_identify(void)
+static u32 cart_identify(u32 base)
 {
     sha1_ctx c;
     u8 digest[20];
@@ -2545,7 +2548,7 @@ static u32 cart_identify(void)
     progress_begin(S_P_CART_ID, cartdb_first_sizes[CARTDB_NFIRST - 1]);
     for (u32 s = 0; s < CARTDB_NFIRST && game == 0xFFFFFFFF; s++) {
         u32 target = cartdb_first_sizes[s];
-        cart_hash_range(&c, done, target - done, done);
+        cart_hash_range(&c, base + done, target - done, done);
         done = target;
         sha1_ctx snap;
         {
@@ -2557,7 +2560,7 @@ static u32 cart_identify(void)
         sha1_final(&snap, digest);
         for (u32 g = 0; g < CARTDB_NGAMES; g++) {
             u32 f = cartdb_game_first[g];
-            if (cartdb_ic_off[f] == 0 && cartdb_ic_size[f] == target &&
+            if (cartdb_ic_off[f] == base && cartdb_ic_size[f] == target &&
                 sha1_eq(digest, cartdb_sha1[f])) {
                 game = g;
                 break;
@@ -2572,7 +2575,8 @@ static u32 cart_identify(void)
 static void test_cartridge(void)
 {
     g1_bus_init();
-    if (!cart_present()) {
+    u32 cbase = cart_base();
+    if (cbase == CART_NONE) {
         log_result(S_L_CART_ABSENT, CLIP_NONE, T_OK, 0, 0);
         say(CLIP_CART, 250);
         say(CLIP_ABSENT, REPORT_GAP_MS);
@@ -2581,7 +2585,7 @@ static void test_cartridge(void)
 
     /* header peek: "NAOMI" magic + ASCII titles live in the first bytes */
     u8 hdr[80];
-    cart_read(0, hdr, sizeof hdr);
+    cart_read(cbase, hdr, sizeof hdr);
     scif_puts(S_CART_HDR);
     for (u32 i = 0; i < 64; i++)
         scif_putc((hdr[i] >= 32 && hdr[i] < 127) ? (char)hdr[i] : '.');
@@ -2599,12 +2603,12 @@ static void test_cartridge(void)
     if (!reloc_active()) {
         scif_puts(S_CART_NORELOC);
         log_result(S_L_CART_SKIP, CLIP_CART, T_SKIP, 0, 0);
-        test_cart_pins();
+        test_cart_pins(cbase);
         return;
     }
 
     g_cart_t_dma = g_cart_t_pio = 0;
-    g_cart_dma = cart_dma_probe();
+    g_cart_dma = cart_dma_probe(cbase);
     scif_puts(g_cart_dma ? S_CART_DMA_ON : S_CART_DMA_OFF);
     if (g_cart_t_pio) {
         scif_puts(S_CART_8K_DMA);       /* 12.5 MHz ticks -> microseconds */
@@ -2614,14 +2618,14 @@ static void test_cartridge(void)
         scif_puts(S_CART_8K_US);
     }
 
-    u32 game = cart_identify();
+    u32 game = cart_identify(cbase);
     if (game == 0xFFFFFFFF && g_cart_dma) {
         /* unknown through the DMA: before calling the content unknown,
          * make sure the DMA path is not the one misreading it */
         g_cart_dma = 0;
         scif_puts(S_CART_RECHECK);
         scif_puts("\n");
-        game = cart_identify();
+        game = cart_identify(cbase);
         if (game != 0xFFFFFFFF) {
             scif_puts(S_CART_DMA_WRONG);
             scif_puts("\n");
@@ -2635,7 +2639,7 @@ static void test_cartridge(void)
         /* A dead or unstable data line corrupts every read, so the game
          * cannot be identified -- run the per-line test anyway: it tells
          * a bus/connector fault apart from a genuinely unknown cart. */
-        test_cart_pins();
+        test_cart_pins(cbase);
         return;
     }
 
@@ -2762,7 +2766,7 @@ static void test_cartridge(void)
     log_result(S_L_CART_CONTENT, CLIP_CART,
                (bad || missing) ? T_FAIL : T_OK, 0, 0);
 
-    test_cart_pins();
+    test_cart_pins(cbase);
 }
 
 /* ------------------------------------------------------------------ */

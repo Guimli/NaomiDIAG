@@ -132,10 +132,10 @@ void cart_pin_scan(u32 offset, u32 len, cart_pin_stats *st)
     }
 }
 
-u32 cart_present(void)
+static u32 cart_answers_at(u32 offset)
 {
     u8 hdr[64];
-    cart_read(0, hdr, sizeof hdr);
+    cart_read(offset, hdr, sizeof hdr);
     u32 zeros = 0, ones = 0;
     for (u32 i = 0; i < sizeof hdr; i++) {
         if (hdr[i] == 0x00)
@@ -144,4 +144,23 @@ u32 cart_present(void)
             ones++;
     }
     return (zeros != sizeof hdr && ones != sizeof hdr);
+}
+
+/* Where the cartridge's first chip, and its header, sits. Sega's boards
+ * put it at 0 (IC22). The Namco-built M2 boards have their program flash
+ * in sockets 2F, 2D, 2C, 2B at 8 MB each in linear mode, and several games
+ * (Mazan, Ninja Assault, World Kicks) leave 2F empty: 0 reads 0xFF and the
+ * "NAOMI" header is at 0x800000, in 2D -- MAME's sets load it there. */
+u32 cart_base(void)
+{
+    if (cart_answers_at(0))
+        return 0;
+    if (cart_answers_at(0x00800000))
+        return 0x00800000;
+    return CART_NONE;
+}
+
+u32 cart_present(void)
+{
+    return cart_base() != CART_NONE;
 }

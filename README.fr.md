@@ -217,6 +217,11 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
     puce que MAME charge deux fois n'est hachée qu'une fois, et un dump
     alternatif (IC22 `_alt` de F355 Challenge 2) est un second contenu
     connu pour cette puce.
+    Les cartes fabriquées par Namco laissent le support 2F vide sur
+    plusieurs jeux (Mazan, Ninja Assault, World Kicks) : l'adresse 0 lit
+    0xFF et l'en-tête est dans 2D, à 0x800000. La cartouche est alors
+    détectée, identifiée, hachée et ses lignes de données échantillonnées à
+    partir de là.
     À l'écran, le jeu identifié a sa propre ligne, suivie de **toutes les
     puces du jeu, quatre par ligne** (`IC22 OK  IC1 HS  IC2 ABS …`) : OK en
     vert, HS (contenu faux) et ABS (muette, ou miroir d'une autre puce) en

@@ -199,6 +199,10 @@ take long enough that they have no business delaying the report.
     grid position (`maz1ma1.4m` → 4M). A chip MAME maps twice is hashed
     once, and an alternative dump (F355 Challenge 2's `_alt` IC22) is a
     second known content for that chip.
+    The Namco-built boards leave socket 2F empty on several games (Mazan,
+    Ninja Assault, World Kicks): address 0 reads 0xFF and the header is in
+    2D, at 0x800000. The cartridge is then found, identified, hashed and
+    its data lines sampled from there.
     On screen, the identified game gets a line of its own, followed by
     **every chip of the game, four per row** (`IC22 OK  IC1 BAD  IC2 ABS
     …`): OK in green, BAD (wrong content) and ABS (silent, or mirroring
