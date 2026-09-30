@@ -130,6 +130,7 @@ CLIPS = {
     "faulty_on":  {"fr": "fautif sur",                        "en": "faulty on"},
     "cut_all":    {"fr": "coupée, commune à toutes les puces.", "en": "cut, common to all chips."},
     "rtc_date":   {"fr": "Date de l'horloge.",                "en": "Clock date."},
+    "cart_unchk": {"fr": "contenu non vérifié,",              "en": "content not checked,"},
 }
 
 RATE = 22050

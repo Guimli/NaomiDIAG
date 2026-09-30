@@ -205,7 +205,14 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
     vérification du contenu est sautée** et le log série l'indique : depuis
     l'EPROM elle prendrait environ 9 s par Mo, 20 minutes pour un jeu moyen
     (132 Mo) et plus d'une heure pour le plus gros (512 Mo). La puce de
-    sécurité et les lignes de données restent testées.
+    sécurité et les lignes de données restent testées. L'écran affiche
+    alors `SHA1 cartouche (RAM CPU HS)  NON TESTE` en orange et la voix
+    annonce « Cartouche de jeu, contenu non vérifié, mémoire principale,
+    défectueuse ».
+    À l'écran, le jeu identifié a sa propre ligne, suivie de **toutes les
+    puces du jeu, quatre par ligne** (`IC22 OK  IC1 HS  IC2 ABS …`) : OK en
+    vert, HS (contenu faux) et ABS (muette, ou miroir d'une autre puce) en
+    rouge, `--` pour une puce présente mais non hachée (builds QUICK).
     La cartouche est lue par **DMA G1 en double tampon** : les 8 Ko suivants
     arrivent dans un tampon pendant que le calcul hache les 8 Ko précédents
     dans l'autre, le bus et le CPU travaillent en même temps. Le chemin DMA

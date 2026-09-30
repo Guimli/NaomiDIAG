@@ -108,6 +108,7 @@ enum {
     CLIP_FAULTY_ON,
     CLIP_CUT_ALL,
     CLIP_RTC_DATE,
+    CLIP_CART_UNCHK,
     CLIP_COUNT
 };
 

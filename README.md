@@ -188,7 +188,15 @@ take long enough that they have no business delaying the report.
     **Without a proven CPU RAM block the content check is skipped** and the
     serial log says so: from the EPROM it would take about 9 s per MB,
     20 minutes for a typical game (132 MB) and over an hour for the largest
-    (512 MB). The security chip and data-line tests still run.
+    (512 MB). The screen then shows `Cart SHA1 (CPU RAM bad)  NOT TESTED`
+    in amber and the speech says "Game cartridge, content not checked,
+    main memory, defective". The security chip and data-line tests still
+    run.
+    On screen, the identified game gets a line of its own, followed by
+    **every chip of the game, four per row** (`IC22 OK  IC1 BAD  IC2 ABS
+    …`): OK in green, BAD (wrong content) and ABS (silent, or mirroring
+    another chip) in red, `--` for a chip present but not hashed (QUICK
+    builds).
     The cartridge is read by **G1 DMA, double-buffered**: the next 8 KB
     arrives in one buffer while the rounds hash the previous 8 KB from the
     other, so the bus and the CPU work at the same time. The DMA path is

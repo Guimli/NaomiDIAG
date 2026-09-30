@@ -56,6 +56,13 @@
 #define LK_ADDR 2           /* SDRAM address pin A0-A11              */
 #define LK_BANK 3           /* SDRAM bank pin BA0/BA1                */
 #define LK_ABIT 4           /* CPU address bit, no pin map known     */
+#define LK_INFO 5           /* a line of text, no verdict            */
+#define LK_ICROW 6          /* cartridge chips, up to 4 per row      */
+#define IC_OK     0         /* LK_ICROW cell: SHA-1 matches          */
+#define IC_BAD    1         /*   answers, wrong content              */
+#define IC_ABS    2         /*   silent, or a mirror of another chip */
+#define IC_NOHASH 3         /*   answers, not hashed (QUICK build)   */
+#define COL_AMBER RGB565(31, 40, 0)
 #define REPORT_GAP_MS 1000          /* >= 1 s between spoken reports */
 
 #define CLIP_NONE   0xFFFFFFFFu
@@ -144,7 +151,9 @@ void diag_input_check(u32 in_loop)
  * slots. The array lives in the 4 KB OC-RAM .bss; 48 entries cost 1.3 KB of
  * it and the linker refuses anything that does not fit. */
 #define LOG_MAX 48
-typedef enum { T_OK = 0, T_FAIL = 1 } t_status;
+/* T_SKIP: the test could not run, which is neither a pass nor a fault --
+ * the screen says so in amber, the speech says why. */
+typedef enum { T_OK = 0, T_FAIL = 1, T_SKIP = 2 } t_status;
 
 /* numbered position -> silkscreen IC (see analysis/ADDRESS_MAP.md).
  * Mapping extracted from the original BIOS RAM TEST tables; the WORK
@@ -277,6 +286,42 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
         return y;
     if (y >= fb_report_ymax())
         return y;
+
+    if (e->kind == LK_INFO) {
+        fb_text(16, y, e->name, COL_WHITE, FB_W);
+        return y + 20;
+    }
+    if (e->kind == LK_ICROW) {
+        /* "IC22 OK   IC1 OK   IC2 HS   IC3 ABS": four columns of 152 px,
+         * room for the longest name (IC12S) and the longest word (ABS) */
+        for (u32 k = 0; k < e->dq; k++) {
+            const char *nm = cartdb_ic_name[e->line + k];
+            char cell[8];
+            u32 n = 0;
+            while (nm[n] && n < 7) {
+                char ch = nm[n];
+                cell[n++] = (ch >= 'a' && ch <= 'z') ? (char)(ch - 32) : ch;
+            }
+            cell[n] = 0;
+            u32 x = 16 + k * 152;
+            u32 st = (e->detail >> (4 * k)) & 0xFu;
+            fb_text(x, y, cell, COL_WHITE, x + 152);
+            fb_text(x + 16 * (n + 1), y,
+                    st == IC_OK ? S_SCR_OK : st == IC_BAD ? S_SCR_IC_BAD :
+                    st == IC_ABS ? S_SCR_IC_ABS : S_SCR_IC_NOHASH,
+                    st == IC_OK ? COL_GREEN : st == IC_NOHASH ? COL_WHITE
+                                                               : COL_RED,
+                    x + 152);
+        }
+        return y + 20;
+    }
+    if (e->status == T_SKIP) {
+        /* right-aligned with OK and FAIL, one character in from the edge */
+        u32 x = FB_W - 16 * (S_SCR_SKIP_LEN + 1);
+        fb_text(16, y, e->name, COL_WHITE, x - 16);
+        fb_text(x, y, S_SCR_SKIP, COL_AMBER, FB_W);
+        return y + 20;
+    }
 
     if (e->status == T_OK) {
         fb_text(16, y, e->name, COL_WHITE, FB_STATUS_X);
@@ -516,6 +561,16 @@ static void say_entry(const log_entry *e)
      * every line -- it is the full log, and it has no line budget. */
     if (e->quiet_ok && e->status == T_OK)
         return;
+    /* Only the cartridge content skips so far, for want of CPU RAM:
+     * "Game cartridge. content not checked, main memory. defective." */
+    if (e->status == T_SKIP) {
+        say(e->clip, 250);
+        say(CLIP_CART_UNCHK, 250);
+        say(CLIP_CPU_RAM, 250);
+        say(CLIP_DEFECT, 250);
+        progress_wait_ms(REPORT_GAP_MS);
+        return;
+    }
     /* The bus tests share their clip between memories -- "data bus" belongs
      * to the CPU RAM and to the sound RAM alike, and "address bus" names no
      * memory at all. The screen line says which one ("SDRAM address bus");
@@ -588,7 +643,7 @@ static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
     log_store(&e);
 
     scif_puts(name);
-    scif_puts(st == T_OK ? S_SUF_OK : S_SUF_FAIL);
+    scif_puts(st == T_OK ? S_SUF_OK : st == T_SKIP ? S_SUF_SKIP : S_SUF_FAIL);
     /* live multi-channel report: one line added, then speech */
     screen_append(&e);
     say_entry(&e);
@@ -598,6 +653,26 @@ static void log_result(const char *name, u32 clip, t_status st, u32 detail,
                        const comp_map *comps)
 {
     log_result_q(name, clip, st, detail, comps, 0, CLIP_NONE);
+}
+
+/* Screen-only lines: serial already has the same facts in its own words,
+ * and there is nothing to say out loud. */
+static void log_screen_line(u32 kind, const char *name, u32 detail, u32 line,
+                            u32 count)
+{
+    log_entry e;
+    e.name = name;
+    e.clip = CLIP_NONE;
+    e.status = T_OK;
+    e.detail = detail;
+    e.comps = 0;
+    e.quiet_ok = 0;
+    e.pre = CLIP_NONE;
+    e.kind = kind;
+    e.line = line;
+    e.dq = count;
+    log_store(&e);
+    screen_append(&e);
 }
 
 /* Sound RAM is ONE 16-bit chip behind the AICA, not four chips on a 64-bit
@@ -2356,6 +2431,32 @@ static u32 sha1_ic(u32 offset, u32 size, u8 out[20])
     return 0;
 }
 
+/* The chips of the game on screen, four to a row, each row drawn as soon as
+ * it is full: the operator watches the verdicts come in. The chips of one
+ * game are consecutive in the database, so a row is its first index, its
+ * count and one 4-bit IC_* code per cell. */
+static u32 g_icrow_base, g_icrow_n, g_icrow_det;
+
+static void icrow_flush(void)
+{
+    if (g_icrow_n)
+        log_screen_line(LK_ICROW, "", g_icrow_det, g_icrow_base, g_icrow_n);
+    g_icrow_n = 0;
+    g_icrow_det = 0;
+}
+
+static void icrow_add(u32 idx, u32 st)
+{
+    if (!g_icrow_n)
+        g_icrow_base = idx;
+    g_icrow_det |= st << (4 * g_icrow_n);
+    if (++g_icrow_n == 4)
+        icrow_flush();
+}
+
+/* "Jeu : <title>", kept for the repaints */
+static char g_gamebuf[48];
+
 static u32 sha1_eq(const u8 *a, const u8 *b)
 {
     for (u32 i = 0; i < 20; i++)
@@ -2497,6 +2598,7 @@ static void test_cartridge(void)
      * still runs, it only samples 1 MB. */
     if (!reloc_active()) {
         scif_puts(S_CART_NORELOC);
+        log_result(S_L_CART_SKIP, CLIP_CART, T_SKIP, 0, 0);
         test_cart_pins();
         return;
     }
@@ -2540,6 +2642,17 @@ static void test_cartridge(void)
     scif_puts(S_IDENTIFIED);
     scif_puts(cartdb_title[game]);
     scif_puts("\n");
+    {
+        u32 n = 0;
+        for (const char *t = S_SCR_GAME; *t; t++)
+            g_gamebuf[n++] = *t;
+        for (u32 i = 0; cartdb_title[game][i] && i < 32 && n < 47; i++)
+            g_gamebuf[n++] = cartdb_title[game][i];
+        g_gamebuf[n] = 0;
+        log_screen_line(LK_INFO, g_gamebuf, 0, 0, 0);
+    }
+    g_icrow_n = 0;
+    g_icrow_det = 0;
 
     /* verify every IC of the identified game: first that the chip answers
      * at all (a missing or unseated EPROM is a different fault from bad
@@ -2570,10 +2683,12 @@ static void test_cartridge(void)
         if (!cart_ic_responds(cartdb_ic_off[idx], cartdb_ic_size[idx])) {
             scif_puts(S_NO_RESPONSE);
             missing++;
+            icrow_add(idx, IC_ABS);
             continue;                     /* no point hashing dead silence */
         }
         if (i >= nhash) {                 /* present, hashing skipped */
             scif_puts(S_PRESENT_ONLY);
+            icrow_add(idx, IC_NOHASH);
             continue;
         }
         scif_putc(' ');
@@ -2613,13 +2728,18 @@ static void test_cartridge(void)
             scif_puts(cartdb_ic_name[aliased]);
             scif_puts(S_ALIAS_B);
             missing++;                    /* chip is effectively absent */
-        } else if (nseen < CART_MAX_TRACK) {
+            icrow_add(idx, IC_ABS);
+            continue;
+        }
+        if (nseen < CART_MAX_TRACK) {
             for (u32 b = 0; b < 20; b++)
                 seen_digest[nseen][b] = digest[b];
             seen_idx[nseen] = idx;
             nseen++;
         }
+        icrow_add(idx, ok ? IC_OK : IC_BAD);
     }
+    icrow_flush();
 
     /* affirmative count: how many of the chips this game needs answered */
     scif_puts(S_ROMSET_A);
@@ -3834,8 +3954,11 @@ void cmain(void)
 
     scif_puts(S_SUMMARY);
     for (u32 i = 0; i < g_log_n; i++) {
+        if (g_log[i].kind == LK_INFO || g_log[i].kind == LK_ICROW)
+            continue;                   /* screen-only lines */
         scif_puts(g_log[i].name);
-        scif_puts(g_log[i].status == T_OK ? S_SUM_OK : S_SUM_FAIL);
+        scif_puts(g_log[i].status == T_OK ? S_SUM_OK :
+                  g_log[i].status == T_SKIP ? S_SUM_SKIP : S_SUM_FAIL);
     }
     if (usable)
         scif_puts(S_MAINRAM_OK);
