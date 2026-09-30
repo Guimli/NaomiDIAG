@@ -754,7 +754,12 @@ What does work goes around it, on the G1 bus:
   timeout). It overwrites the loaded game, so it is on the operator menu only.
 - **`f` — DIMM firmware flash.** The flash is reachable through the G1
   ROM-board PIO with AMD commands. The ROM performs a read-ID, which is
-  non-destructive, and offers a 3.17 / 4.01 / 4.03 selection. **Writing is
+  non-destructive, and offers a 3.17 / 4.01 / 4.03 selection. The screen
+  shows the flash's maker and ID (or "DIMM board: not present" / "DIMM
+  flash (no answer)"), then the versions and "Cancel": TEST moves,
+  SERVICE or START picks, as in the operator menu; keys 1/2/3 still work on
+  the console. The choice ends on an amber "Flash write (not armed yet)".
+  **Writing is
   deliberately not armed.** Sega's own updater was decompiled and it does a
   single chip-erase followed by a full-image reprogram — so the board's
   two-slot recovery net survives a successful flash but not an interrupted

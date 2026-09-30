@@ -809,7 +809,12 @@ Ce qui marche passe à côté, par le bus G1 :
   garde d'une seconde sur le DMA). Il écrase le jeu chargé : réservé au menu opérateur.
 - **`f` — flash du firmware DIMM.** La flash s'atteint par le PIO ROM-board
   du G1 avec des commandes AMD. La ROM fait un read-ID, non destructeur, et
-  propose un choix entre 3.17, 4.01 et 4.03. **La gravure n'est
+  propose un choix entre 3.17, 4.01 et 4.03. L'écran affiche le fabricant
+  et l'identifiant de la flash (ou « Carte DIMM : absente » / « Flash DIMM
+  (ne repond pas) »), puis les versions et « Annuler » : TEST déplace,
+  SERVICE ou START choisit, comme dans le menu opérateur ; les touches
+  1/2/3 marchent toujours sur la console. Le choix se termine par
+  « Gravure (pas encore armee) » en orange. **La gravure n'est
   volontairement pas armée.** L'updater de SEGA a été décompilé : il procède
   par un unique effacement de puce suivi de la reprogrammation de l'image
   entière — le filet de secours à deux slots de la carte survit donc à un
