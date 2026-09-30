@@ -748,10 +748,22 @@ proxy, and one of them is a no-op.
 
 What does work goes around it, on the G1 bus:
 
-- **`d` — DIMM SDRAM test.** Holly's GD-DMA has a direction bit; with
-  `SB_GDDIR = 1` the Naomi writes system RAM into the DIMM. The ROM uses it
-  for a real memory test (`0x01010101`, `0x10101010`, CRC-32, one-second DMA
-  timeout). It overwrites the loaded game, so it is on the operator menu only.
+- **`d` — DIMM SDRAM test.** Holly's GD-DMA has a direction bit, and the
+  sources disagree on it: the DIMM reversing had 0 = read, while the
+  original BIOS loads cartridges with `SB_GDDIR = 1`. The count register
+  (0x5F7014) is in 8-byte units in one, 32-byte units in the other. So the
+  action first **probes the board**, without leaving a trace: 1 KB of the
+  game image (1 MB in) is read twice through the PIO port as a reference,
+  then each `SB_GDDIR` value is tried on a buffer holding a pattern — the
+  buffer becoming the reference is a read, the DIMM becoming the pattern is
+  a write, undone at once with the reference and checked. Then both count
+  units are tried on a read, and 32 KB are timed. The serial log gives
+  every outcome; the screen gives "G1 DMA read GDDIR=n" and "G1 DMA write
+  GDDIR=n". Only with both directions established, and after SERVICE/START
+  (TEST skips), does the destructive memory test run (`0x01010101`,
+  `0x10101010`, CRC-32, one-second DMA timeout) — it overwrites the loaded
+  game. *Not validated on real hardware yet*: MAME cannot run a custom
+  BIOS with a DIMM, and ignores the direction bit anyway.
 - **`f` — DIMM firmware flash.** The flash is reachable through the G1
   ROM-board PIO with AMD commands. The ROM performs a read-ID, which is
   non-destructive, and offers a 3.17 / 4.01 / 4.03 selection. The screen

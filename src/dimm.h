@@ -43,7 +43,7 @@ void dimm_probe(dimm_info *di);
  * path in cart.h even though both drive the G1 ROM-board interface. */
 #define SB_GDSTAR   REG32(0xA05F7404)   /* system RAM address (physical)   */
 #define SB_GDLEN    REG32(0xA05F7408)   /* byte length (multiple of 32)    */
-#define SB_GDDIR    REG32(0xA05F740C)   /* 0 = DIMM->RAM, 1 = RAM->DIMM     */
+#define SB_GDDIR    REG32(0xA05F740C)   /* direction: see dimm_g1_probe     */
 #define SB_GDEN     REG32(0xA05F7414)   /* enable                          */
 #define SB_GDST     REG32(0xA05F7418)   /* start; reads !=0 while running   */
 
@@ -63,7 +63,38 @@ typedef struct {
  * DESTRUCTIVE. Requires a present, booted DIMM and a validated system-RAM
  * scratch (checked internally; on scratch failure r->timeout is left 0 and
  * r->blocks is 0). Abortable at each block via the progress layer. */
-void dimm_mem_test(u32 span, u32 pattern, dimm_mem_result *r);
+/* dir_write / dir_read: the SB_GDDIR values dimm_g1_probe found */
+void dimm_mem_test(u32 span, u32 pattern, dimm_mem_result *r,
+                   u32 dir_write, u32 dir_read);
+
+/* What the G1 DMA does with the DIMM, found on the board itself rather
+ * than taken from the reversing, which disagrees with the BIOS on the
+ * direction bit (the DIMM notes: 0 reads; the BIOS cartridge loader: 1
+ * reads) and on the count's unit (8 or 32 bytes).
+ *
+ * On 1 KB of the game image, 1 MB in: the reference read twice through
+ * the PIO port, then each SB_GDDIR value tried on a buffer holding a
+ * pattern. The buffer becoming the reference is a read; the DIMM becoming
+ * the pattern is a write, undone at once with the reference and checked.
+ * Then both count readings on a read, and the time of 32 KB. The DIMM
+ * flash is never touched; its SDRAM is left as it was. */
+#define DP_NOT_RUN  0
+#define DP_READ     1       /* DIMM -> system RAM                    */
+#define DP_WRITE    2       /* system RAM -> DIMM                    */
+#define DP_NONE     3       /* completed, nothing moved              */
+#define DP_TIMEOUT  4       /* never completed                       */
+#define DP_ODD      5       /* something moved, not the expected way */
+#define DP_UNKNOWN  0xFFu
+typedef struct {
+    u32 pio_flags;          /* PIO offset flags that read it, 0 = none */
+    u32 outcome[2];         /* DP_* per SB_GDDIR value                 */
+    u32 dir_read, dir_write;/* SB_GDDIR values, or DP_UNKNOWN          */
+    u32 restored;           /* a write was undone and verified         */
+    u32 restore_failed;     /* ... or could not be                     */
+    u32 cnt_ok[2];          /* count in 32-byte / 8-byte units worked  */
+    u32 ticks_32k;          /* one 32 KB read, timer ticks             */
+} dimm_g1_probe_result;
+void dimm_g1_probe(dimm_g1_probe_result *r);
 
 /* Quick CPU-side sanity check of the system-RAM scratch the DMA test needs.
  * Returns 1 if the scratch holds data, 0 if main RAM there is unusable. */

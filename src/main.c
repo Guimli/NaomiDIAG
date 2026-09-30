@@ -1901,6 +1901,108 @@ static void test_sram_rtc(void)
  * overwrites the loaded game image, which is why it belongs to this
  * operator-chosen test and nowhere in the automatic sweep. It cannot touch
  * the DIMM's firmware (that runs from the board's own flash, not this SDRAM). */
+static u32 udiv(u32 n, u32 d);
+
+/* The probe's findings: every figure on serial, for the record of what a
+ * real board does; the two directions and the speed on screen. */
+static char g_dimmbuf[3][40];
+
+static void dimm_dir_line(u32 slot, const char *label, u32 dir)
+{
+    u32 n = 0;
+    for (const char *t = label; *t; t++)
+        g_dimmbuf[slot][n++] = *t;
+    for (const char *t = " GDDIR="; *t; t++)
+        g_dimmbuf[slot][n++] = *t;
+    g_dimmbuf[slot][n++] = (char)('0' + dir);
+    g_dimmbuf[slot][n] = 0;
+    log_result(g_dimmbuf[slot], CLIP_NONE, T_OK, 0, 0);
+}
+
+static void dimm_probe_report(const dimm_g1_probe_result *r)
+{
+    static const char *const what[6] = {
+        S_DP_NOTRUN, S_DP_READ, S_DP_WRITE, S_DP_NONE, S_DP_TIMEOUT, S_DP_ODD
+    };
+    scif_puts(S_DP_HDR);
+    if (!r->pio_flags) {
+        scif_puts(S_DP_NOPIO);
+        log_result(S_L_DP_PIO, CLIP_NONE, T_FAIL, 0, 0);
+        return;
+    }
+    scif_puts(S_DP_PIO);
+    scif_puthex(r->pio_flags);
+    scif_puts("\n");
+    for (u32 dir = 0; dir < 2; dir++) {
+        scif_puts(S_DP_DIR);
+        scif_putdec(dir);
+        scif_puts(" : ");
+        scif_puts(what[r->outcome[dir] < 6 ? r->outcome[dir] : 0]);
+        scif_puts("\n");
+    }
+    if (r->restored)
+        scif_puts(S_DP_RESTORED);
+    if (r->restore_failed)
+        scif_puts(S_DP_RESTORE_KO);
+    if (r->dir_read != DP_UNKNOWN) {
+        scif_puts(S_DP_COUNT);
+        scif_puts(r->cnt_ok[0] ? "OK" : "--");
+        scif_puts(" / ");
+        scif_puts(r->cnt_ok[1] ? "OK" : "--");
+        scif_puts("\n");
+    }
+    if (r->ticks_32k) {
+        /* 32 KB in t ticks of 12.5 MHz: KB/s = 32 * 12500000 / t */
+        scif_puts(S_DP_SPEED);
+        scif_putdec(udiv(400000000u, r->ticks_32k));
+        scif_puts(" Ko/s\n");
+    }
+    if (r->dir_read != DP_UNKNOWN)
+        dimm_dir_line(0, S_L_DP_READ, r->dir_read);
+    else
+        log_result(S_L_DP_READ, CLIP_NONE, T_FAIL, 0, 0);
+    if (r->dir_write != DP_UNKNOWN)
+        dimm_dir_line(1, S_L_DP_WRITE, r->dir_write);
+    else
+        log_result(S_L_DP_WRITE, CLIP_NONE,
+                   r->dir_read != DP_UNKNOWN ? T_SKIP : T_FAIL, 0, 0);
+    if (r->restore_failed)
+        log_result(S_L_DP_RESTORE, CLIP_NONE, T_FAIL, 0, 0);
+}
+
+/* SERVICE/START runs it, TEST (or any key but y/o) passes */
+static u32 dimm_confirm_destructive(void)
+{
+    scif_puts(S_DIMM_ASK);
+    u32 y = g_screen_y + 12;
+    if (g_screen_ready) {
+        fb_text(16, y, S_SCR_DIMM_ASK, COL_AMBER, FB_W);
+        fb_text(16, fb_hint_y(), S_SCR_DIMM_ASK_HINT, COL_HINT, FB_W);
+    }
+    u32 go = 0;
+    for (;;) {
+        input_event ev;
+        if (input_poll(&ev)) {
+            if (ev.kind == INPUT_KEY) {
+                go = ev.key == 'y' || ev.key == 'Y' || ev.key == 'o' ||
+                     ev.key == 'O';
+                break;
+            }
+            if (ev.kind == INPUT_CONFIRM) {
+                go = 1;
+                break;
+            }
+            if (ev.kind == INPUT_SELECT)
+                break;
+        }
+        progress_heartbeat();
+        delay_ms(20);
+    }
+    if (g_screen_ready)
+        fb_fill_rows(y, fb_hint_y() + 18, 0);
+    return go;
+}
+
 static void test_dimm(void)
 {
     dimm_info di;
@@ -1955,6 +2057,24 @@ static void test_dimm(void)
     }
     log_result(S_L_DIMM_MEM, CLIP_NONE, unstable ? T_FAIL : T_OK, 0, 0);
 
+    /* What the G1 DMA does with this board, found on it: which SB_GDDIR
+     * value reads and which writes, the count's unit, the speed. Leaves
+     * the DIMM as it was. The cell test below needs both directions. */
+    dimm_g1_probe_result pr;
+    dimm_g1_probe(&pr);
+    dimm_probe_report(&pr);
+    if (pr.dir_read == DP_UNKNOWN || pr.dir_write == DP_UNKNOWN) {
+        scif_puts(S_DIMM_NO_DIRS);
+        log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, T_SKIP, 0, 0);
+        return;
+    }
+    /* It overwrites the game image: asked, not assumed. */
+    if (!dimm_confirm_destructive()) {
+        scif_puts(S_DIMM_SKIPPED);
+        log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, T_SKIP, 0, 0);
+        return;
+    }
+
     /* Destructive cell test: write the requested patterns over the DIMM
      * SDRAM via G1-DMA and read them back with a CRC. Overwrites the game
      * image, hence gated behind this operator-initiated test. dimm_mem_test
@@ -1972,7 +2092,7 @@ static void test_dimm(void)
     for (u32 p = 0; p < 2; p++) {
         dimm_mem_result mr;
         progress_begin(S_P_DIMM, mspan);
-        dimm_mem_test(mspan, patterns[p], &mr);
+        dimm_mem_test(mspan, patterns[p], &mr, pr.dir_write, pr.dir_read);
         progress_end();
 
         /* An operator abort stops dimm_mem_test between blocks, and what it
