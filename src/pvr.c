@@ -430,6 +430,13 @@ u32 fb_report_ymax(void)
 /* The last line once the suite is over: white on blue, where the progress
  * bar was, saying how to reach the operator menu. fb_banner_reserve()
  * first, so the report is laid out clear of it, then fb_banner(). */
+/* The line a blank line above the progress bar's label: where the hint
+ * about the buttons sits while the suite runs. */
+u32 fb_hint_y(void)
+{
+    return BAR_Y - 22 - 40;
+}
+
 void fb_banner_reserve(void)
 {
     g_banner = 1;

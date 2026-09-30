@@ -492,6 +492,11 @@ le repère `>` désigne le choix courant. Chaque appui sur TEST réaffiche la
 liste avec la nouvelle sélection, et SERVICE la lance. Aucun écran VGA ni
 support des séquences ANSI n'est nécessaire pour suivre la navigation.
 
+Pendant la suite, dès que le programme du MIE lit les boutons, une ligne
+bleue, une ligne vide au-dessus du libellé du pourcentage, indique lesquels
+l'arrêtent : `TEST ou START : arret et menu operateur`. Elle s'efface quand
+le rapport atteint sa ligne.
+
 Une fois la suite terminée, la dernière ligne de l'écran — là où était la
 barre de progression — indique comment y accéder, en blanc sur bleu :
 `TEST ou START : menu operateur` (le TEST de la carte, PSW1, ou le START du

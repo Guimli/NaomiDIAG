@@ -451,6 +451,11 @@ serial entry includes its direct key (`c`, `v`, `s`, `d`, `g`, `f`, `j`, `m`); `
 the current selection. TEST prints the list again with the next selection,
 and SERVICE runs it. Navigation needs neither a VGA monitor nor ANSI support.
 
+While the suite runs, as soon as the MIE program reads the buttons, a blue
+line a blank line above the progress label says which ones stop it: `TEST
+or START: stop and operator menu`. It gives way when the report reaches
+its line.
+
 Once the suite is over, the last line of the screen — where the progress
 bar was — says how to get there, white on blue: `TEST or START: operator
 menu` (the board's TEST, PSW1, or the cabinet's player 1 START; the

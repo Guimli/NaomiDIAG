@@ -96,6 +96,7 @@ void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax);
  * that is one line short of the suite. */
 u32  fb_report_ymax(void);
 void fb_progress_retire(void);
+u32  fb_hint_y(void);                    /* the button hint's line */
 void fb_banner_reserve(void);            /* keep the last line for fb_banner */
 void fb_banner(const char *text);        /* white on blue, last line */
 

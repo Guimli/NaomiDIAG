@@ -180,6 +180,7 @@
 #define S_LOOP_ERR          "  erreurs cumulees : "
 #define S_WAIT_TEST         "\nAppuyez sur TEST ou SERVICE (carte) pour le menu operateur.\n"
 #define S_IDLE_BANNER       "TEST ou START : menu operateur"
+#define S_BUTTON_HINT       "TEST ou START : arret et menu operateur"
 #define S_HELP              "\nMenu operateur -- touches :\n"\
                             "  h  cette aide (n'interrompt pas)\n"\
                             "  a  interrompre le test en cours (et une boucle, si les\n"\
@@ -506,6 +507,7 @@
 #define S_LOOP_ERR          "  errors so far: "
 #define S_WAIT_TEST         "\nPress TEST or SERVICE (on the board) for the operator menu.\n"
 #define S_IDLE_BANNER       "TEST or START: operator menu"
+#define S_BUTTON_HINT       "TEST or START: stop and operator menu"
 #define S_HELP              "\nOperator menu -- keys:\n"\
                             "  h  this help (does not interrupt)\n"\
                             "  a  abort the running test (and a loop, when the board\n"\

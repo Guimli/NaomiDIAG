@@ -352,10 +352,46 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
  * every line -- 153,600 uncached VRAM writes to add one line, on every
  * result. Nothing about an appended line requires that: its position depends
  * only on the lines before it, and those are already correct on screen. */
+/* ---- the button hint ---------------------------------------------------
+ * While the suite runs, once the MIE program reads the buttons: which ones
+ * stop the suite and open the operator menu, in blue a blank line above
+ * the progress label. It gives way for good when the report reaches its
+ * line, and goes when the suite ends. */
+#define COL_HINT    RGB565(10, 40, 31)
+
+static u32 g_hint_on, g_hint_done;
+
+static void hint_hide(void)
+{
+    if (g_hint_on && g_screen_ready)
+        fb_fill_rows(fb_hint_y(), fb_hint_y() + 18, 0);
+    g_hint_on = 0;
+}
+
+static void hint_retire(void)
+{
+    hint_hide();
+    g_hint_done = 1;
+}
+
+static void hint_draw(void)
+{
+    if (!g_screen_ready || g_hint_done || !g_mie_prog)
+        return;
+    if (g_screen_y + 16 > fb_hint_y()) {    /* the report got there */
+        hint_retire();
+        return;
+    }
+    fb_text(16, fb_hint_y(), S_BUTTON_HINT, COL_HINT, FB_W);
+    g_hint_on = 1;
+}
+
 static void screen_append(const log_entry *e)
 {
     if (!g_screen_ready)
         return;
+    if (g_hint_on && g_screen_y + 16 > fb_hint_y())
+        hint_retire();                  /* this line lands on the hint */
     g_screen_y = screen_draw_entry(e, g_screen_y);
 }
 
@@ -372,6 +408,8 @@ static void screen_render(void)
     for (u32 i = 0; i < g_log_n; i++)
         y = screen_draw_entry(&g_log[i], y);
     g_screen_y = y;
+    g_hint_on = 0;                      /* the clear took it too */
+    hint_draw();
     /* the clear above took the bar with it: put it back whole */
     fb_progress_full(progress_label(), progress_pct());
 }
@@ -2102,6 +2140,7 @@ static void test_settings_eeprom(void)
         }
         if (up) {
             g_mie_prog = 1;
+            hint_draw();                /* the buttons answer: say so */
             report_mie_inputs(in5);
         } else {
             scif_puts(S_MIE_NO_ANSWER);
@@ -3471,6 +3510,7 @@ static void suite_check_abort(void)
     progress_retire();                  /* nothing is being measured any more */
     progress_phase(PH_DONE);
     eta_finish();
+    hint_retire();
     scif_puts(S_SUITE_STOPPED);
     screen_render();
     if (a >= ABORT_ACT(1) && a <= ABORT_ACT(ACT_COUNT)) {
@@ -3670,6 +3710,7 @@ void cmain(void)
         scif_puts(S_VRAM_OK_MSG);
 
     eta_finish();
+    hint_retire();
     scif_puts(S_COMPLETE);
     say(CLIP_TESTS_DONE, REPORT_GAP_MS);
     scif_flush();
