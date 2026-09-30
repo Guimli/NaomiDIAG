@@ -1,5 +1,6 @@
 /* Compact SHA-1 (FIPS 180-1). 32-bit arithmetic only. */
 #include "sha1.h"
+#include "reloc.h"
 
 static inline u32 rol(u32 v, u32 n) { return (v << n) | (v >> (32 - n)); }
 
@@ -82,4 +83,14 @@ void sha1_final(sha1_ctx *c, u8 out[20])
         out[i * 4 + 2] = (u8)(c->h[i] >> 8);
         out[i * 4 + 3] = (u8)c->h[i];
     }
+}
+
+void sha1_update_cart(sha1_ctx *c, u32 len)
+{
+    u32 w[80];
+    u32 nl = c->len_lo + len;
+    if (nl < c->len_lo)
+        c->len_hi++;
+    c->len_lo = nl;
+    p_sha1_pio_blocks(c->h, len >> 6, w);
 }

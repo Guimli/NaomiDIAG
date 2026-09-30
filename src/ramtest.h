@@ -47,6 +47,8 @@ typedef struct {
 } find_ctx;
 u32 ram_find_pat_fast(const u32 *p, u32 n, find_ctx *c);
 u32 ram_find_prng_fast(const u32 *p, u32 n, find_ctx *c);
+/* SHA-1 of nblocks x 64 bytes read from the cartridge port (sha1.c) */
+void sha1_pio_blocks(u32 h[5], u32 nblocks, u32 w[80]);
 
 #define RAM_MAX_FAILS 8
 

@@ -179,6 +179,13 @@ take long enough that they have no business delaying the report.
     reported as *unknown content* rather than as faulty — it may simply be a
     dump this database does not carry — and the data-line test below still
     runs, because a dead line is one reason a known cart fails to match.
+    The SHA-1 rounds are written in SH-4 assembly (about 31 instructions per
+    byte, cartridge read included) and read the cartridge port directly;
+    they run cached from CPU RAM with the relocated memory-test loops.
+    **Without a proven CPU RAM block the content check is skipped** and the
+    serial log says so: from the EPROM it would take about 9 s per MB,
+    20 minutes for a typical game (132 MB) and over an hour for the largest
+    (512 MB). The security chip and data-line tests still run.
   - **ROM set completeness** — once the game is identified, the
     **whole set of chips that game needs** is checked: every mask ROM in the
     database entry is probed and the result is stated affirmatively

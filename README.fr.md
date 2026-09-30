@@ -195,6 +195,14 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
     cette base — et le test des lignes de données ci-dessous s'exécute quand
     même, une ligne morte étant l'une des raisons pour lesquelles une
     cartouche connue ne correspond plus.
+    Le calcul SHA-1 est écrit en assembleur SH-4 (environ 31 instructions
+    par octet, lecture de la cartouche comprise) et lit directement le port
+    de la cartouche ; il s'exécute en cache depuis la RAM CPU, avec les
+    boucles de test mémoire relogées. **Sans bloc de RAM CPU validé, la
+    vérification du contenu est sautée** et le log série l'indique : depuis
+    l'EPROM elle prendrait environ 9 s par Mo, 20 minutes pour un jeu moyen
+    (132 Mo) et plus d'une heure pour le plus gros (512 Mo). La puce de
+    sécurité et les lignes de données restent testées.
   - **Complétude du jeu de ROM** — une fois le jeu identifié,
     **l'ensemble des puces nécessaires à ce jeu** est vérifié : chaque mask
     ROM de la fiche de la base est sondée et le résultat est affirmé

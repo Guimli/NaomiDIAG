@@ -318,6 +318,9 @@
 #define S_EEPROM_MIE_NOTE   "  le programme MIE ne rend pas l'EEPROM\n"
 #define S_CART_HDR          "\nEn-tete cartouche : \""
 #define S_IDENTIFYING       "Identification"
+#define S_CART_NORELOC      "Contenu cartouche non verifie : aucune RAM CPU valide pour\n"\
+                            "  reloger le calcul SHA-1 (depuis l'EPROM : ~9 s par Mo,\n"\
+                            "  20 min pour un jeu moyen). Lignes de donnees seules.\n"
 #define S_CART_NOTINDB      "  cartouche absente de la base (inconnue ou 1ere IC corrompue)\n"
 #define S_IDENTIFIED        "  identifiee : "
 #define S_CART_NDEF_A       "  "
@@ -643,6 +646,9 @@
 #define S_EEPROM_MIE_NOTE   "  the MIE program did not return the EEPROM\n"
 #define S_CART_HDR          "\nCartridge header: \""
 #define S_IDENTIFYING       "Identifying"
+#define S_CART_NORELOC      "Cartridge content not checked: no good CPU RAM to relocate\n"\
+                            "  the SHA-1 rounds into (from the EPROM: ~9 s per MB,\n"\
+                            "  20 min for a typical game). Data lines only.\n"
 #define S_CART_NOTINDB      "  cartridge not in database (unknown or corrupted first IC)\n"
 #define S_IDENTIFIED        "  identified: "
 #define S_CART_NDEF_A       "  "

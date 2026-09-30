@@ -2249,22 +2249,20 @@ static const char *cart_label(const char *what, const char *icname)
     return g_cartbuf;
 }
 
+/* Cartridge bytes hashed per call of the assembly rounds: small enough to
+ * keep the progress bar moving, large enough that the call costs nothing. */
+#define CART_HASH_CHUNK 0x2000u
+
 static u32 sha1_ic(u32 offset, u32 size, u8 out[20])
 {
     sha1_ctx c;
-    u8 buf[512];
     sha1_init(&c);
     cart_seek(offset);
-    for (u32 done = 0; done < size; done += sizeof buf) {
-        for (u32 i = 0; i < sizeof buf; i += 2) {
-            u16 w = CART_ROM_DATA;
-            buf[i] = (u8)w;
-            buf[i + 1] = (u8)(w >> 8);
-        }
-        sha1_update(&c, buf, sizeof buf);
+    for (u32 done = 0; done < size; done += CART_HASH_CHUNK) {
         progress_tick(done);
         if ((done & 0x3FFFFF) == 0)
             scif_putc('.');
+        sha1_update_cart(&c, CART_HASH_CHUNK);
     }
     progress_end();
     sha1_final(&c, out);
@@ -2365,8 +2363,22 @@ static void test_cartridge(void)
     scif_puts("\"\n");
 
     /* identify: stream first IC, snapshot SHA1 at each known size */
+    /* Identifying the game and checking its content means hashing the whole
+     * cartridge: 132 MB for the median game in the database, 512 MB at most.
+     * The rounds cost about 31 instructions per byte; from the EPROM, at the
+     * 3.5 MIPS this ROM executes there, that is 9 s per megabyte -- twenty
+     * minutes for the median game, well over an hour for the largest, against
+     * about a minute run cached from CPU RAM. Without a proven CPU RAM block
+     * the content check is left out and says so; the per-line bus test below
+     * still runs, it only samples 1 MB. */
+    if (!reloc_active()) {
+        scif_puts(S_CART_NORELOC);
+        test_cart_pins();
+        return;
+    }
+
     sha1_ctx c;
-    u8 buf[512], digest[20];
+    u8 digest[20];
     u32 game = 0xFFFFFFFF;
     sha1_init(&c);
     cart_seek(0);
@@ -2377,13 +2389,8 @@ static void test_cartridge(void)
         u32 target = cartdb_first_sizes[s];
         while (done < target) {
             progress_tick(done);
-            for (u32 i = 0; i < sizeof buf; i += 2) {
-                u16 w = CART_ROM_DATA;
-                buf[i] = (u8)w;
-                buf[i + 1] = (u8)(w >> 8);
-            }
-            sha1_update(&c, buf, sizeof buf);
-            done += sizeof buf;
+            sha1_update_cart(&c, CART_HASH_CHUNK);
+            done += CART_HASH_CHUNK;
             if ((done & 0x3FFFFF) == 0)
                 scif_putc('.');
         }

@@ -502,5 +502,192 @@ _ram_find_prng_fast:
     rts
     mov.l   @r15+, r8
 
+! =============================================================================
+! SHA-1 over the cartridge, read straight from its PIO port.
+!
+! void sha1_pio_blocks(u32 h[5], u32 nblocks, u32 w[80])
+!   r4 = the five state words, updated in place
+!   r5 = number of 64-byte blocks to read from CART_ROM_DATA (0xA05F7008),
+!        which advances by itself on every 16-bit read
+!   r6 = an 80-word scratch area (the message schedule)
+!
+! The C version cost about 68 instructions per byte, from the EPROM: the
+! compiler picked the round function with branches, kept the round counter
+! in memory and made the 5-bit rotation out of five 1-bit ones. Here the
+! rounds are unrolled five at a time with the five variables changing
+! registers instead of being copied, the round function is branch-free, and
+! rol5 is two dynamic shifts: about 31 instructions per byte, cart read
+! included. It lives in the relocated block, so on a board with good CPU RAM
+! it runs cached; the cartridge check refuses to run without that.
+!
+! Registers in the rounds: a..e r8..r12, K r13, schedule walker r14,
+! shift counts r2 = 5 and r3 = -27, temporaries r0, r1, r7, group count r5.
+! =============================================================================
+    .macro  F_ch B, C, D            ! (B & C) | (~B & D) = D ^ (B & (C ^ D))
+    mov     \C, r0
+    xor     \D, r0
+    and     \B, r0
+    xor     \D, r0
+    .endm
+    .macro  F_par B, C, D           ! B ^ C ^ D
+    mov     \B, r0
+    xor     \C, r0
+    xor     \D, r0
+    .endm
+    .macro  F_maj B, C, D           ! (B & C) | (D & (B | C))
+    mov     \B, r0
+    or      \C, r0
+    and     \D, r0
+    mov     \B, r1
+    and     \C, r1
+    or      r1, r0
+    .endm
+    .macro  RND f, A, B, C, D, E    ! E += rol5(A) + f(B,C,D) + K + W; B = rol30(B)
+    mov.l   @r14+, r0
+    add     r13, \E
+    add     r0, \E
+    mov     \A, r1
+    shld    r2, r1
+    mov     \A, r7
+    shld    r3, r7
+    or      r7, r1
+    add     r1, \E
+    F_\f    \B, \C, \D
+    add     r0, \E
+    rotr    \B
+    rotr    \B
+    .endm
+    .macro  RND5 f                  ! five rounds bring the registers back
+    RND     \f, r8, r9, r10, r11, r12
+    RND     \f, r12, r8, r9, r10, r11
+    RND     \f, r11, r12, r8, r9, r10
+    RND     \f, r10, r11, r12, r8, r9
+    RND     \f, r9, r10, r11, r12, r8
+    .endm
+
+    .global _sha1_pio_blocks
+_sha1_pio_blocks:
+    mov.l   r8, @-r15
+    mov.l   r9, @-r15
+    mov.l   r10, @-r15
+    mov.l   r11, @-r15
+    mov.l   r12, @-r15
+    mov.l   r13, @-r15
+    mov.l   r14, @-r15
+    mov.l   r4, @-r15               ! @(4,r15): h
+    mov.l   r5, @-r15               ! @(0,r15): blocks left
+    tst     r5, r5
+    bf      .Lsblock
+    bra     .Lsdone
+    nop
+
+.Lsblock:
+    ! 16 message words, big-endian: each is two port reads, b0 b1 then b2 b3
+    mov.l   .Lsport, r1
+    mov     r6, r3
+    mov     #16, r2
+1:  mov.w   @r1, r0
+    extu.w  r0, r0
+    swap.b  r0, r0                  ! b0 << 8 | b1
+    shll16  r0
+    mov.w   @r1, r7
+    extu.w  r7, r7
+    swap.b  r7, r7                  ! b2 << 8 | b3
+    or      r7, r0
+    mov.l   r0, @r3
+    dt      r2
+    bf/s    1b
+    add     #4, r3
+
+    ! schedule: w[i] = rol1(w[i-3] ^ w[i-8] ^ w[i-14] ^ w[i-16]), i = 16..79
+    mov     r6, r7                  ! r7 = &w[i-16], r3 = &w[i]
+    mov     #64, r2
+2:  mov.l   @r7, r0
+    mov.l   @(8,r7), r1
+    xor     r1, r0
+    mov.l   @(32,r7), r1
+    xor     r1, r0
+    mov.l   @(52,r7), r1
+    xor     r1, r0
+    rotl    r0
+    mov.l   r0, @r3
+    add     #4, r3
+    dt      r2
+    bf/s    2b
+    add     #4, r7
+
+    mov.l   @(4,r15), r0
+    mov.l   @r0, r8
+    mov.l   @(4,r0), r9
+    mov.l   @(8,r0), r10
+    mov.l   @(12,r0), r11
+    mov.l   @(16,r0), r12
+    mov     r6, r14
+    mov     #5, r2
+    mov     #-27, r3
+
+    mov.l   .Lsk1, r13
+    mov     #4, r5
+3:  RND5    ch
+    dt      r5
+    bf      3b
+    mov.l   .Lsk2, r13
+    mov     #4, r5
+4:  RND5    par
+    dt      r5
+    bf      4b
+    mov.l   .Lsk3, r13
+    mov     #4, r5
+5:  RND5    maj
+    dt      r5
+    bf      5b
+    mov.l   .Lsk4, r13
+    mov     #4, r5
+6:  RND5    par
+    dt      r5
+    bf      6b
+
+    mov.l   @(4,r15), r0            ! h += a..e
+    mov.l   @r0, r1
+    add     r1, r8
+    mov.l   r8, @r0
+    mov.l   @(4,r0), r1
+    add     r1, r9
+    mov.l   r9, @(4,r0)
+    mov.l   @(8,r0), r1
+    add     r1, r10
+    mov.l   r10, @(8,r0)
+    mov.l   @(12,r0), r1
+    add     r1, r11
+    mov.l   r11, @(12,r0)
+    mov.l   @(16,r0), r1
+    add     r1, r12
+    mov.l   r12, @(16,r0)
+
+    mov.l   @r15, r5
+    dt      r5
+    mov.l   r5, @r15
+    bt      .Lsdone
+    bra     .Lsblock
+    nop
+
+.Lsdone:
+    add     #8, r15
+    mov.l   @r15+, r14
+    mov.l   @r15+, r13
+    mov.l   @r15+, r12
+    mov.l   @r15+, r11
+    mov.l   @r15+, r10
+    mov.l   @r15+, r9
+    rts
+    mov.l   @r15+, r8
+
+    .align 2
+.Lsport:    .long   0xA05F7008      ! CART_ROM_DATA, P2
+.Lsk1:      .long   0x5A827999
+.Lsk2:      .long   0x6ED9EBA1
+.Lsk3:      .long   0x8F1BBCDC
+.Lsk4:      .long   0xCA62C1D6
+
     .global _reloc_blk_end
 _reloc_blk_end:
