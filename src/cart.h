@@ -12,6 +12,13 @@
 
 void g1_bus_init(void);
 void cart_seek(u32 offset);
+
+/* G1 DMA of len bytes (multiple of 32) from the cartridge into system RAM
+ * at physical address phys. start returns 1 if the previous transfer never
+ * finished; wait returns 1 on a timeout (100 ms). */
+u32  cart_dma_start(u32 offset, u32 phys, u32 len);
+u32  cart_dma_wait(void);
+u32  cart_dma_busy(void);
 void cart_read(u32 offset, u8 *buf, u32 len);
 
 /* 1 if something answers with plausible data (not stuck all-0/all-1) */

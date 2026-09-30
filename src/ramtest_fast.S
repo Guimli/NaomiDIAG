@@ -506,10 +506,14 @@ _ram_find_prng_fast:
 ! SHA-1 over the cartridge, read straight from its PIO port.
 !
 ! void sha1_pio_blocks(u32 h[5], u32 nblocks, u32 w[80])
+! void sha1_mem_blocks(u32 h[5], u32 nblocks, u32 w[80], const u32 *src)
 !   r4 = the five state words, updated in place
-!   r5 = number of 64-byte blocks to read from CART_ROM_DATA (0xA05F7008),
-!        which advances by itself on every 16-bit read
+!   r5 = number of 64-byte blocks
 !   r6 = an 80-word scratch area (the message schedule)
+!   r7 = where the bytes come from: the PIO entry reads CART_ROM_DATA
+!        (0xA05F7008), which advances by itself on every 16-bit read; the
+!        memory entry reads a buffer the G1 DMA filled with the same bytes
+!        in the same order
 !
 ! The C version cost about 68 instructions per byte, from the EPROM: the
 ! compiler picked the round function with branches, kept the round counter
@@ -566,7 +570,10 @@ _ram_find_prng_fast:
     .endm
 
     .global _sha1_pio_blocks
+    .global _sha1_mem_blocks
 _sha1_pio_blocks:
+    mov     #0, r7                  ! no buffer: the port
+_sha1_mem_blocks:
     mov.l   r8, @-r15
     mov.l   r9, @-r15
     mov.l   r10, @-r15
@@ -574,18 +581,36 @@ _sha1_pio_blocks:
     mov.l   r12, @-r15
     mov.l   r13, @-r15
     mov.l   r14, @-r15
-    mov.l   r4, @-r15               ! @(4,r15): h
-    mov.l   r5, @-r15               ! @(0,r15): blocks left
+    mov.l   r4, @-r15               ! @(8,r15): h
+    mov.l   r5, @-r15               ! @(4,r15): blocks left
+    mov.l   r7, @-r15               ! @(0,r15): source buffer, 0 = port
     tst     r5, r5
     bf      .Lsblock
     bra     .Lsdone
     nop
 
 .Lsblock:
-    ! 16 message words, big-endian: each is two port reads, b0 b1 then b2 b3
-    mov.l   .Lsport, r1
     mov     r6, r3
     mov     #16, r2
+    mov.l   @r15, r1
+    tst     r1, r1
+    bt      .Lsport_rd
+    ! 16 message words from memory: little-endian there, b3 b2 b1 b0 once
+    ! loaded, turned big-endian
+0:  mov.l   @r1+, r0
+    swap.b  r0, r0
+    swap.w  r0, r0
+    swap.b  r0, r0
+    mov.l   r0, @r3
+    dt      r2
+    bf/s    0b
+    add     #4, r3
+    bra     .Lsched
+    mov.l   r1, @r15                ! where the next block starts
+
+.Lsport_rd:
+    ! 16 message words, big-endian: each is two port reads, b0 b1 then b2 b3
+    mov.l   .Lsport, r1
 1:  mov.w   @r1, r0
     extu.w  r0, r0
     swap.b  r0, r0                  ! b0 << 8 | b1
@@ -600,6 +625,7 @@ _sha1_pio_blocks:
     add     #4, r3
 
     ! schedule: w[i] = rol1(w[i-3] ^ w[i-8] ^ w[i-14] ^ w[i-16]), i = 16..79
+.Lsched:
     mov     r6, r7                  ! r7 = &w[i-16], r3 = &w[i]
     mov     #64, r2
 2:  mov.l   @r7, r0
@@ -616,7 +642,7 @@ _sha1_pio_blocks:
     bf/s    2b
     add     #4, r7
 
-    mov.l   @(4,r15), r0
+    mov.l   @(8,r15), r0
     mov.l   @r0, r8
     mov.l   @(4,r0), r9
     mov.l   @(8,r0), r10
@@ -647,7 +673,7 @@ _sha1_pio_blocks:
     dt      r5
     bf      6b
 
-    mov.l   @(4,r15), r0            ! h += a..e
+    mov.l   @(8,r15), r0            ! h += a..e
     mov.l   @r0, r1
     add     r1, r8
     mov.l   r8, @r0
@@ -664,15 +690,15 @@ _sha1_pio_blocks:
     add     r1, r12
     mov.l   r12, @(16,r0)
 
-    mov.l   @r15, r5
-    dt      r5
-    mov.l   r5, @r15
+    mov.l   @(4,r15), r0
+    dt      r0
+    mov.l   r0, @(4,r15)
     bt      .Lsdone
     bra     .Lsblock
     nop
 
 .Lsdone:
-    add     #8, r15
+    add     #12, r15
     mov.l   @r15+, r14
     mov.l   @r15+, r13
     mov.l   @r15+, r12

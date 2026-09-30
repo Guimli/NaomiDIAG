@@ -10,6 +10,7 @@ void (*p_ram_prng_verify_fast)(const u32 *, u32, prng_ctx *);
 u32  (*p_ram_find_pat_fast)(const u32 *, u32, find_ctx *);
 u32  (*p_ram_find_prng_fast)(const u32 *, u32, find_ctx *);
 void (*p_sha1_pio_blocks)(u32 *, u32, u32 *);
+void (*p_sha1_mem_blocks)(u32 *, u32, u32 *, const u32 *);
 
 static u32 g_active;
 static u32 g_p2_dest;        /* uncached address of the relocated block */
@@ -51,6 +52,7 @@ void reloc_init(void)
     p_ram_find_pat_fast    = ram_find_pat_fast;
     p_ram_find_prng_fast   = ram_find_prng_fast;
     p_sha1_pio_blocks      = sha1_pio_blocks;
+    p_sha1_mem_blocks      = sha1_mem_blocks;
     g_active = 0;
 }
 
@@ -116,6 +118,8 @@ u32 reloc_install(u32 p2_dest)
         (cached + ((u32)(char *)ram_find_prng_fast - (u32)reloc_blk_start));
     p_sha1_pio_blocks      = (void (*)(u32 *, u32, u32 *))
         (cached + ((u32)(char *)sha1_pio_blocks - (u32)reloc_blk_start));
+    p_sha1_mem_blocks      = (void (*)(u32 *, u32, u32 *, const u32 *))
+        (cached + ((u32)(char *)sha1_mem_blocks - (u32)reloc_blk_start));
     g_p2_dest = p2_dest;
     g_active = 1;
     return 1;

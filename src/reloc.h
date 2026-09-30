@@ -43,6 +43,8 @@ extern void (*p_ram_prng_verify_fast)(const u32 *base, u32 npairs,
 extern u32  (*p_ram_find_pat_fast)(const u32 *p, u32 n, find_ctx *c);
 extern u32  (*p_ram_find_prng_fast)(const u32 *p, u32 n, find_ctx *c);
 extern void (*p_sha1_pio_blocks)(u32 h[5], u32 nblocks, u32 w[80]);
+extern void (*p_sha1_mem_blocks)(u32 h[5], u32 nblocks, u32 w[80],
+                                 const u32 *src);
 
 void reloc_init(void);              /* point everything at the ROM copies */
 

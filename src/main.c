@@ -2253,17 +2253,105 @@ static const char *cart_label(const char *what, const char *icname)
  * keep the progress bar moving, large enough that the call costs nothing. */
 #define CART_HASH_CHUNK 0x2000u
 
+/* Reading the cartridge through the PIO port costs two G1 bus cycles per
+ * 32-bit word, about as long as the rounds that hash it. The G1 DMA fetches
+ * the next chunk into one buffer while the rounds hash the previous one out
+ * of the other, the way the DIMM test and the BIOS itself load data, so the
+ * bus and the CPU work at the same time. Two 8 KB buffers in main RAM, 4 MB
+ * in (the DIMM test's scratch, never in use at the same time), read by the
+ * rounds through P2 so they see what the DMA wrote. */
+#define CART_DMA_PHYS   0x0C400000u
+#define CART_DMA_BUF(i) ((volatile u32 *)(0xA0000000u | \
+                         (CART_DMA_PHYS + (i) * CART_HASH_CHUNK)))
+static u32 g_cart_dma;          /* the DMA path was proven on this cartridge */
+static u32 g_cart_t_dma, g_cart_t_pio;  /* one chunk each way, timer ticks */
+
+static void cart_hash_pio(sha1_ctx *c, u32 off, u32 len, u32 pbase)
+{
+    cart_seek(off);
+    for (u32 done = 0; done < len; done += CART_HASH_CHUNK) {
+        progress_tick(pbase + done);
+        if (((pbase + done) & 0x3FFFFF) == 0)
+            scif_putc('.');
+        sha1_update_cart(c, CART_HASH_CHUNK);
+    }
+}
+
+/* Hash [off, off + len) into c, progress counted from pbase. */
+static void cart_hash_range(sha1_ctx *c, u32 off, u32 len, u32 pbase)
+{
+    if (!g_cart_dma) {
+        cart_hash_pio(c, off, len, pbase);
+        return;
+    }
+    u32 cur = 0, done = 0;
+    if (cart_dma_start(off, CART_DMA_PHYS, CART_HASH_CHUNK))
+        goto lost;
+    for (; done < len; done += CART_HASH_CHUNK) {
+        progress_tick(pbase + done);
+        if (((pbase + done) & 0x3FFFFF) == 0)
+            scif_putc('.');
+        if (cart_dma_wait())
+            goto lost;
+        if (done + CART_HASH_CHUNK < len)
+            cart_dma_start(off + done + CART_HASH_CHUNK,
+                           CART_DMA_PHYS + (cur ^ 1) * CART_HASH_CHUNK,
+                           CART_HASH_CHUNK);
+        sha1_update_buf(c, (const void *)CART_DMA_BUF(cur), CART_HASH_CHUNK);
+        cur ^= 1;
+    }
+    return;
+lost:
+    /* a transfer never completed: finish this range, and the rest of the
+     * cartridge, through the port -- slower, same digests */
+    scif_puts(S_CART_DMA_LOST);
+    g_cart_dma = 0;
+    cart_hash_pio(c, off + done, len - done, pbase + done);
+}
+
+/* Before trusting the DMA path with a verdict: both buffers must hold what
+ * is written to them, and 8 KB fetched by DMA must equal the same 8 KB read
+ * through the port. Anything else -- a board that does not answer the DMA,
+ * a buffer cell that fails -- and the check runs on the port alone. */
+static u32 cart_dma_probe(void)
+{
+    volatile u32 *b = CART_DMA_BUF(0);
+    const u32 nw = 2 * CART_HASH_CHUNK / 4;
+    for (u32 pass = 0; pass < 2; pass++) {
+        u32 x = pass ? 0xFFFFFFFFu : 0;
+        for (u32 i = 0; i < nw; i++)
+            b[i] = (i * 0x9E3779B1u) ^ x;
+        for (u32 i = 0; i < nw; i++)
+            if (b[i] != ((i * 0x9E3779B1u) ^ x))
+                return 0;
+    }
+    for (u32 i = 0; i < CART_HASH_CHUNK / 4; i++)
+        b[i] = 0x5A5A5A5Au;
+    u32 t0 = timer_ticks();
+    if (cart_dma_start(0, CART_DMA_PHYS, CART_HASH_CHUNK) || cart_dma_wait())
+        return 0;
+    g_cart_t_dma = timer_ticks() - t0;
+    /* the port read is timed on its own, compared afterwards: the two
+     * figures go in the log, for the real speed of both paths */
+    u32 *pio = (u32 *)CART_DMA_BUF(1);
+    t0 = timer_ticks();
+    cart_seek(0);
+    for (u32 i = 0; i < CART_HASH_CHUNK / 4; i++) {
+        u32 lo = CART_ROM_DATA;
+        pio[i] = lo | ((u32)CART_ROM_DATA << 16);
+    }
+    g_cart_t_pio = timer_ticks() - t0;
+    for (u32 i = 0; i < CART_HASH_CHUNK / 4; i++)
+        if (b[i] != pio[i])
+            return 0;
+    return 1;
+}
+
 static u32 sha1_ic(u32 offset, u32 size, u8 out[20])
 {
     sha1_ctx c;
     sha1_init(&c);
-    cart_seek(offset);
-    for (u32 done = 0; done < size; done += CART_HASH_CHUNK) {
-        progress_tick(done);
-        if ((done & 0x3FFFFF) == 0)
-            scif_putc('.');
-        sha1_update_cart(&c, CART_HASH_CHUNK);
-    }
+    cart_hash_range(&c, offset, size, 0);
     progress_end();
     sha1_final(&c, out);
     return 0;
@@ -2344,6 +2432,43 @@ static void test_cart_pins(void)
     log_result(S_L_CART_PINS, CLIP_DATA_BUS, faults ? T_FAIL : T_OK, 0, 0);
 }
 
+/* Stream the first chip and snapshot the SHA-1 at every size a first chip
+ * has in the database: the game, or 0xFFFFFFFF. */
+static u32 cart_identify(void)
+{
+    sha1_ctx c;
+    u8 digest[20];
+    u32 game = 0xFFFFFFFF;
+    sha1_init(&c);
+    u32 done = 0;
+    scif_puts(S_IDENTIFYING);
+    progress_begin(S_P_CART_ID, cartdb_first_sizes[CARTDB_NFIRST - 1]);
+    for (u32 s = 0; s < CARTDB_NFIRST && game == 0xFFFFFFFF; s++) {
+        u32 target = cartdb_first_sizes[s];
+        cart_hash_range(&c, done, target - done, done);
+        done = target;
+        sha1_ctx snap;
+        {
+            const u8 *s = (const u8 *)&c;
+            u8 *d = (u8 *)&snap;
+            for (u32 i = 0; i < sizeof c; i++)
+                d[i] = s[i];
+        }
+        sha1_final(&snap, digest);
+        for (u32 g = 0; g < CARTDB_NGAMES; g++) {
+            u32 f = cartdb_game_first[g];
+            if (cartdb_ic_off[f] == 0 && cartdb_ic_size[f] == target &&
+                sha1_eq(digest, cartdb_sha1[f])) {
+                game = g;
+                break;
+            }
+        }
+    }
+    progress_end();
+    scif_puts("\n");
+    return game;
+}
+
 static void test_cartridge(void)
 {
     g1_bus_init();
@@ -2377,42 +2502,31 @@ static void test_cartridge(void)
         return;
     }
 
-    sha1_ctx c;
-    u8 digest[20];
-    u32 game = 0xFFFFFFFF;
-    sha1_init(&c);
-    cart_seek(0);
-    u32 done = 0;
-    scif_puts(S_IDENTIFYING);
-    progress_begin(S_P_CART_ID, cartdb_first_sizes[CARTDB_NFIRST - 1]);
-    for (u32 s = 0; s < CARTDB_NFIRST && game == 0xFFFFFFFF; s++) {
-        u32 target = cartdb_first_sizes[s];
-        while (done < target) {
-            progress_tick(done);
-            sha1_update_cart(&c, CART_HASH_CHUNK);
-            done += CART_HASH_CHUNK;
-            if ((done & 0x3FFFFF) == 0)
-                scif_putc('.');
-        }
-        sha1_ctx snap;
-        {
-            const u8 *s = (const u8 *)&c;
-            u8 *d = (u8 *)&snap;
-            for (u32 i = 0; i < sizeof c; i++)
-                d[i] = s[i];
-        }
-        sha1_final(&snap, digest);
-        for (u32 g = 0; g < CARTDB_NGAMES; g++) {
-            u32 f = cartdb_game_first[g];
-            if (cartdb_ic_off[f] == 0 && cartdb_ic_size[f] == target &&
-                sha1_eq(digest, cartdb_sha1[f])) {
-                game = g;
-                break;
-            }
+    g_cart_t_dma = g_cart_t_pio = 0;
+    g_cart_dma = cart_dma_probe();
+    scif_puts(g_cart_dma ? S_CART_DMA_ON : S_CART_DMA_OFF);
+    if (g_cart_t_pio) {
+        scif_puts(S_CART_8K_DMA);       /* 12.5 MHz ticks -> microseconds */
+        scif_putdec(udiv(g_cart_t_dma * 4u, 50u));
+        scif_puts(S_CART_8K_PIO);
+        scif_putdec(udiv(g_cart_t_pio * 4u, 50u));
+        scif_puts(S_CART_8K_US);
+    }
+
+    u32 game = cart_identify();
+    if (game == 0xFFFFFFFF && g_cart_dma) {
+        /* unknown through the DMA: before calling the content unknown,
+         * make sure the DMA path is not the one misreading it */
+        g_cart_dma = 0;
+        scif_puts(S_CART_RECHECK);
+        scif_puts("\n");
+        game = cart_identify();
+        if (game != 0xFFFFFFFF) {
+            scif_puts(S_CART_DMA_WRONG);
+            scif_puts("\n");
         }
     }
-    progress_end();
-    scif_puts("\n");
+    u8 digest[20];
 
     if (game == 0xFFFFFFFF) {
         scif_puts(S_CART_NOTINDB);
@@ -2468,6 +2582,20 @@ static void test_cartridge(void)
                        cartdb_ic_size[idx]);
         sha1_ic(cartdb_ic_off[idx], cartdb_ic_size[idx], digest);
         u32 ok = sha1_eq(digest, cartdb_sha1[idx]);
+        if (!ok && g_cart_dma) {
+            /* a bad chip is a verdict on the cartridge: make sure it is not
+             * the DMA path talking, by reading it again through the port */
+            g_cart_dma = 0;
+            scif_puts(S_CART_RECHECK);
+            progress_begin(cart_label(S_P_CART_IC, cartdb_ic_name[idx]),
+                           cartdb_ic_size[idx]);
+            sha1_ic(cartdb_ic_off[idx], cartdb_ic_size[idx], digest);
+            ok = sha1_eq(digest, cartdb_sha1[idx]);
+            if (ok)
+                scif_puts(S_CART_DMA_WRONG);    /* stays on the port */
+            else
+                g_cart_dma = 1;                 /* the chip, not the DMA */
+        }
         scif_puts(ok ? S_GOOD : S_BAD);
         if (!ok)
             bad++;

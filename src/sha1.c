@@ -94,3 +94,13 @@ void sha1_update_cart(sha1_ctx *c, u32 len)
     c->len_lo = nl;
     p_sha1_pio_blocks(c->h, len >> 6, w);
 }
+
+void sha1_update_buf(sha1_ctx *c, const void *src, u32 len)
+{
+    u32 w[80];
+    u32 nl = c->len_lo + len;
+    if (nl < c->len_lo)
+        c->len_hi++;
+    c->len_lo = nl;
+    p_sha1_mem_blocks(c->h, len >> 6, w, (const u32 *)src);
+}

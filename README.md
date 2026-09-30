@@ -186,6 +186,15 @@ take long enough that they have no business delaying the report.
     serial log says so: from the EPROM it would take about 9 s per MB,
     20 minutes for a typical game (132 MB) and over an hour for the largest
     (512 MB). The security chip and data-line tests still run.
+    The cartridge is read by **G1 DMA, double-buffered**: the next 8 KB
+    arrives in one buffer while the rounds hash the previous 8 KB from the
+    other, so the bus and the CPU work at the same time. The DMA path is
+    trusted only after 8 KB fetched by DMA match the same 8 KB read through
+    the port; a transfer that never completes switches to the port, and a
+    chip found bad (or a cart found unknown) through the DMA is read again
+    through the port before any verdict. The log gives the time of 8 KB
+    both ways. *Not yet validated on real hardware* (MAME models neither
+    speed).
   - **ROM set completeness** — once the game is identified, the
     **whole set of chips that game needs** is checked: every mask ROM in the
     database entry is probed and the result is stated affirmatively

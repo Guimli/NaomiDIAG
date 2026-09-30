@@ -318,6 +318,14 @@
 #define S_EEPROM_MIE_NOTE   "  le programme MIE ne rend pas l'EEPROM\n"
 #define S_CART_HDR          "\nEn-tete cartouche : \""
 #define S_IDENTIFYING       "Identification"
+#define S_CART_DMA_ON       "Lecture cartouche : DMA G1, double tampon\n"
+#define S_CART_DMA_OFF      "Lecture cartouche : port PIO (DMA G1 non conforme)\n"
+#define S_CART_8K_DMA       "  8 Ko par DMA G1 : "
+#define S_CART_8K_PIO       " us, par le port PIO : "
+#define S_CART_8K_US        " us\n"
+#define S_CART_DMA_LOST     " [DMA G1 muet, suite par le port PIO] "
+#define S_CART_RECHECK      " relecture par le port PIO"
+#define S_CART_DMA_WRONG    " [le DMA G1 lisait faux : port PIO desormais] "
 #define S_CART_NORELOC      "Contenu cartouche non verifie : aucune RAM CPU valide pour\n"\
                             "  reloger le calcul SHA-1 (depuis l'EPROM : ~9 s par Mo,\n"\
                             "  20 min pour un jeu moyen). Lignes de donnees seules.\n"
@@ -646,6 +654,14 @@
 #define S_EEPROM_MIE_NOTE   "  the MIE program did not return the EEPROM\n"
 #define S_CART_HDR          "\nCartridge header: \""
 #define S_IDENTIFYING       "Identifying"
+#define S_CART_DMA_ON       "Cartridge read: G1 DMA, double-buffered\n"
+#define S_CART_DMA_OFF      "Cartridge read: PIO port (G1 DMA check failed)\n"
+#define S_CART_8K_DMA       "  8 KB by G1 DMA: "
+#define S_CART_8K_PIO       " us, by the PIO port: "
+#define S_CART_8K_US        " us\n"
+#define S_CART_DMA_LOST     " [G1 DMA silent, PIO port from here] "
+#define S_CART_RECHECK      " re-read through the PIO port"
+#define S_CART_DMA_WRONG    " [G1 DMA read wrong: PIO port from now on] "
 #define S_CART_NORELOC      "Cartridge content not checked: no good CPU RAM to relocate\n"\
                             "  the SHA-1 rounds into (from the EPROM: ~9 s per MB,\n"\
                             "  20 min for a typical game). Data lines only.\n"

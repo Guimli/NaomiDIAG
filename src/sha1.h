@@ -17,5 +17,7 @@ void sha1_final(sha1_ctx *c, u8 out[20]);
  * from the cartridge port, which must already be positioned (cart_seek).
  * Runs the assembly rounds, relocated into CPU RAM when possible. */
 void sha1_update_cart(sha1_ctx *c, u32 len);
+/* Same, from bytes already in memory (a G1 DMA buffer); len as above. */
+void sha1_update_buf(sha1_ctx *c, const void *src, u32 len);
 
 #endif

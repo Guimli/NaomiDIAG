@@ -203,6 +203,15 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
     l'EPROM elle prendrait environ 9 s par Mo, 20 minutes pour un jeu moyen
     (132 Mo) et plus d'une heure pour le plus gros (512 Mo). La puce de
     sécurité et les lignes de données restent testées.
+    La cartouche est lue par **DMA G1 en double tampon** : les 8 Ko suivants
+    arrivent dans un tampon pendant que le calcul hache les 8 Ko précédents
+    dans l'autre, le bus et le CPU travaillent en même temps. Le chemin DMA
+    n'est retenu qu'après que 8 Ko lus par DMA sont identiques aux mêmes 8 Ko
+    lus par le port ; un transfert qui n'aboutit pas bascule sur le port, et
+    une puce trouvée mauvaise (ou une cartouche inconnue) par le DMA est
+    relue par le port avant tout verdict. Le log donne le temps de 8 Ko par
+    les deux voies. *Pas encore validé sur vrai matériel* (MAME ne simule
+    aucune des deux vitesses).
   - **Complétude du jeu de ROM** — une fois le jeu identifié,
     **l'ensemble des puces nécessaires à ce jeu** est vérifié : chaque mask
     ROM de la fiche de la base est sondée et le résultat est affirmé

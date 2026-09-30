@@ -1,5 +1,7 @@
 #include "cart.h"
 #include "progress.h"
+#include "dimm.h"           /* SB_GD* */
+#include "timer.h"
 
 /* G1 bus timing, with the values the original BIOS programs before it
  * touches the ROM board (0x5F7490/7494 <- 0x511, 0x5F74A0 <- 5). The exact
@@ -11,6 +13,47 @@ void g1_bus_init(void)
     REG32(0xA05F7490) = 0x00000511;
     REG32(0xA05F7494) = 0x00000511;
     REG32(0xA05F74A0) = 0x00000005;
+    /* G1 DMA protection: the range of system RAM the GD-DMA may write. The
+     * BIOS sets 0x8843007F (key 0x8843, the whole of it allowed) before any
+     * cartridge or DIMM transfer; left at its reset value, no DMA lands. */
+    REG32(0xA05F74B8) = 0x8843007Fu;
+}
+
+/* The G1 DMA from the ROM board, as the BIOS programs it to load a game:
+ * the board's DMA offset takes the same flags as the PIO one (auto-advance,
+ * linear M2 addressing), its count is in 32-byte units, and SB_GDDIR = 1
+ * brings the data into system RAM. MAME's M2 board reads the linear flag
+ * from the PIO offset, so that one is set too. */
+u32 cart_dma_busy(void)
+{
+    return SB_GDST & 1;
+}
+
+u32 cart_dma_wait(void)
+{
+    u32 t0 = timer_ticks();
+    while (SB_GDST & 1)
+        if (timer_ticks() - t0 > TIMER_HZ / 10)
+            return 1;                   /* 100 ms for 8 KB: it is not coming */
+    return 0;
+}
+
+u32 cart_dma_start(u32 offset, u32 phys, u32 len)
+{
+    if (cart_dma_wait())
+        return 1;
+    u16 hi = (u16)(((offset >> 16) & 0x1FFF) | 0xA000);
+    CART_ROM_OFFSETH = hi;
+    CART_ROM_OFFSETL = (u16)offset;
+    REG32(0xA05F7010) = offset & 0xFFFF;
+    REG32(0xA05F700C) = hi;
+    REG32(0xA05F7014) = len >> 5;
+    SB_GDSTAR = phys;
+    SB_GDLEN  = len;
+    SB_GDDIR  = 1;
+    SB_GDEN   = 1;
+    SB_GDST   = 1;
+    return 0;
 }
 
 void cart_seek(u32 offset)
