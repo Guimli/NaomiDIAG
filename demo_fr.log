@@ -70,8 +70,8 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:00:59.055] NVRAM sauvegarde (IC29, non destructif) + RTC AICA (IC33)...
 [00:00:59.316] NVRAM sauvegarde IC29 (intacte) ........ OK
 [00:01:04.938] RTC (AICA, doit avancer) ........ OK
-[00:01:08.600]   Lectures RTC : 2421763131 -> 2421763133 (+2 s)
-[00:01:08.813]   Date RTC : 2026-09-28 15:58:53 (avance)
+[00:01:08.600]   Lectures RTC : 2421892404 -> 2421892406 (+2 s)
+[00:01:08.813]   Date RTC : 2026-09-30 03:53:26 (avance)
 [00:01:09.003] Date RTC (2026 ou apres) ........ OK
 
 [00:01:09.210] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
@@ -103,7 +103,7 @@ OC-RAM CPU (cache en RAM, 2x4Ko) ........ OK
 [00:01:16.747] RAM son test cellules: OK
 [00:01:16.885] NVRAM sauvegarde IC29 (intacte): OK
 [00:01:17.055] RTC (AICA, doit avancer): OK
-[00:01:17.203] Date RTC (2026 ou apres): OK
+[00:01:17.202] Date RTC (2026 ou apres): OK
 [00:01:17.350] EEPROM serie (IC31, 93C46): OK
 [00:01:17.504] Integrite du code reloge en RAM: OK
 [00:01:17.674] RAM principale utilisable.

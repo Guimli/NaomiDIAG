@@ -280,24 +280,69 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
     if (y >= fb_report_ymax())
         return y;
 
-    fb_text(16, y, e->name, COL_WHITE, FB_STATUS_X);
     if (e->status == T_OK) {
+        fb_text(16, y, e->name, COL_WHITE, FB_STATUS_X);
         fb_text(FB_W - 16 * 3, y, S_SCR_OK, COL_GREEN, FB_W);
-    } else {
-        fb_text(FB_W - 16 * 6, y, S_SCR_FAIL, COL_RED, FB_W);
-        if (e->detail && e->comps && e->kind == LK_NONE) {
-            y += 20;
-            u32 x = 32;
-            const char *last = 0;
-            for (u32 b = 0; b < (e->comps == pvrb_comps ? 8u : 4u) && x < FB_W - 80; b++) {
-                if (!(e->detail & (1u << b)) || e->comps[b].name == last)
-                    continue;
-                last = e->comps[b].name;
-                fb_text(x, y, e->comps[b].name, COL_RED, FB_W);
-                x += 16 * 5;
+        return y + 20;
+    }
+
+    /* A failure names its chips on its own line, in red just before FAIL,
+     * rather than on a line of their own: a Naomi 2 report is one line
+     * short of the screen already. The label gives way to them. */
+    char chips[20];
+    u32 n = 0;
+    if (e->detail && e->comps && e->kind == LK_NONE) {
+        const char *last = 0;
+        u32 distinct = 0;
+        u32 ncomps = e->comps == pvrb_comps ? 8u : 4u;
+        for (u32 b = 0; b < ncomps; b++)
+            if ((e->detail & (1u << b)) && e->comps[b].name != last)
+                distinct++, last = e->comps[b].name;
+        last = 0;
+        for (u32 b = 0; b < ncomps; b++) {
+            if (!(e->detail & (1u << b)) || e->comps[b].name == last)
+                continue;
+            last = e->comps[b].name;
+            const char *s = e->comps[b].name;
+            u32 len = 0;
+            while (s[len])
+                len++;
+            if (n + len + (n ? 1 : 0) > 13) {   /* no room: how many */
+                n = 0;
+                chips[n++] = (char)('0' + distinct % 10);
+                for (const char *t = S_ADDR_CHIPS; *t && n < 19; t++)
+                    chips[n++] = *t;
+                break;
             }
+            if (n)
+                chips[n++] = ' ';
+            while (*s)
+                chips[n++] = *s++;
         }
     }
+    chips[n] = 0;
+    u32 fail_x = FB_W - 16 * 6;
+    u32 chips_x = n ? fail_x - 16 * (n + 1) : fail_x;
+    /* A label too long for the chips beside it drops its parenthesis --
+     * on the memories it lists the region's chips, which the red names
+     * now say better -- rather than being cut mid-word. */
+    const char *label = e->name;
+    char lbuf[40];
+    u32 llen = 0;
+    while (label[llen])
+        llen++;
+    if (16 + llen * 16 > chips_x - 16) {
+        u32 i = 0;
+        while (label[i] && i < sizeof lbuf - 1 &&
+               !(label[i] == ' ' && label[i + 1] == '('))
+            lbuf[i] = label[i], i++;
+        lbuf[i] = 0;
+        label = lbuf;
+    }
+    fb_text(16, y, label, COL_WHITE, chips_x - 16);
+    if (n)
+        fb_text(chips_x, y, chips, COL_RED, fail_x);
+    fb_text(fail_x, y, S_SCR_FAIL, COL_RED, FB_W);
     return y + 20;
 }
 
@@ -3591,7 +3636,9 @@ void cmain(void)
     if (reloc_active()) {
         u32 off, expect, got;
         if (reloc_verify(&off, &expect, &got)) {
-            log_result(S_L_RELOC_CHK, CLIP_NONE, T_OK, 0, 0);
+            /* Serial only while intact: the screen is a line short on a
+             * Naomi 2, and this one only matters when it fails. */
+            log_result_q(S_L_RELOC_CHK, CLIP_NONE, T_OK, 0, 0, 1, CLIP_NONE);
         } else {
             log_result(S_L_RELOC_CHK, CLIP_NONE, T_FAIL, 0, 0);
             scif_puts("  relocated code changed at offset ");

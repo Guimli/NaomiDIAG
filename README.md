@@ -151,7 +151,8 @@ are reported as they land.
 15. **Serial-number EEPROM** (IC31, 93C46 on SH-4 GPIO) — read + content
     check.
 16. **Relocated code integrity** — the relocated loops ran from the very RAM
-    under test, so they are read back and compared with the ROM copy.
+    under test, so they are read back and compared with the ROM copy. On
+    screen only when it fails; serial always.
 
 The **operator actions** are on the operator menu (see
 [Operator menu](#operator-menu)): they either write to something or
@@ -197,7 +198,10 @@ take long enough that they have no business delaying the report.
 
 RAM faults are reported per component: a bit mask, the affected data lanes,
 and the silkscreen IC designator (e.g. `CPU RAM 1 (IC9) DEFECTIVE`). VRAM and
-Elan RAM chips are named as a *suspect lane (chip or connections)*.
+Elan RAM chips are named as a *suspect lane (chip or connections)*. On screen
+the failing chips sit in red on the failure's own line, just before `FAIL`
+(`SDRAM cell test   IC9 IC12S FAIL`); a label too long to leave them room
+drops its parenthesis.
 
 A CPU RAM fault is also checked for a **cut data line**. Each failing bit is
 probed on 64 addresses spread over the tested region, on the word parity it

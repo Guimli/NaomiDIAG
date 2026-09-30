@@ -423,7 +423,8 @@ u32 fb_report_ymax(void)
 {
     if (g_banner)
         return BAR_Y - 4;               /* the banner keeps the bar's rows */
-    return g_bar_retired ? (FB_H - 8) : (BAR_Y - 30);
+    /* a line is 16 px high: the last one must start by FB_H - 16 */
+    return g_bar_retired ? (FB_H - 16) : (BAR_Y - 30);
 }
 
 /* The last line once the suite is over: white on blue, where the progress

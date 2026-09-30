@@ -166,7 +166,7 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
     contrôle du contenu.
 16. **Intégrité du code relogé** — les boucles relogées ont tourné depuis la
     RAM même qu'on testait : elles sont relues et comparées à la copie en
-    ROM.
+    ROM. À l'écran seulement en cas d'échec ; toujours sur le port série.
 
 Les **actions opérateur** sont au menu opérateur (voir
 [Menu opérateur](#menu-opérateur)) : soit elles écrivent quelque part,
@@ -216,7 +216,10 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
 Les pannes RAM sont rapportées par composant : masque de bits, voies de
 données concernées, et désignateur IC sérigraphié (ex.
 `RAM CPU 1 (IC9) DEFECTUEUX`). Les puces de VRAM et de RAM Elan sont
-désignées comme *voie suspecte (puce ou connexions)*.
+désignées comme *voie suspecte (puce ou connexions)*. À l'écran, les puces
+fautives s'affichent en rouge sur la ligne même de l'échec, juste avant
+`ECHEC` (`SDRAM test cellules   IC9 IC12S ECHEC`) ; un libellé trop long pour
+leur laisser la place perd sa parenthèse.
 
 Une panne de RAM CPU est aussi examinée pour une **ligne de données
 coupée**. Chaque bit fautif est sondé sur 64 adresses réparties dans la zone

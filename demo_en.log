@@ -70,19 +70,19 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:00:56.362] Backup NVRAM (IC29, non-destructive) + AICA RTC (IC33)...
 [00:00:56.613] Backup NVRAM IC29 (kept intact) ........ OK
 [00:01:02.065] RTC (AICA, must tick) ........ OK
-[00:01:05.589]   RTC reads: 2421763175 -> 2421763177 (+2 s)
-[00:01:05.789]   RTC date: 2026-09-28 15:59:37 (ticking)
+[00:01:05.589]   RTC reads: 2421892450 -> 2421892452 (+2 s)
+[00:01:05.789]   RTC date: 2026-09-30 03:54:12 (ticking)
 [00:01:05.979] RTC date (2026 or later) ........ OK
 
 [00:01:06.187] Serial EEPROM (93C46 on SH4 GPIO): "..                      " printable 46/128
 [00:01:06.498] Serial EEPROM (IC31, 93C46) ........ OK
 [00:01:09.858] Relocated code integrity ........ OK
 
-[00:01:10.039] ==== SUMMARY ====
+[00:01:10.038] ==== SUMMARY ====
 [00:01:10.150] CPU OC-RAM (SH-4 IC1): OK
 [00:01:10.288] VRAM framebuffer quick check: OK
 [00:01:10.448] Sound RAM clip zone quick check: OK
-[00:01:10.619] Board: Naomi 1 (837-13544): OK
+[00:01:10.618] Board: Naomi 1 (837-13544): OK
 [00:01:10.773] BIOS ROM (IC27) CRC32: OK
 [00:01:10.910] Test loops relocated to CPU RAM: OK
 [00:01:11.081] Maple bus / MIE (JVS): OK
@@ -94,7 +94,7 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:01:11.926] SDRAM cell test: OK
 [00:01:12.044] VRAM TEX0 data bus: OK
 [00:01:12.172] VRAM TEX0 address bus: OK
-[00:01:12.310] VRAM TEX0 (IC16/18/20/22): OK
+[00:01:12.309] VRAM TEX0 (IC16/18/20/22): OK
 [00:01:12.460] VRAM TEX1 data bus: OK
 [00:01:12.588] VRAM TEX1 address bus: OK
 [00:01:12.726] VRAM TEX1 (IC17S/19S/21S/23S): OK
@@ -102,12 +102,12 @@ CPU OC-RAM (cache as RAM, 2x4KB) ........ OK
 [00:01:13.017] Sound RAM address bus: OK
 [00:01:13.155] Sound RAM cell test: OK
 [00:01:13.286] Backup NVRAM IC29 (kept intact): OK
-[00:01:13.457] RTC (AICA, must tick): OK
+[00:01:13.456] RTC (AICA, must tick): OK
 [00:01:13.594] RTC date (2026 or later): OK
 [00:01:13.742] Serial EEPROM (IC31, 93C46): OK
 [00:01:13.899] Relocated code integrity: OK
 [00:01:14.046] Main RAM usable.
-[00:01:14.155] Sound RAM usable, audio reports active.
+[00:01:14.154] Sound RAM usable, audio reports active.
 [00:01:14.338] VRAM usable, on-screen report active.
 
 [00:01:14.522] *** DIAG COMPLETE ***
