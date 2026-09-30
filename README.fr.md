@@ -187,7 +187,8 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
 - **Cartouche** (`g`) :
   - **Puce de sécurité** (X76F100) — présence par response-to-reset.
   - **Contenu** — identifie le jeu dans une base embarquée de tous
-    les jeux cartouche Naomi/Naomi 2 connus (192 jeux, 2298 IC) et vérifie
+    les jeux cartouche Naomi/Naomi 2 connus (192 jeux plus une variante de
+    dump, 2318 IC) et vérifie
     chaque puce ROM par SHA-1, en nommant l'IC fautive par sa sérigraphie.
     L'identification lit la première puce en flux et prend un instantané du
     SHA-1 à chaque taille de première ROM connue : la cartouche est nommée
@@ -209,6 +210,13 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
     alors `SHA1 cartouche (RAM CPU HS)  NON TESTE` en orange et la voix
     annonce « Cartouche de jeu, contenu non vérifié, mémoire principale,
     défectueuse ».
+    Les puces sont nommées d'après les fichiers MAME, dont l'extension est
+    la position sérigraphiée (`mpr-23083.ic31` → IC31) ; `ic8.bin` donne
+    IC8, un `.18` seul donne IC18, et les cartouches développées par Namco
+    gardent leur position dans la grille du PCB (`maz1ma1.4m` → 4M). Une
+    puce que MAME charge deux fois n'est hachée qu'une fois, et un dump
+    alternatif (IC22 `_alt` de F355 Challenge 2) est un second contenu
+    connu pour cette puce.
     À l'écran, le jeu identifié a sa propre ligne, suivie de **toutes les
     puces du jeu, quatre par ligne** (`IC22 OK  IC1 HS  IC2 ABS …`) : OK en
     vert, HS (contenu faux) et ABS (muette, ou miroir d'une autre puce) en

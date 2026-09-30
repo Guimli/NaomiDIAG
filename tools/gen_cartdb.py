@@ -2,16 +2,45 @@
 """Generate src/cartdb.h: per-IC SHA1 database of every known Naomi/Naomi 2
 cartridge game, extracted from `mame -listxml` metadata.
 
-Usage: gen_cartdb.py <mamelist.xml> [out.h]
-(regenerate the XML with: mame -listxml > mamelist.xml)"""
+Usage: gen_cartdb.py <mamelist.xml | -> [out.h]
+("-" reads stdin: mame -listxml | gen_cartdb.py - src/cartdb.h, which
+spares writing the ~300 MB XML to disk)
+
+Chip names come from the MAME file names, whose extension is the chip's
+silkscreen position ("mpr-23083.ic31" -> ic31). The exceptions:
+  - "ic8.bin" (a few prototypes and later releases): the IC is the stem;
+  - "opr-24067.18" (Club Kart Prize): a bare number, "ic" is added;
+  - the Namco-developed carts ("maz1ma1.4m"): a PCB grid position,
+    kept as it is, since that is what the board shows.
+Two more MAME habits are folded:
+  - the same file loaded at two offsets (mvsc2's ic31) is one chip:
+    hashed once;
+  - an alternative dump at the same offset (f355twn2's "_alt" ic22) is a
+    second known content for that chip: the game is listed once more with
+    it, so either version identifies and verifies."""
+import re
 import sys
 import xml.etree.ElementTree as ET
 
 xml_path = sys.argv[1]
 out_path = sys.argv[2] if len(sys.argv) > 2 else "src/cartdb.h"
+src_xml = sys.stdin.buffer if xml_path == "-" else xml_path
+
+
+def ic_name(fname):
+    stem, _, ext = fname.rpartition(".")
+    if not stem:
+        return fname[:7]
+    if re.fullmatch(r"ic\d+s?", ext):
+        return ext
+    if ext == "bin" and re.fullmatch(r"ic\d+s?", stem):
+        return stem
+    if re.fullmatch(r"\d+s?", ext):
+        return "ic" + ext
+    return ext[:7]
 
 games = []
-for ev, el in ET.iterparse(xml_path, events=("end",)):
+for ev, el in ET.iterparse(src_xml, events=("end",)):
     if el.tag != "machine":
         continue
     src = el.get("sourcefile") or ""
@@ -24,18 +53,33 @@ for ev, el in ET.iterparse(xml_path, events=("end",)):
             continue
         if r.get("status") == "nodump":
             continue
-        name = r.get("name")
-        icname = name.rsplit(".", 1)[-1] if "." in name else name
         ics.append({
             "off": int(r.get("offset", "0"), 16),
             "size": int(r.get("size", "0")),
             "sha1": r.get("sha1"),
-            "ic": icname[:7],
+            "ic": ic_name(r.get("name")),
         })
     if ics:
         ics.sort(key=lambda x: x["off"])
+        # one chip mapped twice: keep its first appearance
+        seen, uniq = set(), []
+        for i in ics:
+            if (i["sha1"], i["ic"]) not in seen:
+                seen.add((i["sha1"], i["ic"]))
+                uniq.append(i)
+        # alternative dumps at one offset: a variant of the game per extra
+        base, alts = [], []
+        for i in uniq:
+            if base and base[-1]["off"] == i["off"] and base[-1]["size"] == i["size"]:
+                alts.append(i)
+            else:
+                base.append(i)
         desc = (el.findtext("description") or el.get("name"))[:31]
-        games.append({"name": el.get("name"), "desc": desc, "ics": ics})
+        games.append({"name": el.get("name"), "desc": desc, "ics": base})
+        for k, a in enumerate(alts):
+            var = [a if (i["off"] == a["off"]) else i for i in base]
+            games.append({"name": f'{el.get("name")}~{k}',
+                          "desc": desc[:25].rstrip() + " (alt)", "ics": var})
     el.clear()
 
 games.sort(key=lambda g: g["name"])

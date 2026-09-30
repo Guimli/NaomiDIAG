@@ -104,7 +104,7 @@ mieprog:
 
 # regenerate the cartridge SHA1 database (needs a mame -listxml dump)
 cartdb:
-	python3 tools/gen_cartdb.py mamelist.xml src/cartdb.h
+	mame -listxml | python3 tools/gen_cartdb.py - src/cartdb.h
 
 dis: $(ELF)
 	$(OBJDUMP) -d $< > $(ELF:.elf=.dis)

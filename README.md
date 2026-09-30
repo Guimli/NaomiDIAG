@@ -173,7 +173,8 @@ take long enough that they have no business delaying the report.
 - **Cartridge** (`g`):
   - **Security chip** (X76F100) — presence via response-to-reset.
   - **Content** — identifies the game against an embedded
-    database of every known Naomi/Naomi 2 cartridge (192 games, 2298 ICs)
+    database of every known Naomi/Naomi 2 cartridge (192 games plus one
+    alternative dump, 2318 ICs)
     and verifies each ROM chip by SHA-1, reporting the failing IC by its
     silkscreen name. Identification streams the first chip and snapshots the
     SHA-1 at each known first-ROM size, so a cart is named without hashing
@@ -192,6 +193,12 @@ take long enough that they have no business delaying the report.
     in amber and the speech says "Game cartridge, content not checked,
     main memory, defective". The security chip and data-line tests still
     run.
+    Chips are named after the MAME file names, whose extension is the
+    silkscreen position (`mpr-23083.ic31` → IC31); `ic8.bin` gives IC8,
+    a bare `.18` gives IC18, and the Namco-developed carts keep their PCB
+    grid position (`maz1ma1.4m` → 4M). A chip MAME maps twice is hashed
+    once, and an alternative dump (F355 Challenge 2's `_alt` IC22) is a
+    second known content for that chip.
     On screen, the identified game gets a line of its own, followed by
     **every chip of the game, four per row** (`IC22 OK  IC1 BAD  IC2 ABS
     …`): OK in green, BAD (wrong content) and ABS (silent, or mirroring
