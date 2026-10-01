@@ -56,7 +56,12 @@ all: $(BIN)
 
 # config stamp: objects carry no LANG/QUICK in their name, so force a
 # rebuild whenever the selected language or QUICK setting changes.
-STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)_A$(AUDIO)_B$(BAUD)$(subst -,,$(subst =,,$(CFLAGS_EXTRA)))
+# CFLAGS_EXTRA may hold several flags: their spaces become underscores, or
+# the stamp would be several targets and the extra words would be touched
+# as stray empty files in the tree (DSIM_LANE0x... and the like).
+empty :=
+space := $(empty) $(empty)
+STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)_A$(AUDIO)_B$(BAUD)$(subst $(space),_,$(subst -,,$(subst =,,$(strip $(CFLAGS_EXTRA)))))
 $(STAMP):
 	rm -f .build_* && touch $@
 
