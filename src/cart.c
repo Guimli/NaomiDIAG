@@ -3,16 +3,25 @@
 #include "dimm.h"           /* SB_GD* */
 #include "timer.h"
 
-/* G1 bus timing, with the values the original BIOS programs before it
- * touches the ROM board (0x5F7490/7494 <- 0x511, 0x5F74A0 <- 5). The exact
- * semantics are unverified and the BIOS writes them conditionally, on a
- * condition we have not identified -- but running the cartridge tests on a
- * completely unconfigured bus is worse. */
+/* G1 bus timing: the values the original BIOS (epr-21576h) leaves before
+ * it touches the ROM board, cartridge or DIMM alike, logged from it
+ * running under MAME. The ROM board lives where the Dreamcast has its
+ * GD-ROM drive, so its cycles follow G1GDRC/G1GDWC (0x5F74A0/A4).
+ *
+ * This used to write G1GDRC = 5 and leave G1GDWC, the system ROM and the
+ * flash timings at their reset values -- a misreading of the BIOS. MAME
+ * ignores G1 timings, so nothing showed it there; on a real board the
+ * DIMM's mailbox latches would not hold a write. */
 void g1_bus_init(void)
 {
-    REG32(0xA05F7490) = 0x00000511;
-    REG32(0xA05F7494) = 0x00000511;
-    REG32(0xA05F74A0) = 0x00000005;
+    REG32(0xA05F7480) = 0x00000600;     /* G1RRC  system ROM read  */
+    REG32(0xA05F7484) = 0x00000600;     /* G1RWC  system ROM write */
+    REG32(0xA05F7488) = 0x00000200;     /* G1FRC  flash read       */
+    REG32(0xA05F748C) = 0x00000200;     /* G1FWC  flash write      */
+    REG32(0xA05F7490) = 0x00000511;     /* G1CRC                   */
+    REG32(0xA05F7494) = 0x00000511;     /* G1CWC                   */
+    REG32(0xA05F74A0) = 0x00001006;     /* G1GDRC ROM board read   */
+    REG32(0xA05F74A4) = 0x00001006;     /* G1GDWC ROM board write  */
     /* G1 DMA protection: the range of system RAM the GD-DMA may write. The
      * BIOS sets 0x8843007F (key 0x8843, the whole of it allowed) before any
      * cartridge or DIMM transfer; left at its reset value, no DMA lands. */
