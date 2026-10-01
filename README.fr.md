@@ -808,7 +808,8 @@ Ce qui marche passe à côté, par le bus G1 :
   alors que le BIOS d'origine charge les cartouches avec `SB_GDDIR = 1`. Le
   compteur (0x5F7014) est en unités de 8 octets dans l'un, de 32 dans
   l'autre. L'action commence donc par **sonder la carte**, sans laisser de
-  trace : 1 Ko de l'image du jeu (à 1 Mo) est lu deux fois par le port PIO
+  trace : 1 Ko de l'image du jeu (à 1 Mo, ou au premier de quelques
+  emplacements qui contient de vraies données) est lu deux fois par le port PIO
   comme référence, puis chaque valeur de `SB_GDDIR` est essayée sur un
   tampon contenant un motif — le tampon devenu la référence est une
   lecture, le DIMM devenu le motif est une écriture, aussitôt défaite avec
@@ -818,9 +819,13 @@ Ce qui marche passe à côté, par le bus G1 :
   ecriture GDDIR=n ». Le test mémoire destructif (`0x01010101`,
   `0x10101010`, CRC-32, délai de garde d'une seconde) ne se lance qu'avec
   les deux sens établis et après SERVICE/START (TEST le passe) — il écrase
-  le jeu chargé. *Pas encore validé sur vrai matériel* : MAME ne fait pas
-  tourner un BIOS maison avec un DIMM, et ignore de toute façon le bit de
-  sens.
+  le jeu chargé. La présence se décide en écrivant deux motifs dans les
+  registres OFFSETL/PARAMETERL de la mailbox et en les relisant : après
+  un reset, la mailbox d'un DIMM lit 0xFFFF partout, exactement comme un
+  bus vide. *Pas encore validé sur vrai matériel* ; sous MAME (un jeu
+  GD-ROM avec NaomiDIAG à la place de l'epr-21576h de `naomigd.zip`,
+  `-bios bios2`) la carte est détectée et la sonde lit, mais MAME ignore
+  le bit de sens et ne peut pas montrer d'écriture.
 - **`f` — flash du firmware DIMM.** La flash s'atteint par le PIO ROM-board
   du G1 avec des commandes AMD. La ROM fait un read-ID, non destructeur, et
   propose un choix entre 3.17, 4.01 et 4.03. L'écran affiche le fabricant

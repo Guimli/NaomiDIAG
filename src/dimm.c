@@ -16,8 +16,26 @@ void dimm_probe(dimm_info *di)
     /* The BIOS's own test is the signature's high byte, 0x55. The mailbox
      * may well read all ones until a command is posted, so it was the wrong
      * thing to look at alone; it still counts if it answers. */
+    /* All ones proves nothing either way: the DIMM's mailbox comes out of
+     * reset at 0xFFFF in every register (MAME's naomigd models exactly
+     * that), which is also what an empty bus reads. What tells them apart
+     * is a register that holds what is written to it. OFFSETL and
+     * PARAMETERL are plain latches the firmware reads only once a command
+     * arrives -- COMMAND and STATUS, which do trigger things, are never
+     * written -- so two patterns go in and must come back, and the
+     * reset value is put back afterwards. */
+    static const u16 pat[2] = { 0x5AC3, 0xA53C };
+    di->latch = 1;
+    for (u32 i = 0; i < 2; i++) {
+        DIMM_OFFSETL = pat[i];
+        DIMM_PARAML  = (u16)~pat[i];
+        if (DIMM_OFFSETL != pat[i] || DIMM_PARAML != (u16)~pat[i])
+            di->latch = 0;
+    }
+    DIMM_OFFSETL = di->offsetl;
+    DIMM_PARAML  = di->paraml;
     di->present = ((di->signature & 0xFF00) == 0x5500) ||
-                  (di->command != 0xFFFF);
+                  (di->command != 0xFFFF) || di->latch;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -82,7 +100,6 @@ static u32 dimm_dma(u32 dimm_addr, u32 sysram_phys, u32 len, u32 dir)
 /* ------------------------------------------------------------------------- */
 /* Probe of the G1 DMA with the DIMM, leaving its SDRAM as it found it.       */
 
-#define PROBE_ADDR  0x00100000u         /* 1 MB into the game image */
 #define PROBE_LEN   1024u
 #define PROBE_NW    (PROBE_LEN / 4)
 #define PHYS_A      SCRATCH_PHYS_W                  /* original, by PIO    */
@@ -130,6 +147,7 @@ void dimm_g1_probe(dimm_g1_probe_result *r)
 {
     volatile u32 *a = P2(PHYS_A), *b = P2(PHYS_B), *d = P2(PHYS_D);
     r->pio_flags = 0;
+    r->addr = 0;
     r->dir_read = r->dir_write = DP_UNKNOWN;
     r->outcome[0] = r->outcome[1] = DP_NOT_RUN;
     r->restored = r->restore_failed = 0;
@@ -141,12 +159,20 @@ void dimm_g1_probe(dimm_g1_probe_result *r)
     /* 1. the reference: the same 1 KB twice through the PIO port, which
      *    must be stable and not a constant. Auto-advance alone first, then
      *    with the linear-mapping flag the cartridge code uses. */
+    /* The block is the first that holds real data: 1 MB in by preference,
+     * clear of the header, but a game can leave zeros there (MAME's
+     * Ikaruga does), so a few places are tried, the header last. */
     static const u16 flags[2] = { 0x8000, 0xA000 };
-    for (u32 f = 0; f < 2 && !r->pio_flags; f++) {
-        dimm_pio_read(PROBE_ADDR, a, PROBE_NW, flags[f]);
-        dimm_pio_read(PROBE_ADDR, d, PROBE_NW, flags[f]);
-        if (same(a, d) && plausible(a))
-            r->pio_flags = flags[f];
+    static const u32 where[6] = { 0x00100000, 0x00200000, 0x00400000,
+                                  0x00040000, 0x00010000, 0x00000000 };
+    for (u32 w = 0; w < 6 && !r->pio_flags; w++) {
+        r->addr = where[w];
+        for (u32 f = 0; f < 2 && !r->pio_flags; f++) {
+            dimm_pio_read(r->addr, a, PROBE_NW, flags[f]);
+            dimm_pio_read(r->addr, d, PROBE_NW, flags[f]);
+            if (same(a, d) && plausible(a))
+                r->pio_flags = flags[f];
+        }
     }
     if (!r->pio_flags)
         return;                         /* nothing to compare against */
@@ -160,11 +186,11 @@ void dimm_g1_probe(dimm_g1_probe_result *r)
         u32 dir = k ? 0u : 1u;
         for (u32 i = 0; i < PROBE_NW; i++)
             b[i] = probe_pat(i);
-        if (dimm_dma_n(PROBE_ADDR, PHYS_B, PROBE_LEN, dir, PROBE_LEN >> 5)) {
+        if (dimm_dma_n(r->addr, PHYS_B, PROBE_LEN, dir, PROBE_LEN >> 5)) {
             r->outcome[dir] = DP_TIMEOUT;
             continue;
         }
-        dimm_pio_read(PROBE_ADDR, d, PROBE_NW, r->pio_flags);
+        dimm_pio_read(r->addr, d, PROBE_NW, r->pio_flags);
         u32 dimm_same = same(d, a);
         if (dimm_same && same(b, a)) {
             r->outcome[dir] = DP_READ;
@@ -176,8 +202,8 @@ void dimm_g1_probe(dimm_g1_probe_result *r)
                 /* put the game data back: the reference, same direction */
                 for (u32 i = 0; i < PROBE_NW; i++)
                     b[i] = a[i];
-                dimm_dma_n(PROBE_ADDR, PHYS_B, PROBE_LEN, dir, PROBE_LEN >> 5);
-                dimm_pio_read(PROBE_ADDR, d, PROBE_NW, r->pio_flags);
+                dimm_dma_n(r->addr, PHYS_B, PROBE_LEN, dir, PROBE_LEN >> 5);
+                dimm_pio_read(r->addr, d, PROBE_NW, r->pio_flags);
                 if (same(d, a))
                     r->restored = 1;
                 else
@@ -201,7 +227,7 @@ void dimm_g1_probe(dimm_g1_probe_result *r)
     for (u32 c = 0; c < 2; c++) {
         for (u32 i = 0; i < PROBE_NW; i++)
             b[i] = probe_pat(i);
-        if (!dimm_dma_n(PROBE_ADDR, PHYS_B, PROBE_LEN, r->dir_read,
+        if (!dimm_dma_n(r->addr, PHYS_B, PROBE_LEN, r->dir_read,
                         PROBE_LEN >> shifts[c]) && same(b, a))
             r->cnt_ok[c] = 1;
     }
@@ -210,7 +236,7 @@ void dimm_g1_probe(dimm_g1_probe_result *r)
 
     /* 4. speed: one 32 KB read */
     u32 t0 = timer_ticks();
-    if (!dimm_dma(PROBE_ADDR, SCRATCH_PHYS_R, DIMM_DMA_BLK, r->dir_read))
+    if (!dimm_dma(r->addr, SCRATCH_PHYS_R, DIMM_DMA_BLK, r->dir_read))
         r->ticks_32k = timer_ticks() - t0;
 }
 

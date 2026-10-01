@@ -753,7 +753,7 @@ What does work goes around it, on the G1 bus:
   original BIOS loads cartridges with `SB_GDDIR = 1`. The count register
   (0x5F7014) is in 8-byte units in one, 32-byte units in the other. So the
   action first **probes the board**, without leaving a trace: 1 KB of the
-  game image (1 MB in) is read twice through the PIO port as a reference,
+  game image (1 MB in, or the first of a few places holding real data) is read twice through the PIO port as a reference,
   then each `SB_GDDIR` value is tried on a buffer holding a pattern — the
   buffer becoming the reference is a read, the DIMM becoming the pattern is
   a write, undone at once with the reference and checked. Then both count
@@ -762,8 +762,13 @@ What does work goes around it, on the G1 bus:
   GDDIR=n". Only with both directions established, and after SERVICE/START
   (TEST skips), does the destructive memory test run (`0x01010101`,
   `0x10101010`, CRC-32, one-second DMA timeout) — it overwrites the loaded
-  game. *Not validated on real hardware yet*: MAME cannot run a custom
-  BIOS with a DIMM, and ignores the direction bit anyway.
+  game. Presence is decided by writing two patterns into the mailbox's
+  OFFSETL/PARAMETERL latches and reading them back: a DIMM's mailbox reads
+  0xFFFF in every register after reset, exactly like an empty bus.
+  *Not validated on real hardware yet*; under MAME (a GD-ROM game with
+  NaomiDIAG staged as `naomigd.zip`'s epr-21576h, `-bios bios2`) the board
+  is found and the probe reads, but MAME ignores the direction bit and
+  cannot show a write.
 - **`f` — DIMM firmware flash.** The flash is reachable through the G1
   ROM-board PIO with AMD commands. The ROM performs a read-ID, which is
   non-destructive, and offers a 3.17 / 4.01 / 4.03 selection. The screen

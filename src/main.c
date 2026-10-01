@@ -1932,6 +1932,8 @@ static void dimm_probe_report(const dimm_g1_probe_result *r)
     }
     scif_puts(S_DP_PIO);
     scif_puthex(r->pio_flags);
+    scif_puts(S_DP_AT);
+    scif_puthex(r->addr);
     scif_puts("\n");
     for (u32 dir = 0; dir < 2; dir++) {
         scif_puts(S_DP_DIR);
@@ -1955,7 +1957,7 @@ static void dimm_probe_report(const dimm_g1_probe_result *r)
         /* 32 KB in t ticks of 12.5 MHz: KB/s = 32 * 12500000 / t */
         scif_puts(S_DP_SPEED);
         scif_putdec(udiv(400000000u, r->ticks_32k));
-        scif_puts(" Ko/s\n");
+        scif_puts(S_DP_KBS);
     }
     if (r->dir_read != DP_UNKNOWN)
         dimm_dir_line(0, S_L_DP_READ, r->dir_read);
@@ -2022,7 +2024,7 @@ static void test_dimm(void)
     scif_puthex(di.status);
     scif_puts(S_DIMM_SIG);
     scif_puthex(di.signature);
-    scif_puts("\n");
+    scif_puts(di.latch ? S_DIMM_LATCH_OK : S_DIMM_LATCH_KO);
 
     if (!di.present) {
         log_result(S_L_DIMM_ABSENT, CLIP_NONE, T_OK, 0, 0);

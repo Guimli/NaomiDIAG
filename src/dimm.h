@@ -20,6 +20,7 @@
 
 typedef struct {
     u16 command, offsetl, paraml, paramh, status, signature;
+    u32 latch;          /* offsetl/parameterl held two written patterns */
     u32 present;
 } dimm_info;
 
@@ -75,7 +76,8 @@ void dimm_mem_test(u32 span, u32 pattern, dimm_mem_result *r,
  * direction bit (the DIMM notes: 0 reads; the BIOS cartridge loader: 1
  * reads) and on the count's unit (8 or 32 bytes).
  *
- * On 1 KB of the game image, 1 MB in: the reference read twice through
+ * On 1 KB of the game image (1 MB in, or the first of a few places that
+ * holds real data): the reference read twice through
  * the PIO port, then each SB_GDDIR value tried on a buffer holding a
  * pattern. The buffer becoming the reference is a read; the DIMM becoming
  * the pattern is a write, undone at once with the reference and checked.
@@ -89,6 +91,7 @@ void dimm_mem_test(u32 span, u32 pattern, dimm_mem_result *r,
 #define DP_ODD      5       /* something moved, not the expected way */
 #define DP_UNKNOWN  0xFFu
 typedef struct {
+    u32 addr;               /* DIMM offset of the 1 KB used            */
     u32 pio_flags;          /* PIO offset flags that read it, 0 = none */
     u32 outcome[2];         /* DP_* per SB_GDDIR value                 */
     u32 dir_read, dir_write;/* SB_GDDIR values, or DP_UNKNOWN          */
