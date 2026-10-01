@@ -14,9 +14,12 @@
 #define DIMM_PARAML     REG16(0xA05F7044)
 #define DIMM_PARAMH     REG16(0xA05F7048)
 #define DIMM_STATUS     REG16(0xA05F704C)
+/* The DIMM's signature: the BIOS takes the board as present when the high
+ * byte reads 0x55 (epr-21576h, 0xA0032F74 and 0xA0034080). */
+#define DIMM_SIGNATURE  REG16(0xA05F7034)
 
 typedef struct {
-    u16 command, offsetl, paraml, paramh, status;
+    u16 command, offsetl, paraml, paramh, status, signature;
     u32 present;
 } dimm_info;
 

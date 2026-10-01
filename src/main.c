@@ -2020,6 +2020,8 @@ static void test_dimm(void)
     scif_puthex(di.paramh);
     scif_putc(' ');
     scif_puthex(di.status);
+    scif_puts(S_DIMM_SIG);
+    scif_puthex(di.signature);
     scif_puts("\n");
 
     if (!di.present) {

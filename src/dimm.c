@@ -12,8 +12,12 @@ void dimm_probe(dimm_info *di)
     di->paraml  = DIMM_PARAML;
     di->paramh  = DIMM_PARAMH;
     di->status  = DIMM_STATUS;
-    /* all-ones on the command register = no board driving the bus */
-    di->present = (di->command != 0xFFFF);
+    di->signature = DIMM_SIGNATURE;
+    /* The BIOS's own test is the signature's high byte, 0x55. The mailbox
+     * may well read all ones until a command is posted, so it was the wrong
+     * thing to look at alone; it still counts if it answers. */
+    di->present = ((di->signature & 0xFF00) == 0x5500) ||
+                  (di->command != 0xFFFF);
 }
 
 /* ------------------------------------------------------------------------- */
