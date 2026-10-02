@@ -177,6 +177,14 @@ take long enough that they have no business delaying the report.
   START stops the loop (key `a` on the console when the MIE program is not
   running). The CPU RAM loop stops below the 8 KB block the relocated code
   runs from.
+- **Serial monitor** (`!` on the console, from the menu or the idle
+  screen) — `r b|w|l ADDR [N]` reads, `w b|w|l ADDR VAL` writes any
+  address (P2 alias for registers, e.g. `A05F703C`), `u [BITS]` runs the
+  G1 unlock in parts (bit 0 G1RRC = 0x700, bit 1 the 0x5F74E4 key, bit 2
+  2 MB read through P2, bit 3 the BIOS's P1 read), `x` the X76F100
+  response-to-reset, `d` the DIMM probe, `q` returns. It lets a hardware
+  question be put to a real board without burning an EPROM per guess; a
+  wild address ends in the CPU exception report.
 - **DIMM board** (`d`) — register dump and read stability, then the
   destructive SDRAM test over the G1 DMA; `f` identifies the DIMM's firmware
   flash (see [DIMM board](#dimm-board)).

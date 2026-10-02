@@ -192,6 +192,15 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
   qu'elle teste celle où elle se trouve. TEST ou START arrête la boucle
   (touche `a` sur la console si le programme du MIE ne tourne pas). La
   boucle RAM CPU s'arrête sous le bloc de 8 Ko où tourne le code relogé.
+- **Moniteur série** (`!` sur la console, depuis le menu ou l'écran
+  d'attente) — `r b|w|l ADR [N]` lit, `w b|w|l ADR VAL` écrit n'importe
+  quelle adresse (alias P2 pour les registres, par ex. `A05F703C`),
+  `u [BITS]` lance le déverrouillage G1 par morceaux (bit 0 G1RRC = 0x700,
+  bit 1 la clé 0x5F74E4, bit 2 lecture de 2 Mo par P2, bit 3 la lecture P1
+  du BIOS), `x` la réponse au reset de la X76F100, `d` la sonde DIMM, `q`
+  revient. Il permet de poser une question matérielle à une vraie carte
+  sans graver une EPROM par essai ; une adresse farfelue finit sur le
+  rapport d'exception CPU.
 - **Carte DIMM** (`d`) — vidage des registres et contrôle de stabilité en
   lecture, puis le test destructif de la SDRAM par DMA G1 ; `f` identifie
   la flash du firmware DIMM (voir [Carte DIMM](#carte-dimm)).

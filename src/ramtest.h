@@ -53,6 +53,7 @@ void sha1_pio_blocks(u32 h[5], u32 nblocks, u32 w[80]);
 u32  crc32_rom_block(const u32 *src, u32 nquads, u32 crc);
 /* open the G1 bus to the ROM board (Holly's GD-ROM bus lock) */
 void g1_unlock(void);
+void g1_unlock_v(u32 flags);   /* parts of it, for the serial monitor */
 void sha1_mem_blocks(u32 h[5], u32 nblocks, u32 w[80], const u32 *src);
 
 #define RAM_MAX_FAILS 8

@@ -3505,6 +3505,7 @@ static void menu_draw(u32 sel)
 }
 
 static void run_action(u32 act);
+static void monitor_run(void);
 
 /* TEST steps through the entries and wraps at the end; SERVICE runs the one
  * shown. A serial key jumps straight to its action without the menu. */
@@ -3525,6 +3526,8 @@ static void menu_run(void)
             } else if (ev.kind == INPUT_KEY) {
                 if (ev.key == 'h' || ev.key == 'H') {
                     scif_puts(S_HELP);
+                } else if (ev.key == '!') {
+                    monitor_run();
                 } else {
                     for (u32 i = 0; i < ACT_COUNT; i++) {
                         if (ev.key == menu_key[i]) {
@@ -4066,6 +4069,136 @@ static void idle_screen(void)
     fb_banner(S_IDLE_BANNER);
 }
 
+/* ---- serial monitor ----------------------------------------------------
+ * '!' on the console, from the menu or the idle screen. Reads and writes
+ * any address and runs the G1 unlock in parts, so a hardware question can
+ * be put to a real board without burning an EPROM for each guess. Lines:
+ *   r b|w|l ADDR [N]    read N bytes/words/longs (hex), 8 per line
+ *   w b|w|l ADDR VAL    write
+ *   u [FLAGS]           G1 unlock, g1_unlock_v bits (default F)
+ *   x                   X76F100 response-to-reset (board-ID register)
+ *   d                   DIMM mailbox, signature and latch probe
+ *   q                   back
+ * Addresses are raw: give the P2 alias (A05F703C) for a register. A bad
+ * one ends in the CPU exception report, as any other wild access would. */
+static u32 mon_hex(const char **s, u32 *v)
+{
+    while (**s == ' ')
+        (*s)++;
+    u32 n = 0, r = 0;
+    for (;;) {
+        char c = **s;
+        u32 d;
+        if (c >= '0' && c <= '9') d = (u32)(c - '0');
+        else if (c >= 'a' && c <= 'f') d = (u32)(c - 'a' + 10);
+        else if (c >= 'A' && c <= 'F') d = (u32)(c - 'A' + 10);
+        else break;
+        r = (r << 4) | d;
+        n++;
+        (*s)++;
+    }
+    *v = r;
+    return n != 0;
+}
+
+static u32 mon_line(char *buf, u32 max)
+{
+    u32 n = 0;
+    for (;;) {
+        input_event ev;
+        if (input_poll(&ev) && ev.kind == INPUT_KEY) {
+            int c = ev.key;
+            if (c == '\r' || c == '\n') {
+                scif_puts("\n");
+                buf[n] = 0;
+                return n;
+            }
+            if ((c == 8 || c == 127) && n) {
+                n--;
+                scif_puts("\b \b");
+            } else if (c >= 32 && c < 127 && n < max - 1) {
+                buf[n++] = (char)c;
+                scif_putc((char)c);
+            }
+        }
+        progress_heartbeat();
+    }
+}
+
+static void monitor_run(void)
+{
+    char line[64];
+    scif_puts(S_MON_HELP);
+    for (;;) {
+        scif_puts("mon> ");
+        mon_line(line, sizeof line);
+        const char *s = line;
+        while (*s == ' ')
+            s++;
+        char cmd = *s ? *s++ : 0;
+        if (cmd == 'q' || cmd == 'Q')
+            return;
+        if (cmd == 'r' || cmd == 'w') {
+            while (*s == ' ')
+                s++;
+            char sz = *s ? *s++ : 0;
+            u32 addr, v = 1;
+            if ((sz != 'b' && sz != 'w' && sz != 'l') || !mon_hex(&s, &addr)) {
+                scif_puts(S_MON_ERR);
+                continue;
+            }
+            u32 step = sz == 'b' ? 1 : sz == 'w' ? 2 : 4;
+            if (cmd == 'w') {
+                if (!mon_hex(&s, &v)) {
+                    scif_puts(S_MON_ERR);
+                    continue;
+                }
+                if (step == 1) *(volatile u8 *)addr = (u8)v;
+                else if (step == 2) *(volatile u16 *)addr = (u16)v;
+                else *(volatile u32 *)addr = v;
+                continue;
+            }
+            if (!mon_hex(&s, &v))
+                v = 1;
+            for (u32 i = 0; i < v; i++) {
+                u32 a = addr + i * step;
+                if ((i & 7) == 0) {
+                    if (i)
+                        scif_puts("\n");
+                    scif_puthex(a);
+                    scif_puts(":");
+                }
+                scif_putc(' ');
+                if (step == 1) scif_puthex(*(volatile u8 *)a);
+                else if (step == 2) scif_puthex(*(volatile u16 *)a);
+                else scif_puthex(*(volatile u32 *)a);
+            }
+            scif_puts("\n");
+        } else if (cmd == 'u' || cmd == 'U') {
+            u32 f;
+            if (!mon_hex(&s, &f))
+                f = 0xF;
+            p_g1_unlock_v(f);
+            scif_puts(S_MON_DONE);
+        } else if (cmd == 'x' || cmd == 'X') {
+            scif_puthex(x76f100_rtr());
+            scif_puts("\n");
+        } else if (cmd == 'd' || cmd == 'D') {
+            dimm_info di;
+            dimm_probe(&di);
+            scif_puthex(di.command); scif_putc(' ');
+            scif_puthex(di.offsetl); scif_putc(' ');
+            scif_puthex(di.paraml); scif_putc(' ');
+            scif_puthex(di.paramh); scif_putc(' ');
+            scif_puthex(di.status); scif_puts(" sig ");
+            scif_puthex(di.signature);
+            scif_puts(di.latch ? " latch OK\n" : " latch --\n");
+        } else if (cmd) {
+            scif_puts(S_MON_HELP);
+        }
+    }
+}
+
 static void console_idle(void)
 {
     idle_screen();
@@ -4080,6 +4213,8 @@ static void console_idle(void)
             } else if (ev.kind == INPUT_KEY) {
                 if (ev.key == 'h' || ev.key == 'H') {
                     scif_puts(S_HELP);
+                } else if (ev.key == '!') {
+                    monitor_run();
                 } else {
                     for (u32 i = 0; i < ACT_COUNT; i++) {
                         if (ev.key == menu_key[i]) {

@@ -830,25 +830,53 @@ _crc32_rom_block:
 ! (P1, from 0x100); the loops run from the relocated block so no
 ! instruction fetch from the EPROM comes in between.
 ! =============================================================================
+!
+! void g1_unlock_v(u32 flags) -- the same in parts, for the serial monitor:
+!   bit 0  G1RRC (0x5F7480) = 0x700 first, as the BIOS's first instruction
+!   bit 1  the key, 0x001FFFFF to 0x5F74E4
+!   bit 2  2 MB read through P2 (uncached) from 0xA0000000
+!   bit 3  the BIOS's read: 0x7FFC0 words through P1 from 0x80000100
+! g1_unlock() is all four.
     .global _g1_unlock
+    .global _g1_unlock_v
 _g1_unlock:
+    mov     #15, r4
+_g1_unlock_v:
+    mov     r4, r6
+    mov     #1, r0
+    tst     r0, r6
+    bt      3f
+    mov.l   .Lg1rrc, r1
+    mov.w   .Lg1700, r2
+    mov.l   r2, @r1
+3:  mov     #2, r0
+    tst     r0, r6
+    bt      4f
     mov.l   .Lg1key, r2
     mov.l   .Lg1reg, r1
     mov.l   r2, @r1
+4:  mov     #4, r0
+    tst     r0, r6
+    bt      5f
     mov.l   .Lg1rom, r4
     mov.l   .Lg1cnt, r5
 1:  mov.l   @r4+, r0
     dt      r5
     bf      1b
-    ! then exactly what the BIOS reads: from 0x100, through P1
+5:  mov     #8, r0
+    tst     r0, r6
+    bt      6f
     mov.l   .Lg1bios, r4
     mov.l   .Lg1bcnt, r5
 2:  mov.l   @r4+, r0
     dt      r5
     bf      2b
-    rts
+6:  rts
     nop
     .align 2
+.Lg1700:    .word   0x0700
+    .align 2
+.Lg1rrc:    .long   0xA05F7480
 .Lg1key:    .long   0x001FFFFF
 .Lg1reg:    .long   0xA05F74E4
 .Lg1rom:    .long   0xA0000000
