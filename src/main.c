@@ -403,6 +403,7 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
 #define COL_HINT    RGB565(10, 40, 31)
 
 static u32 g_hint_on, g_hint_done;
+static u32 g_keys_box_shown;            /* console reminder printed once */
 
 static void hint_hide(void)
 {
@@ -2435,6 +2436,14 @@ static void test_settings_eeprom(void)
             g_mie_prog = 1;
             hint_draw();                /* the buttons answer: say so */
             report_mie_inputs(in5);
+            /* The same moment on the console, framed so it does not drown
+             * in the log: the board's buttons work, which also means the
+             * CPU RAM block was proven, the loops relocated and the G1 bus
+             * opened -- everything the menu actions behind a and h need. */
+            if (!g_keys_box_shown) {
+                g_keys_box_shown = 1;
+                scif_puts(S_KEYS_BOX);
+            }
         } else {
             scif_puts(S_MIE_NO_ANSWER);
         }
@@ -4343,7 +4352,6 @@ void cmain(void)
      * declared the register until now, never wrote it. */
     DMAOR = 0x00008201;
     scif_puts(S_SCIF_UP);
-    scif_puts(S_KEYS_BOX);              /* framed: it must not drown in the log */
 
     /* crt0 already proved OC-RAM works, put it in the log.
      * A failure here means the SH4 itself (IC designator TBD) is dead —
