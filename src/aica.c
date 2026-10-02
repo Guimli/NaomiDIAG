@@ -121,6 +121,35 @@ void aica_arm_park(void)
 #endif
 }
 
+u32 aram_rd(u32 off)
+{
+    g2_fifo_wait();
+    return REG32(ARAM_P2_BASE + off);
+}
+
+void aram_wr(u32 off, u32 v)
+{
+    g2_fifo_wait();
+    REG32(ARAM_P2_BASE + off) = v;
+}
+
+u32 aica_arm_load(const u32 *prog, u32 nwords)
+{
+    for (u32 i = 0; i < nwords; i++)
+        aram_wr(i << 2, prog[i]);
+    for (u32 i = 0; i < nwords; i++)
+        if (aram_rd(i << 2) != prog[i])
+            return 1;
+    return 0;
+}
+
+void aica_arm_release(void)
+{
+    g2_fifo_wait();
+    AICA_ARMRST = 0;
+    g2_fifo_wait();
+}
+
 /* Back into reset. Mandatory before anything overwrites sound RAM offset 0:
  * the ARM would carry on fetching from it and execute whatever the test just
  * wrote there. */

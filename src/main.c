@@ -31,6 +31,7 @@
 #include "strings.h"
 #include "audio_clips.h"
 #include "cartdb.h"
+#include "arm_prog.h"
 #include "progress.h"
 #include "reloc.h"
 #include "input.h"
@@ -1454,6 +1455,153 @@ static u32 test_sdram_cells(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* ---- the AICA's ARM7, and the sound RAM tested through it -------------
+ * Same plan as the CPU RAM and its relocated loops: the SH-4 proves a small
+ * window (ARM_WINDOW, 16 KB at sound RAM 0), loads arm/aica_arm_test.S
+ * there and lets the ARM7 out of reset. The ARM tests itself on that
+ * window alone (registers, banked registers, ALU and multiplier, byte and
+ * word access, a timed loop), then the rest of the 8 MB with the SH-4's
+ * patterns, from its own side of the memory bus instead of one G2 access at
+ * a time. The SH-4 only reads the mailbox and keeps the time.
+ * Returns 1 with res filled for [ARM_WINDOW, len), 0 if the ARM path is not
+ * usable (the caller runs its own cell test), 2 on an operator abort. */
+static u32 arm_word(u32 off) { return aram_rd(ARMB + off); }
+
+static void arm_report_fail(const char *why, u32 code)
+{
+    scif_puts(why);
+    if (code) {
+        scif_puthex(code);
+        scif_puts("\n");
+    }
+    log_result(S_L_ARM7, CLIP_ARM7, T_FAIL, 0, 0);
+}
+
+static u32 arm_aram_test(u32 len, ram_result *res)
+{
+    ram_result w;
+    ram_result_clear(&w);
+    scif_puts(S_ARM_WINDOW);
+    aram_test_pattern(0, ARM_WINDOW, 0x55555555, &w);
+    aram_test_pattern(0, ARM_WINDOW, 0xAAAAAAAA, &w);
+    aram_test_prng(0, ARM_WINDOW, 0x5EED0A12, &w);
+    if (progress_aborted())
+        return 2;
+    if (w.errors || aica_arm_load(arm_prog, ARM_PROG_WORDS)) {
+        scif_puts(S_ARM_WIN_BAD);
+        log_result(S_L_ARM7_SKIP, CLIP_NONE, T_SKIP, 0, 0);
+        return 0;
+    }
+    for (u32 o = 0; o < 0xA0; o += 4)
+        aram_wr(ARMB + o, 0);
+    aram_wr(ARMB + ARMB_START, ARM_WINDOW);
+    aram_wr(ARMB + ARMB_END, len);
+    aram_wr(ARMB + ARMB_SEED, 0xC0FFEE42 ^ 0x9E3779B9u);
+
+    aica_arm_release();
+    u32 t0 = timer_ms();
+    while (arm_word(ARMB_SIG) != ARM_SIG) {
+        if (timer_ms() - t0 > 500) {
+            aica_arm_halt();
+            arm_report_fail(S_ARM_NOSTART, 0);
+            return 0;
+        }
+        delay_ms(1);
+    }
+
+    const u32 words = (len - ARM_WINDOW) >> 2;
+    u32 step = 0, last_prog = 0, t_step4 = 0, t_step5 = 0;
+    u32 t_moved = timer_ms(), st;
+    for (;;) {
+        st = arm_word(ARMB_STATUS);
+        u32 s = arm_word(ARMB_STEP);
+        u32 prog = arm_word(ARMB_PROG);
+        if (s != step) {
+            if (s == 4)
+                t_step4 = timer_ms();
+            if (s == 5)
+                t_step5 = timer_ms();
+            if (step >= 5) {            /* a pass ended */
+                progress_end();
+                res->errors = arm_word(ARMB_ERRS);
+                phase_mark(res);
+            }
+            if (s >= 5 && s <= 7) {
+                /* the ARM reports its read side only: the bar follows it */
+                scif_puts(S_PASS);
+                scif_putdec(s - 4);
+                scif_puts("/3 ");
+                scif_puts(s == 5 ? S_PH_0101 : s == 6 ? S_PH_1010 : S_PH_PRNG);
+                progress_begin(pass_label(S_P_ARAM, s - 4), words);
+                /* the previous pass left its last address there: back to
+                 * the start until the ARM reaches its read side again */
+                aram_wr(ARMB + ARMB_PROG, ARM_WINDOW);
+                last_prog = ARM_WINDOW;
+            }
+            step = s;
+            t_moved = timer_ms();
+        }
+        if (prog != last_prog) {
+            last_prog = prog;
+            t_moved = timer_ms();
+        }
+        if (step >= 5 && prog >= ARM_WINDOW)
+            progress_tick((prog - ARM_WINDOW) >> 2);
+        else
+            progress_heartbeat();
+        if (st != 0)
+            break;
+        if (progress_aborted()) {
+            aica_arm_halt();
+            return 2;
+        }
+        if (timer_ms() - t_moved > 20000) {   /* no sign of life for 20 s */
+            aica_arm_halt();
+            if (step >= 5)
+                progress_end();
+            scif_puts(S_ARM_STUCK);
+            scif_putdec(step);
+            scif_puts("\n");
+            log_result(S_L_ARM7, CLIP_ARM7, T_FAIL, 0, 0);
+            return 0;
+        }
+        delay_ms(2);
+    }
+    if (step >= 5)
+        progress_end();
+
+    if (st != ARM_DONE) {
+        u32 detail = arm_word(ARMB_DETAIL);
+        aica_arm_halt();
+        arm_report_fail((st & 0xFF) >= 0xE1 ? S_ARM_EXC : S_ARM_SELFTEST,
+                        (st & 0xFF) >= 0xE1 ? st : (step << 8) | detail);
+        return 0;
+    }
+
+    res->errors  = arm_word(ARMB_ERRS);
+    res->badbits = res->badbits_e = res->badbits_o = arm_word(ARMB_BAD);
+    u32 nf = arm_word(ARMB_NFAIL);
+    if (nf > RAM_MAX_FAILS)
+        nf = RAM_MAX_FAILS;
+    for (u32 i = 0; i < nf; i++) {
+        res->fail_exp[i]  = arm_word(ARMB_FAILS + i * 12);
+        res->fail_got[i]  = arm_word(ARMB_FAILS + i * 12 + 4);
+        res->fail_addr[i] = ARAM_P2_BASE + arm_word(ARMB_FAILS + i * 12 + 8);
+    }
+    res->nfails = nf;
+    phase_mark(res);
+    aica_arm_halt();
+
+    log_result(S_L_ARM7, CLIP_ARM7, T_OK, 0, 0);
+    if (t_step5 > t_step4) {
+        /* 100000 turns of a three-instruction loop */
+        scif_puts(S_ARM_SPEED);
+        scif_putdec(t_step5 - t_step4);
+        scif_puts(S_ARM_SPEED_MS);
+    }
+    return 1;
+}
+
 static u32 test_aram(void)
 {
     scif_puts(S_AICA_HDR);
@@ -1502,7 +1650,12 @@ static u32 test_aram(void)
 
     ram_result res;
     ram_result_clear(&res);
+    u32 by_arm = arm_aram_test(len, &res);
+    if (by_arm == 2)
+        return 0;                       /* aborted: no verdict either way */
+    if (!by_arm) {
     u32 words = len >> 2;
+    ram_result_clear(&res);
     phase_begin(S_P_ARAM, 1, S_PH_0101, words);
     aram_test_pattern(0, len, 0x55555555, &res);
     progress_end();
@@ -1521,6 +1674,7 @@ static u32 test_aram(void)
     scif_puthex(res.crc_r);
 #endif
     phase_mark(&res);
+    }
 
     if (progress_aborted())             /* partial run: no verdict either way */
         return 0;

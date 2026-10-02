@@ -20,6 +20,33 @@ u32 aica_g2_stalled(void);
 void aica_arm_park(void);
 void aica_arm_halt(void);
 
+/* Running a program on the ARM7 (see arm/aica_arm_test.S). The words go to
+ * sound RAM 0 and are read back: 0 if they stuck. Release lets the ARM7
+ * start at its reset vector; aica_arm_halt() stops it again. */
+u32  aica_arm_load(const u32 *prog, u32 nwords);
+void aica_arm_release(void);
+u32  aram_rd(u32 off);                  /* one G2-safe word read / write */
+void aram_wr(u32 off, u32 v);
+
+/* The ARM7 program's mailbox, in sound RAM (offsets from MB) */
+#define ARMB            0x3F00u
+#define ARMB_SIG        0x00u
+#define ARMB_STEP       0x04u
+#define ARMB_STATUS     0x08u
+#define ARMB_PROG       0x0Cu
+#define ARMB_ERRS       0x10u
+#define ARMB_BAD        0x14u
+#define ARMB_NFAIL      0x18u
+#define ARMB_FAILS      0x1Cu           /* 8 x {exp, got, addr} */
+#define ARMB_START      0x80u
+#define ARMB_END        0x84u
+#define ARMB_SEED       0x88u
+#define ARMB_DETAIL     0x8Cu
+#define ARMB_TICKS      0x90u
+#define ARM_WINDOW      0x4000u         /* code + scratch + mailbox */
+#define ARM_SIG         0x41524D37u     /* 'ARM7' */
+#define ARM_DONE        0x600D600Du
+
 /* Hold the ARM7 in reset and set master volume; call before touching ARAM. */
 void aica_init(void);
 

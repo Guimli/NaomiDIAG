@@ -156,8 +156,18 @@ are reported as they land.
 12. **Naomi 2 only** — PVR-B VRAM (16 MB, IC111 to IC118S) once its windows
     are shown independent of PVR-A, and the Elan RAM (32 MB,
     IC106/107/108S/109S); see [below](#pvr-b-access-and-the-elan-ram).
-13. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus), same
-    tests, every access paced by the G2 FIFO.
+13. **Sound ARM7 and sound RAM** (AICA IC33, RAM IC35, 8 MB). The SH-4
+    reaches this RAM only across G2, one FIFO-paced access at a time —
+    eight minutes for the 8 MB. The AICA's ARM7 sits on the RAM's own bus,
+    so it is used the way the CPU RAM's relocated loops are: the SH-4 tests
+    a 16 KB window, loads `arm/aica_arm_test.S` there and releases the ARM7
+    from reset. The ARM checks itself on that window only (general and
+    banked registers, ALU and multiplier, byte and word access, a timed
+    loop) and then runs the three patterns over the rest of the RAM,
+    reporting failures (count, data lines, first addresses) through a
+    mailbox. Result lines: **Sound ARM7 (AICA IC33)** and the usual sound
+    RAM cell test. If the window is bad or the ARM7 does not start, stops
+    or fails its self-test, the SH-4 runs the cell test itself as before.
 14. **Backup NVRAM (IC29)** — non-destructive save/restore test.
 15. **RTC** (inside the AICA, IC33) — non-destructive: the counter must
     advance by a plausible amount over 2.2 s. A failure is measured again,

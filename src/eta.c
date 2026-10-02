@@ -83,7 +83,11 @@ static const step_est est[ETA_STEPS] = {
     [ETA_MIE]     = {  4500,     0, 4, 0, 0 },
     [ETA_SDRAM]   = { Q(48100, 32), Q(755000, 32), 1, 3, 1 },
     [ETA_VRAM]    = { Q(45300, 8),  Q(378000, 8),  2, 6, 1 },
-    [ETA_ARAM]    = { Q(498800, 8), Q(498800, 8),  1, 3, 0 },
+    /* v0.18: tested by the AICA's ARM7 from its own side of the bus (see
+     * arm_aram_test); 40 s is an estimate until a real log gives the
+     * figure -- the SH-4 fallback, if the ARM7 fails, is the 498.8 s
+     * measured above, and the progress tracking corrects either way */
+    [ETA_ARAM]    = { Q(40000, 8),  Q(40000, 8),   2, 3, 0 },
     [ETA_N2]      = { Q(83900, 24), Q(1133000, 24), 2, 6, 1 },
     [ETA_PERIPH]  = {  6200,  6200, 2, 0, 0 },
     [ETA_SEEPROM] = { 10900, 10900, 1, 0, 0 },

@@ -55,7 +55,7 @@ OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.
 
 HDRS := src/config.h src/version.inc src/hw.h src/scif.h src/sdram.h src/ramtest.h src/vram_mapping.h src/timer.h src/aica.h \
         src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/sha1.h \
-        src/cart.h src/cartdb.h src/eta.h src/strings.h src/mie_prog.h src/input.h
+        src/cart.h src/cartdb.h src/eta.h src/strings.h src/mie_prog.h src/arm_prog.h src/input.h
 
 all: $(BIN)
 
@@ -114,6 +114,10 @@ $(BIN): $(ELF)
 audio:
 	python3 tools/gen_audio.py fr src/audio_clips_fr.h
 	python3 tools/gen_audio.py en src/audio_clips_en.h
+
+# regenerate the AICA ARM7 program header (needs arm-none-eabi binutils)
+armprog:
+	python3 tools/gen_armprog.py arm/aica_arm_test.S src/arm_prog.h
 
 # regenerate the MIE Z80 program header (needs z80asm)
 mieprog:

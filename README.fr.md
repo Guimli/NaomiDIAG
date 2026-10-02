@@ -170,8 +170,20 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
     ses fenêtres reconnues indépendantes de celles du PVR-A, et RAM Elan
     (32 Mo, IC106/107/108S/109S) ; voir
     [plus bas](#accès-au-pvr-b-et-ram-elan).
-13. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2), mêmes
-    tests, chaque accès cadencé par la FIFO du bus G2.
+13. **ARM7 son et RAM son** (AICA IC33, RAM IC35, 8 Mo). Le SH-4 n'atteint
+    cette RAM qu'à travers le bus G2, un accès à la fois cadencé par sa
+    FIFO : huit minutes pour les 8 Mo. L'ARM7 de l'AICA est sur le bus de
+    la RAM elle-même ; il est donc utilisé comme les boucles relogées de la
+    RAM CPU : le SH-4 teste une fenêtre de 16 Ko, y charge
+    `arm/aica_arm_test.S` et sort l'ARM7 du reset. L'ARM se teste sur cette
+    seule fenêtre (registres généraux et des autres modes, ALU et
+    multiplicateur, accès octet et mot, boucle chronométrée), puis passe les
+    trois motifs sur le reste de la RAM et rend ses erreurs (nombre, lignes
+    de données, premières adresses) dans une boîte aux lettres. Lignes de
+    résultat : **ARM7 son (AICA IC33)** et le test cellules habituel de la
+    RAM son. Si la fenêtre est mauvaise, ou si l'ARM7 ne démarre pas, se
+    bloque ou rate son auto-test, le SH-4 fait le test cellules lui-même
+    comme avant.
 14. **NVRAM de sauvegarde (IC29)** — test non destructif
     (sauvegarde/restauration).
 15. **RTC** (interne à l'AICA, IC33) — non destructif : le compteur doit

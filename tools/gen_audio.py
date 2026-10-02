@@ -131,6 +131,7 @@ CLIPS = {
     "cut_all":    {"fr": "coupée, commune à toutes les puces.", "en": "cut, common to all chips."},
     "rtc_date":   {"fr": "Date de l'horloge.",                "en": "Clock date."},
     "cart_unchk": {"fr": "contenu non vérifié,",              "en": "content not checked,"},
+    "arm7":       {"fr": "Processeur son.",                   "en": "Sound processor."},
 }
 
 RATE = 22050
