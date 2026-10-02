@@ -4260,6 +4260,12 @@ void cmain(void)
     eta_set_mie_early(g_maple_safe);
     suite_check_abort();
 
+    /* Open the G1 bus to the cartridge or DIMM now, before the EPROM
+     * checksum, from the relocated block when there is one (see g1_unlock
+     * in ramtest_fast.S). Without it every ROM-board access reads 0xFFFF. */
+    if (g1_open())
+        scif_puts(reloc_active() ? S_G1_UNLOCKED : S_G1_UNLOCKED_ROM);
+
     /* Only now the 2 MB ROM checksum: it is the single longest test in the
      * whole suite (4.2 M table steps), it must never run while the operator
      * is still staring at a black screen, and it waits for the relocation so

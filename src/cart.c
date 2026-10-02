@@ -2,6 +2,7 @@
 #include "progress.h"
 #include "dimm.h"           /* SB_GD* */
 #include "timer.h"
+#include "reloc.h"
 
 /* G1 bus timing: the values the original BIOS (epr-21576h) leaves before
  * it touches the ROM board, cartridge or DIMM alike, logged from it
@@ -22,8 +23,23 @@ void g1_set_board_timing(u32 v)
     REG32(0xA05F74A4) = v;              /* G1GDWC */
 }
 
+/* Once per boot: the unlock reads 2 MB of EPROM. Done after the loop
+ * relocation in the suite, and here too for a menu action reached before
+ * it (the suite stopped early). */
+static u32 g_g1_open;
+
+u32 g1_open(void)
+{
+    if (g_g1_open)
+        return 0;
+    p_g1_unlock();
+    g_g1_open = 1;
+    return 1;
+}
+
 void g1_bus_init(void)
 {
+    g1_open();
     REG32(0xA05F7480) = 0x00000600;     /* G1RRC  system ROM read  */
     REG32(0xA05F7484) = 0x00000600;     /* G1RWC  system ROM write */
     REG32(0xA05F7488) = 0x00000200;     /* G1FRC  flash read       */

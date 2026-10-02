@@ -99,17 +99,23 @@ are reported as they land.
 4. **Test-loop relocation** — the memory-test loops are copied into an 8 KB
    block of CPU RAM, tested first, and run from there cached (see
    [Where the test loops execute](#where-the-test-loops-execute)).
-5. **BIOS EPROM (IC27)** — CRC32 self-check. It runs right after the
+5. **G1 bus unlock** — Holly keeps the bus to the cartridge or DIMM closed
+   after reset (every read 0xFFFF, writes dropped) until `0x001FFFFF` is
+   written to `0x5F74E4` and the boot ROM is read through: the Dreamcast's
+   GD-ROM lock, still in the Naomi. The original BIOS does it first; MAME
+   does not model it, so the cartridge and DIMM tests only ever worked
+   there until this step was added.
+6. **BIOS EPROM (IC27)** — CRC32 self-check. It runs right after the
    relocation so that its loop, too, executes cached from CPU RAM: only the
    2 MB of data still cross the EPROM bus. Without a proven block it runs
    from the EPROM as before.
-6. **Maple bus / MIE** (315-6146 Z80) — version request + factory
+7. **Maple bus / MIE** (315-6146 Z80) — version request + factory
    self-test.
-7. **Settings EEPROM** (93C46 via MIE) — read and both CRC-checked copies
+8. **Settings EEPROM** (93C46 via MIE) — read and both CRC-checked copies
    verified. Needs a Z80 program uploaded into the MIE first
    (`src/mie_prog.z80`), which then stays resident and also serves the
    board's buttons and DIP switches (both reported on the serial console).
-8. **JVS I/O board** — the same program is a JVS master: it resets the
+9. **JVS I/O board** — the same program is a JVS master: it resets the
    bus, gives the board address 1, and reports its identification,
    revisions and inputs (players, switches, coin slots, analog channels).
    No board answering is reported as *not present*, not as a fault.
@@ -118,7 +124,7 @@ are reported as they land.
    step 5, so the buttons can interrupt the long part of the suite. On a
    board where no block qualifies they wait for the CPU RAM test and are
    skipped if it fails.
-9. **Main CPU RAM** (SDRAM, 16/32 MB, IC9/IC10/IC11S/IC12S) — first a data-bus
+10. **Main CPU RAM** (SDRAM, 16/32 MB, IC9/IC10/IC11S/IC12S) — first a data-bus
    walking-ones test and an address-bus test, then **three phases**, each
    reported as `pass n/3` and each driving the progress bar from 0 to 100%:
    - **1/3** — write `0x55555555` (0101…) over the whole region, then read it
@@ -133,27 +139,27 @@ are reported as they land.
    main RAM unusable. If **all** CPU RAM is bad, the program keeps running
    from the SH-4 cache (OC-RAM) and completes every test that does not need
    main RAM.
-10. **VRAM** — 16 MB in eight 16 Mbit chips around the graphics chip, tested
+11. **VRAM** — 16 MB in eight 16 Mbit chips around the graphics chip, tested
     through the 32-bit window as two 8 MB regions, TEX0 (IC16/18/20/22) and
     TEX1 (IC17S/19S/21S/23S), with the same bus tests and three phases.
     Inside a region a chip is a 4 MiB half and a 16-bit data half (see
     [TEX and PVR-A/B diagnostics](#tex-and-pvr-ab-diagnostics)).
-11. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus), same
+12. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus), same
     tests, every access paced by the G2 FIFO.
-12. **Naomi 2 only** — PVR-B VRAM (16 MB, IC111 to IC118S) once its windows
+13. **Naomi 2 only** — PVR-B VRAM (16 MB, IC111 to IC118S) once its windows
     are shown independent of PVR-A, and the Elan RAM (32 MB,
     IC106/107/108S/109S); see [below](#pvr-b-access-and-the-elan-ram).
-13. **Backup NVRAM (IC29)** — non-destructive save/restore test.
-14. **RTC** (inside the AICA, IC33) — non-destructive: the counter must
+14. **Backup NVRAM (IC29)** — non-destructive save/restore test.
+15. **RTC** (inside the AICA, IC33) — non-destructive: the counter must
     advance by a plausible amount over 2.2 s. A failure is measured again,
     so the report tells a stopped clock (still twice) from an irregular one
     (still, then moving) and from an implausible read (a jump or a step
     backwards); the serial console prints every raw read. Its date is a
     separate check: before 2026 it cannot be today's — a flat battery, or a
     clock never set — and it gets its own line (`RTC date (2026 or later)`).
-15. **Serial-number EEPROM** (IC31, 93C46 on SH-4 GPIO) — read + content
+16. **Serial-number EEPROM** (IC31, 93C46 on SH-4 GPIO) — read + content
     check.
-16. **Relocated code integrity** — the relocated loops ran from the very RAM
+17. **Relocated code integrity** — the relocated loops ran from the very RAM
     under test, so they are read back and compared with the ROM copy. On
     screen only when it fails; serial always.
 

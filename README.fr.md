@@ -105,18 +105,25 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
    recopiées dans un bloc de 8 Ko de RAM CPU, testé d'abord, et exécutées
    de là en cache (voir
    [Où s'exécutent les boucles de test](#où-sexécutent-les-boucles-de-test)).
-5. **EPROM BIOS (IC27)** — auto-contrôle CRC32. Il s'exécute juste après la
+5. **Déverrouillage du bus G1** — Holly garde fermé le bus vers la
+   cartouche ou le DIMM après un reset (toute lecture rend 0xFFFF, les
+   écritures sont perdues) jusqu'à ce que `0x001FFFFF` soit écrit en
+   `0x5F74E4` et que la ROM de démarrage soit relue en entier : c'est le
+   verrou GD-ROM de la Dreamcast, toujours présent dans la Naomi. Le BIOS
+   d'origine le fait en premier ; MAME ne le simule pas, si bien que les
+   tests cartouche et DIMM ne marchaient que sous MAME avant cette étape.
+6. **EPROM BIOS (IC27)** — auto-contrôle CRC32. Il s'exécute juste après la
    relocalisation pour que sa boucle tourne elle aussi en cache depuis la
    RAM CPU : seuls les 2 Mo de données traversent encore le bus de l'EPROM.
    Sans bloc validé, il s'exécute depuis l'EPROM comme avant.
-6. **Bus Maple / MIE** (Z80 315-6146) — requête de version + auto-test
+7. **Bus Maple / MIE** (Z80 315-6146) — requête de version + auto-test
    d'usine.
-7. **EEPROM des réglages** (93C46 via MIE) — lue, et ses deux copies
+8. **EEPROM des réglages** (93C46 via MIE) — lue, et ses deux copies
    vérifiées par CRC. Nécessite d'abord le téléversement d'un programme Z80
    dans le MIE (`src/mie_prog.z80`), qui reste ensuite résident et sert
    aussi les boutons de la carte et les DIP switches (tous deux rapportés
    sur la console série).
-8. **Carte I/O JVS** — le même programme est un maître JVS : il
+9. **Carte I/O JVS** — le même programme est un maître JVS : il
    réinitialise le bus, donne l'adresse 1 à la carte, et rapporte son
    identifiant, ses révisions et ses entrées (joueurs, contacts,
    monnayeurs, voies analogiques). Si aucune carte ne répond, elle est
@@ -126,7 +133,7 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
    qualifié à l'étape 5 : les boutons peuvent ainsi interrompre la partie
    longue de la suite. Sur une carte où aucun bloc n'est qualifié, elles
    attendent le test de la RAM CPU et sont ignorées s'il échoue.
-9. **RAM CPU principale** (SDRAM, 16/32 Mo, IC9/IC10/IC11S/IC12S) — d'abord
+10. **RAM CPU principale** (SDRAM, 16/32 Mo, IC9/IC10/IC11S/IC12S) — d'abord
    un test bus de données (walking-ones) et un test bus d'adresses, puis
    **trois phases**, annoncées `passe n/3` et menant chacune la barre de
    progression de 0 à 100 % :
@@ -143,21 +150,21 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
    principale inutilisable dans le résumé. Si **toute** la RAM CPU est
    défectueuse, le programme continue depuis le cache du SH-4 (OC-RAM) et
    effectue tous les tests ne nécessitant pas la RAM principale.
-10. **VRAM** — 16 Mo en huit puces de 16 Mbit autour du circuit graphique,
+11. **VRAM** — 16 Mo en huit puces de 16 Mbit autour du circuit graphique,
     testées par la fenêtre 32 bits en deux régions de 8 Mo, TEX0
     (IC16/18/20/22) et TEX1 (IC17S/19S/21S/23S), avec les mêmes tests de
     bus et les trois phases. Dans une région, une puce est une moitié de
     4 Mio et une moitié de 16 bits de données (voir
     [Diagnostic TEX et PVR-A/B](#diagnostic-tex-et-pvr-ab)).
-11. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2), mêmes
+12. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2), mêmes
     tests, chaque accès cadencé par la FIFO du bus G2.
-12. **Naomi 2 uniquement** — VRAM du PVR-B (16 Mo, IC111 à IC118S) une fois
+13. **Naomi 2 uniquement** — VRAM du PVR-B (16 Mo, IC111 à IC118S) une fois
     ses fenêtres reconnues indépendantes de celles du PVR-A, et RAM Elan
     (32 Mo, IC106/107/108S/109S) ; voir
     [plus bas](#accès-au-pvr-b-et-ram-elan).
-13. **NVRAM de sauvegarde (IC29)** — test non destructif
+14. **NVRAM de sauvegarde (IC29)** — test non destructif
     (sauvegarde/restauration).
-14. **RTC** (interne à l'AICA, IC33) — non destructif : le compteur doit
+15. **RTC** (interne à l'AICA, IC33) — non destructif : le compteur doit
     avancer d'une valeur plausible en 2,2 s. Un échec est mesuré une
     seconde fois, pour distinguer une horloge figée (deux fois immobile),
     irrégulière (immobile puis repartie) ou une lecture aberrante (saut ou
@@ -165,9 +172,9 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
     est un contrôle à part : avant 2026, elle ne peut pas être celle du jour
     — pile HS ou horloge jamais réglée — et elle a sa propre ligne
     (`Date RTC (2026 ou apres)`).
-15. **EEPROM numéro de série** (IC31, 93C46 sur GPIO du SH-4) — lecture +
+16. **EEPROM numéro de série** (IC31, 93C46 sur GPIO du SH-4) — lecture +
     contrôle du contenu.
-16. **Intégrité du code relogé** — les boucles relogées ont tourné depuis la
+17. **Intégrité du code relogé** — les boucles relogées ont tourné depuis la
     RAM même qu'on testait : elles sont relues et comparées à la copie en
     ROM. À l'écran seulement en cas d'échec ; toujours sur le port série.
 

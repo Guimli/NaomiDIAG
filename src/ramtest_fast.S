@@ -814,5 +814,47 @@ _crc32_rom_block:
 .Lcrctab:    .long   _crc32_tab8
 .Lp1mask:    .long   0xDFFFFFFF      ! clear bit 29: P2 -> P1
 
+! =============================================================================
+! void g1_unlock(void)
+!
+! Opens the G1 bus to the ROM board (cartridge or DIMM). Holly keeps it
+! closed after reset -- every read returns all ones, writes are dropped --
+! until 0x001FFFFF is written to 0x5F74E4 and the boot ROM is then read
+! through. It is the Dreamcast's GD-ROM bus lock, still present in the
+! Naomi's Holly. The original BIOS does it first thing, from a loop it
+! copies to RAM (traced under MAME: 0x8C0000E4 writes 0x1FFFFF, then reads
+! 0x7FFC0 words from 0x80000100). MAME does not model the lock, which is
+! why the cartridge and DIMM tests always worked there and saw nothing on
+! a real board. Here the whole 2 MB is read through P2, uncached, so every
+! word is a real bus cycle, then the BIOS's own read is repeated as it is
+! (P1, from 0x100); the loops run from the relocated block so no
+! instruction fetch from the EPROM comes in between.
+! =============================================================================
+    .global _g1_unlock
+_g1_unlock:
+    mov.l   .Lg1key, r2
+    mov.l   .Lg1reg, r1
+    mov.l   r2, @r1
+    mov.l   .Lg1rom, r4
+    mov.l   .Lg1cnt, r5
+1:  mov.l   @r4+, r0
+    dt      r5
+    bf      1b
+    ! then exactly what the BIOS reads: from 0x100, through P1
+    mov.l   .Lg1bios, r4
+    mov.l   .Lg1bcnt, r5
+2:  mov.l   @r4+, r0
+    dt      r5
+    bf      2b
+    rts
+    nop
+    .align 2
+.Lg1key:    .long   0x001FFFFF
+.Lg1reg:    .long   0xA05F74E4
+.Lg1rom:    .long   0xA0000000
+.Lg1cnt:    .long   0x00080000      ! 2 MB in words
+.Lg1bios:   .long   0x80000100
+.Lg1bcnt:   .long   0x0007FFC0
+
     .global _reloc_blk_end
 _reloc_blk_end:
