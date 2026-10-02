@@ -332,15 +332,15 @@ extrapolated:
 | Screen + speaker bring-up | 0:29 | 0:29 |
 | Board identification | 0:04 | 0:04 |
 | Loop relocation | 0:37 | 0:31 (up to 128 blocks scanned from ROM) |
-| BIOS CRC | 0:02 (estimate, to be measured) | 0:04 |
+| BIOS CRC | 0:01 (measured: 1.06 s) | 0:04 |
 | MIE, settings EEPROM, JVS | 0:19 | skipped |
 | CPU RAM | 0:52 | 12:39 |
 | VRAM TEX0 + TEX1 | 0:53 | 6:25 |
 | Naomi 2: PVR-B + Elan RAM | 1:31 | 19:00 |
 | Sound RAM | 8:22 | 8:22 (never relocated) |
 | NVRAM, RTC, serial EEPROM, end | 0:29 | 0:29 |
-| **Naomi 1 total** | **12:07** | **29:04** |
-| **Naomi 2 total** | **13:38** | **48:04** |
+| **Naomi 1 total** | **12:06** | **29:04** |
+| **Naomi 2 total** | **13:37** | **48:04** |
 
 - That run took 13:42. The Naomi 1 total is the same run without the PVR-B
   and Elan RAM. TEX1 is measured slower than TEX0 there, 8.9 s against

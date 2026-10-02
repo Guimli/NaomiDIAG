@@ -360,15 +360,15 @@ parlés compris ; seul le cas sans RAM CPU pour les boucles est extrapolé :
 | Amorçage écran + haut-parleur | 0:29 | 0:29 |
 | Identification de la carte | 0:04 | 0:04 |
 | Relocalisation des boucles | 0:37 | 0:31 (jusqu'à 128 blocs balayés depuis la ROM) |
-| CRC du BIOS | 0:02 (estimation, à mesurer) | 0:04 |
+| CRC du BIOS | 0:01 (mesuré : 1,06 s) | 0:04 |
 | MIE, EEPROM des réglages, JVS | 0:19 | sautée |
 | RAM CPU | 0:52 | 12:39 |
 | VRAM TEX0 + TEX1 | 0:53 | 6:25 |
 | Naomi 2 : PVR-B + RAM Elan | 1:31 | 19:00 |
 | RAM son | 8:22 | 8:22 (jamais relogée) |
 | NVRAM, RTC, EEPROM série, fin | 0:29 | 0:29 |
-| **Total Naomi 1** | **12:07** | **29:04** |
-| **Total Naomi 2** | **13:38** | **48:04** |
+| **Total Naomi 1** | **12:06** | **29:04** |
+| **Total Naomi 2** | **13:37** | **48:04** |
 
 - Cette exécution a duré 13:42. Le total Naomi 1 est la même exécution
   sans le PVR-B ni la RAM Elan. TEX1 y est mesurée plus lente que TEX0,
