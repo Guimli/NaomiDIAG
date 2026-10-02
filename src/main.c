@@ -405,6 +405,17 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
 static u32 g_hint_on, g_hint_done;
 static u32 g_keys_box_shown;            /* console reminder printed once */
 
+/* The framed a/h reminder on the console, once per boot: as soon as the
+ * board's buttons answer, and in any case before the long memory tests,
+ * which is what 'a' is there to cut short -- with or without the MIE. */
+static void keys_box(void)
+{
+    if (g_keys_box_shown)
+        return;
+    g_keys_box_shown = 1;
+    scif_puts(S_KEYS_BOX);
+}
+
 static void hint_hide(void)
 {
     if (g_hint_on && g_screen_ready)
@@ -2436,14 +2447,7 @@ static void test_settings_eeprom(void)
             g_mie_prog = 1;
             hint_draw();                /* the buttons answer: say so */
             report_mie_inputs(in5);
-            /* The same moment on the console, framed so it does not drown
-             * in the log: the board's buttons work, which also means the
-             * CPU RAM block was proven, the loops relocated and the G1 bus
-             * opened -- everything the menu actions behind a and h need. */
-            if (!g_keys_box_shown) {
-                g_keys_box_shown = 1;
-                scif_puts(S_KEYS_BOX);
-            }
+            keys_box();                 /* and on the console */
         } else {
             scif_puts(S_MIE_NO_ANSWER);
         }
@@ -4451,6 +4455,7 @@ void cmain(void)
      * regions the screen and the speaker need, so every result is shown
      * and spoken as it lands whichever memory is under test -- which lets
      * the memory the rest of the board leans on go first. */
+    keys_box();                         /* if the MIE did not answer */
     eta_step(ETA_SDRAM);
     u32 usable = test_sdram_cells();
     suite_check_abort();

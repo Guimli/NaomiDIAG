@@ -202,11 +202,10 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
   qu'elle teste celle où elle se trouve. TEST ou START arrête la boucle
   (touche `a` sur la console si le programme du MIE ne tourne pas). La
   boucle RAM CPU s'arrête sous le bloc de 8 Ko où tourne le code relogé.
-- **Touches de la console** — dès que les boutons de la carte répondent (le
-  programme du MIE tourne : le bloc de RAM CPU est validé, les boucles
-  relogées et le bus G1 ouvert), le log série affiche un rappel encadré :
-  `a` annule les tests en cours, `h` affiche l'aide, au même moment que
-  l'indication bleue des boutons à l'écran.
+- **Touches de la console** — le log série affiche un rappel encadré : `a`
+  annule les tests en cours, `h` affiche l'aide. Il apparaît dès que les
+  boutons de la carte répondent (avec l'indication bleue à l'écran), et
+  dans tous les cas juste avant les longs tests mémoire, MIE ou pas.
   Majuscules et minuscules sont équivalentes (le verrouillage majuscules ne
   gêne pas).
 - **Moniteur série** (`!` sur la console, depuis le menu ou l'écran
