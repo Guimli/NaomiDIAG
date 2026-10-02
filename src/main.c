@@ -4343,6 +4343,7 @@ void cmain(void)
      * declared the register until now, never wrote it. */
     DMAOR = 0x00008201;
     scif_puts(S_SCIF_UP);
+    scif_puts(S_KEYS_BOX);              /* framed: it must not drown in the log */
 
     /* crt0 already proved OC-RAM works, put it in the log.
      * A failure here means the SH4 itself (IC designator TBD) is dead —

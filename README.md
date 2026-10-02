@@ -186,6 +186,9 @@ take long enough that they have no business delaying the report.
   START stops the loop (key `a` on the console when the MIE program is not
   running). The CPU RAM loop stops below the 8 KB block the relocated code
   runs from.
+- **Console keys** — right after the banner, the serial log shows a framed
+  reminder that `a` cancels the running tests and `h` prints the help.
+  Keys are case-insensitive (caps lock does no harm).
 - **Serial monitor** (`!` on the console, from the menu or the idle
   screen) — `r b|w|l ADDR [N]` reads, `w b|w|l ADDR VAL` writes any
   address (P2 alias for registers, e.g. `A05F703C`), `u [BITS]` runs the

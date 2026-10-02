@@ -242,6 +242,13 @@
 #define S_WAIT_TEST         "\nAppuyez sur TEST ou SERVICE (carte) pour le menu operateur.\n"
 #define S_IDLE_BANNER       "TEST ou START : menu operateur"
 #define S_BUTTON_HINT       "TEST ou START : arret et menu operateur"
+#define S_KEYS_BOX          "\n"\
+                            "+-----------------------------------------+\n"\
+                            "|                                         |\n"\
+                            "|  TOUCHE a : ANNULER LES TESTS EN COURS  |\n"\
+                            "|  TOUCHE h : AFFICHER L'AIDE             |\n"\
+                            "|                                         |\n"\
+                            "+-----------------------------------------+\n\n"
 #define S_HELP              "\nMenu operateur -- touches :\n"\
                             "  h  cette aide (n'interrompt pas)\n"\
                             "  a  interrompre le test en cours (et une boucle, si les\n"\
@@ -253,7 +260,9 @@
                             "  g  integrite des flash du jeu (SHA1)\n"\
                             "  f  identifier la flash du DIMM (ecriture non armee)\n"\
                             "  j  test des entrees JVS (boutons, monnayeurs, analogiques)\n"\
-                            "  m  mire video (barres, quadrillage, gris, purete...)\n"
+                            "  m  mire video (barres, quadrillage, gris, purete...)\n"\
+                            "  !  moniteur serie (lecture/ecriture memoire, deverrouillage G1)\n"\
+                            "  (majuscules et minuscules sont equivalentes)\n"
 #define S_M_JVS             "Test des entrees JVS"
 #define S_M_PATTERN         "Mire video"
 #define S_PAT_HINT          "TEST : suivante   SERVICE : quitter"
@@ -641,6 +650,13 @@
 #define S_WAIT_TEST         "\nPress TEST or SERVICE (on the board) for the operator menu.\n"
 #define S_IDLE_BANNER       "TEST or START: operator menu"
 #define S_BUTTON_HINT       "TEST or START: stop and operator menu"
+#define S_KEYS_BOX          "\n"\
+                            "+------------------------------------+\n"\
+                            "|                                    |\n"\
+                            "|  KEY a : CANCEL THE RUNNING TESTS  |\n"\
+                            "|  KEY h : SHOW THE HELP             |\n"\
+                            "|                                    |\n"\
+                            "+------------------------------------+\n\n"
 #define S_HELP              "\nOperator menu -- keys:\n"\
                             "  h  this help (does not interrupt)\n"\
                             "  a  abort the running test (and a loop, when the board\n"\
@@ -652,7 +668,9 @@
                             "  g  game flash integrity (SHA1)\n"\
                             "  f  identify the DIMM flash (writing not armed)\n"\
                             "  j  JVS input test (buttons, coin slots, analog)\n"\
-                            "  m  video test pattern (bars, crosshatch, grey, purity...)\n"
+                            "  m  video test pattern (bars, crosshatch, grey, purity...)\n"\
+                            "  !  serial monitor (memory read/write, G1 unlock)\n"\
+                            "  (upper and lower case are the same)\n"
 #define S_M_JVS             "JVS input test"
 #define S_M_PATTERN         "Video test pattern"
 #define S_PAT_HINT          "TEST: next   SERVICE: quit"

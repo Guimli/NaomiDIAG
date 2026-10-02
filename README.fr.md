@@ -202,6 +202,10 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
   qu'elle teste celle où elle se trouve. TEST ou START arrête la boucle
   (touche `a` sur la console si le programme du MIE ne tourne pas). La
   boucle RAM CPU s'arrête sous le bloc de 8 Ko où tourne le code relogé.
+- **Touches de la console** — juste après la bannière, le log série affiche
+  un rappel encadré : `a` annule les tests en cours, `h` affiche l'aide.
+  Majuscules et minuscules sont équivalentes (le verrouillage majuscules ne
+  gêne pas).
 - **Moniteur série** (`!` sur la console, depuis le menu ou l'écran
   d'attente) — `r b|w|l ADR [N]` lit, `w b|w|l ADR VAL` écrit n'importe
   quelle adresse (alias P2 pour les registres, par ex. `A05F703C`),

@@ -81,6 +81,10 @@ u32 input_poll(input_event *ev)
 {
     int c = scif_getc();
     if (c >= 0) {
+        /* One key, whatever the case: a terminal with caps lock on must
+         * not lose the menu. Everything downstream compares lower case. */
+        if (c >= 'A' && c <= 'Z')
+            c += 'a' - 'A';
         ev->kind = INPUT_KEY;
         ev->key = c;
         return 1;
