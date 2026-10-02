@@ -1465,7 +1465,12 @@ static u32 test_sdram_cells(void)
  * a time. The SH-4 only reads the mailbox and keeps the time.
  * Returns 1 with res filled for [ARM_WINDOW, len), 0 if the ARM path is not
  * usable (the caller runs its own cell test), 2 on an operator abort. */
+static u32 udiv(u32 n, u32 d);
 static u32 arm_word(u32 off) { return aram_rd(ARMB + off); }
+
+/* quiet: the soak loop's pass -- no result lines, no pass lines, the bar
+ * keeps the loop's label; a failure is printed and the caller falls back */
+static u32 g_arm_quiet;
 
 static void arm_report_fail(const char *why, u32 code)
 {
@@ -1474,14 +1479,16 @@ static void arm_report_fail(const char *why, u32 code)
         scif_puthex(code);
         scif_puts("\n");
     }
-    log_result(S_L_ARM7, CLIP_ARM7, T_FAIL, 0, 0);
+    if (!g_arm_quiet)
+        log_result(S_L_ARM7, CLIP_ARM7, T_FAIL, 0, 0);
 }
 
-static u32 arm_aram_test(u32 len, ram_result *res)
+static u32 arm_aram_run(u32 len, ram_result *res, u32 seed)
 {
     ram_result w;
     ram_result_clear(&w);
-    scif_puts(S_ARM_WINDOW);
+    if (!g_arm_quiet)
+        scif_puts(S_ARM_WINDOW);
     aram_test_pattern(0, ARM_WINDOW, 0x55555555, &w);
     aram_test_pattern(0, ARM_WINDOW, 0xAAAAAAAA, &w);
     aram_test_prng(0, ARM_WINDOW, 0x5EED0A12, &w);
@@ -1489,14 +1496,15 @@ static u32 arm_aram_test(u32 len, ram_result *res)
         return 2;
     if (w.errors || aica_arm_load(arm_prog, ARM_PROG_WORDS)) {
         scif_puts(S_ARM_WIN_BAD);
-        log_result(S_L_ARM7_SKIP, CLIP_NONE, T_SKIP, 0, 0);
+        if (!g_arm_quiet)
+            log_result(S_L_ARM7_SKIP, CLIP_NONE, T_SKIP, 0, 0);
         return 0;
     }
     for (u32 o = 0; o < 0xA0; o += 4)
         aram_wr(ARMB + o, 0);
     aram_wr(ARMB + ARMB_START, ARM_WINDOW);
     aram_wr(ARMB + ARMB_END, len);
-    aram_wr(ARMB + ARMB_SEED, 0xC0FFEE42 ^ 0x9E3779B9u);
+    aram_wr(ARMB + ARMB_SEED, seed);
 
     aica_arm_release();
     u32 t0 = timer_ms();
@@ -1521,12 +1529,15 @@ static u32 arm_aram_test(u32 len, ram_result *res)
                 t_step4 = timer_ms();
             if (s == 5)
                 t_step5 = timer_ms();
-            if (step >= 5) {            /* a pass ended */
+            if (step >= 5 && !g_arm_quiet) {   /* a pass ended */
                 progress_end();
                 res->errors = arm_word(ARMB_ERRS);
                 phase_mark(res);
             }
-            if (s >= 5 && s <= 7) {
+            if (s >= 5 && s <= 7 && g_arm_quiet) {
+                aram_wr(ARMB + ARMB_PROG, ARM_WINDOW);
+                last_prog = ARM_WINDOW;
+            } else if (s >= 5 && s <= 7) {
                 /* the ARM reports its read side only: the bar follows it */
                 scif_puts(S_PASS);
                 scif_putdec(s - 4);
@@ -1546,7 +1557,11 @@ static u32 arm_aram_test(u32 len, ram_result *res)
             t_moved = timer_ms();
         }
         if (step >= 5 && prog >= ARM_WINDOW)
-            progress_tick((prog - ARM_WINDOW) >> 2);
+            /* quiet: one bar for the three passes, as the loop draws it */
+            progress_tick(g_arm_quiet   /* the loop's bar counts 2 x words */
+                          ? udiv(2 * ((step - 5) * words +
+                                      ((prog - ARM_WINDOW) >> 2)), 3)
+                          : (prog - ARM_WINDOW) >> 2);
         else
             progress_heartbeat();
         if (st != 0)
@@ -1567,7 +1582,7 @@ static u32 arm_aram_test(u32 len, ram_result *res)
         }
         delay_ms(2);
     }
-    if (step >= 5)
+    if (step >= 5 && !g_arm_quiet)
         progress_end();
 
     if (st != ARM_DONE) {
@@ -1589,8 +1604,10 @@ static u32 arm_aram_test(u32 len, ram_result *res)
         res->fail_addr[i] = ARAM_P2_BASE + arm_word(ARMB_FAILS + i * 12 + 8);
     }
     res->nfails = nf;
-    phase_mark(res);
     aica_arm_halt();
+    if (g_arm_quiet)
+        return 1;
+    phase_mark(res);
 
     log_result(S_L_ARM7, CLIP_ARM7, T_OK, 0, 0);
     if (t_step5 > t_step4) {
@@ -1600,6 +1617,12 @@ static u32 arm_aram_test(u32 len, ram_result *res)
         scif_puts(S_ARM_SPEED_MS);
     }
     return 1;
+}
+
+static u32 arm_aram_test(u32 len, ram_result *res)
+{
+    g_arm_quiet = 0;
+    return arm_aram_run(len, res, 0xC0FFEE42 ^ 0x9E3779B9u);
 }
 
 static u32 test_aram(void)
@@ -3587,9 +3610,17 @@ static void loop_regions(const loop_part *parts, u32 nparts, const char *what)
                                    !(lp->base <= fbaddr && fbaddr < lp->base + lp->len));
             progress_begin(what, (lp->len >> 2) * 2);
             if (lp->base == ARAM_P2_BASE) {
-                aram_test_pattern(0, lp->len, 0x55555555, &res);
-                aram_test_pattern(0, lp->len, 0xAAAAAAAA, &res);
-                aram_test_prng(0, lp->len, 0xC0FFEE42 ^ pass, &res);
+                /* through the ARM7, as in the boot suite; the SH-4's own
+                 * passes if the ARM path is not usable this time */
+                g_arm_quiet = 1;
+                u32 by_arm = arm_aram_run(lp->len, &res, 0xC0FFEE42 ^ pass);
+                g_arm_quiet = 0;
+                if (by_arm == 0) {
+                    ram_result_clear(&res);
+                    aram_test_pattern(0, lp->len, 0x55555555, &res);
+                    aram_test_pattern(0, lp->len, 0xAAAAAAAA, &res);
+                    aram_test_prng(0, lp->len, 0xC0FFEE42 ^ pass, &res);
+                }
             } else if (lp->base == SDRAM_P2_BASE) {
                 ram_test_pattern(lp->base, lp->len, 0x55555555, &res);
                 ram_test_pattern(lp->base, lp->len, 0xAAAAAAAA, &res);

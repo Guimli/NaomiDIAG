@@ -194,7 +194,9 @@ take long enough that they have no business delaying the report.
   of each memory is also spoken. The video loop moves the image to the
   other bank (TEX0 ↔ TEX1) while it tests the one it sits in. TEST or
   START stops the loop (key `a` on the console when the MIE program is not
-  running). The CPU RAM loop stops below the 8 KB block the relocated code
+  running). The sound RAM loop runs through the AICA's ARM7 as the boot
+  suite does, the SH-4 taking over for any pass where the ARM path is not
+  usable. The CPU RAM loop stops below the 8 KB block the relocated code
   runs from.
 - **Console keys** — the serial log shows a framed reminder that `a`
   cancels the running tests and `h` prints the help: as soon as the

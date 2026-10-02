@@ -213,6 +213,9 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
   boucle vidéo déplace l'image dans l'autre banque (TEX0 ↔ TEX1) pendant
   qu'elle teste celle où elle se trouve. TEST ou START arrête la boucle
   (touche `a` sur la console si le programme du MIE ne tourne pas). La
+  boucle RAM son passe par l'ARM7 de l'AICA comme la suite de démarrage ;
+  le SH-4 reprend la main pour toute passe où le chemin ARM n'est pas
+  utilisable. La
   boucle RAM CPU s'arrête sous le bloc de 8 Ko où tourne le code relogé.
 - **Touches de la console** — le log série affiche un rappel encadré : `a`
   annule les tests en cours, `h` affiche l'aide. Il apparaît dès que les
