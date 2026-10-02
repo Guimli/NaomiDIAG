@@ -819,28 +819,34 @@ _crc32_rom_block:
 !
 ! Opens the G1 bus to the ROM board (cartridge or DIMM). Holly keeps it
 ! closed after reset -- every read returns all ones, writes are dropped --
-! until 0x001FFFFF is written to 0x5F74E4 and the boot ROM is then read
-! through. It is the Dreamcast's GD-ROM bus lock, still present in the
-! Naomi's Holly. The original BIOS does it first thing, from a loop it
-! copies to RAM (traced under MAME: 0x8C0000E4 writes 0x1FFFFF, then reads
-! 0x7FFC0 words from 0x80000100). MAME does not model the lock, which is
-! why the cartridge and DIMM tests always worked there and saw nothing on
-! a real board. Here the whole 2 MB is read through P2, uncached, so every
-! word is a real bus cycle, then the BIOS's own read is repeated as it is
-! (P1, from 0x100); the loops run from the relocated block so no
-! instruction fetch from the EPROM comes in between.
-! =============================================================================
+! until a key is written to 0x5F74E4 and the boot ROM is read through: an
+! integrity check of the BIOS, the Dreamcast's GD-ROM lock, still in the
+! Naomi. The key is how much of what follows is checked: the retail BIOS
+! writes 0x1FFFFF and reads its whole 2 MB from 0x100 (through P1), the
+! development BIOS writes 0x3FF and reads 0x7C0 words from 0xA0000100
+! (through P2) -- only its first kilobyte there counts. Both traced under
+! MAME, which does not model the check (so the cartridge and DIMM tests
+! always worked there and saw nothing on a real board).
 !
-! void g1_unlock_v(u32 flags) -- the same in parts, for the serial monitor:
+! This ROM cannot pass the 2 MB check, being a different 2 MB; it uses the
+! development BIOS's: ROM 0x100-0x4FF holds that kilobyte once
+! tools/inject_devboot.py has copied it from the owner's dump. The loops
+! run from the relocated block so no instruction fetch from the EPROM
+! comes in between.
+!
+! void g1_unlock_v(u32 flags) -- in parts, for the serial monitor:
 !   bit 0  G1RRC (0x5F7480) = 0x700 first, as the BIOS's first instruction
-!   bit 1  the key, 0x001FFFFF to 0x5F74E4
-!   bit 2  2 MB read through P2 (uncached) from 0xA0000000
-!   bit 3  the BIOS's read: 0x7FFC0 words through P1 from 0x80000100
-! g1_unlock() is all four.
+!   bit 1  retail key, 0x001FFFFF to 0x5F74E4
+!   bit 2  2 MB read through P2 from 0xA0000000
+!   bit 3  retail BIOS read: 0x7FFC0 words through P1 from 0x80000100
+!   bit 4  development key, 0x000003FF to 0x5F74E4
+!   bit 5  development BIOS read: 0x7C0 words through P2 from 0xA0000100
+! g1_unlock() is bits 0, 4 and 5.
+! =============================================================================
     .global _g1_unlock
     .global _g1_unlock_v
 _g1_unlock:
-    mov     #15, r4
+    mov     #0x31, r4
 _g1_unlock_v:
     mov     r4, r6
     mov     #1, r0
@@ -871,10 +877,26 @@ _g1_unlock_v:
 2:  mov.l   @r4+, r0
     dt      r5
     bf      2b
-6:  rts
+6:  mov     #16, r0
+    tst     r0, r6
+    bt      7f
+    mov.w   .Lg1dkey, r2
+    mov.l   .Lg1reg, r1
+    mov.l   r2, @r1
+7:  mov     #32, r0
+    tst     r0, r6
+    bt      9f
+    mov.l   .Lg1dev, r4
+    mov.w   .Lg1dcnt, r5
+8:  mov.l   @r4+, r0
+    dt      r5
+    bf      8b
+9:  rts
     nop
     .align 2
 .Lg1700:    .word   0x0700
+.Lg1dkey:   .word   0x03FF
+.Lg1dcnt:   .word   0x07C0
     .align 2
 .Lg1rrc:    .long   0xA05F7480
 .Lg1key:    .long   0x001FFFFF
@@ -883,6 +905,7 @@ _g1_unlock_v:
 .Lg1cnt:    .long   0x00080000      ! 2 MB in words
 .Lg1bios:   .long   0x80000100
 .Lg1bcnt:   .long   0x0007FFC0
+.Lg1dev:    .long   0xA0000100
 
     .global _reloc_blk_end
 _reloc_blk_end:

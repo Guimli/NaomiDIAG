@@ -37,6 +37,17 @@ u32 g1_open(void)
     return 1;
 }
 
+/* The kilobyte at ROM 0x100 the unlock depends on: 0xFF as built, the
+ * development BIOS's bytes once tools/inject_devboot.py has run. */
+u32 g1_devboot_present(void)
+{
+    const volatile u32 *p = (const volatile u32 *)0xA0000100u;
+    for (u32 i = 0; i < 0x100; i++)
+        if (p[i] != 0xFFFFFFFFu)
+            return 1;
+    return 0;
+}
+
 void g1_bus_init(void)
 {
     g1_open();

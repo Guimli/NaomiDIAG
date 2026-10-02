@@ -45,4 +45,5 @@ SECTIONS
     /DISCARD/ : { *(.comment) *(.note*) }
 }
 
+ASSERT(_devboot == ORIGIN(ROM) + 0x100, "the unlock kilobyte must sit at ROM 0x100")
 ASSERT(SIZEOF(.data) == 0, "no writable .data allowed (ROM runs without RAM)")

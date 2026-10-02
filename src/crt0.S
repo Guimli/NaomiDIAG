@@ -17,9 +17,23 @@
 #include "version.inc"
 #include "strings.h"
 
+! The first 256 bytes only jump over the next 1 KB: ROM 0x100-0x4FF is kept
+! for the G1 bus unlock (see g1_unlock in ramtest_fast.S and
+! tools/inject_devboot.py). Holly opens the bus to the cartridge or DIMM
+! only after the key is written to 0x5F74E4 and a known stretch of boot ROM
+! is read through it; the Naomi development BIOS keys 0x3FF, which checks
+! exactly that kilobyte. It ships as 0xFF: the bytes are SEGA's and are
+! put there locally, from the owner's own dump, never in this repository.
     .section .text.start, "ax"
     .global _start
 _start:
+    bra     _start_main
+    nop
+    .balign 0x100, 0x09             ! nop-filled up to ROM 0x100
+    .global _devboot
+_devboot:
+    .fill   0x400, 1, 0xFF
+_start_main:
     mov.l   Lsr_init, r0
     ldc     r0, sr              ! MD=1 RB=1 BL=1 IMASK=15
     mov.l   Lmmucr, r1

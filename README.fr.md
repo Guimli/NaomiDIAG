@@ -107,11 +107,21 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
    [Où s'exécutent les boucles de test](#où-sexécutent-les-boucles-de-test)).
 5. **Déverrouillage du bus G1** — Holly garde fermé le bus vers la
    cartouche ou le DIMM après un reset (toute lecture rend 0xFFFF, les
-   écritures sont perdues) jusqu'à ce que `0x001FFFFF` soit écrit en
-   `0x5F74E4` et que la ROM de démarrage soit relue en entier : c'est le
-   verrou GD-ROM de la Dreamcast, toujours présent dans la Naomi. Le BIOS
-   d'origine le fait en premier ; MAME ne le simule pas, si bien que les
-   tests cartouche et DIMM ne marchaient que sous MAME avant cette étape.
+   écritures sont perdues) jusqu'à ce qu'une clé soit écrite en `0x5F74E4`
+   et qu'une portion connue de la ROM de démarrage soit relue : un contrôle
+   d'intégrité du BIOS, le verrou GD-ROM de la Dreamcast, toujours présent
+   dans la Naomi. Le BIOS commercial écrit `0x1FFFFF` et contrôle ses 2 Mo,
+   ce qu'une autre ROM ne peut pas passer ; le BIOS de **développement**
+   Naomi écrit `0x3FF` et ne contrôle que ses octets `0x100`–`0x4FF`.
+   NaomiDIAG garde ce kilo-octet libre et refait la lecture du BIOS de
+   développement. **Ce kilo-octet appartient à SEGA et n'est pas dans ce
+   dépôt** : compilez avec `DEVBOOT=chemin/develop.ic27` (jeu `naomi` de
+   MAME, `develop.ic27` ou `develop110.ic27`) et `tools/inject_devboot.py`
+   le copie depuis votre propre dump dans votre image locale et corrige le
+   CRC. Sans lui, le log de démarrage le signale et les tests cartouche et
+   DIMM trouvent le bus fermé sur vrai matériel (MAME ne simule pas ce
+   contrôle, d'où leur bon fonctionnement sous MAME). Ne publiez jamais une
+   image compilée avec `DEVBOOT`.
 6. **EPROM BIOS (IC27)** — auto-contrôle CRC32. Il s'exécute juste après la
    relocalisation pour que sa boucle tourne elle aussi en cache depuis la
    RAM CPU : seuls les 2 Mo de données traversent encore le bus de l'EPROM.

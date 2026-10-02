@@ -100,11 +100,20 @@ are reported as they land.
    block of CPU RAM, tested first, and run from there cached (see
    [Where the test loops execute](#where-the-test-loops-execute)).
 5. **G1 bus unlock** — Holly keeps the bus to the cartridge or DIMM closed
-   after reset (every read 0xFFFF, writes dropped) until `0x001FFFFF` is
-   written to `0x5F74E4` and the boot ROM is read through: the Dreamcast's
-   GD-ROM lock, still in the Naomi. The original BIOS does it first; MAME
-   does not model it, so the cartridge and DIMM tests only ever worked
-   there until this step was added.
+   after reset (every read 0xFFFF, writes dropped) until a key is written
+   to `0x5F74E4` and a known stretch of the boot ROM is read through it:
+   an integrity check of the BIOS, the Dreamcast's GD-ROM lock, still in
+   the Naomi. The retail BIOS keys `0x1FFFFF` and checks all its 2 MB,
+   which a different ROM cannot pass; the Naomi **development** BIOS keys
+   `0x3FF` and checks only its bytes at `0x100`–`0x4FF`. NaomiDIAG keeps
+   that kilobyte free and does the development BIOS's read. **The
+   kilobyte is SEGA's and is not in this repository**: build with
+   `DEVBOOT=path/to/develop.ic27` (from MAME's `naomi` set, `develop.ic27`
+   or `develop110.ic27`) and `tools/inject_devboot.py` copies it from your
+   own dump into your local image and fixes the CRC. Without it the boot
+   log says so and the cartridge and DIMM tests find the bus closed on real
+   hardware (MAME does not model the check, which is why they always worked
+   there). Never publish an image built with `DEVBOOT`.
 6. **BIOS EPROM (IC27)** — CRC32 self-check. It runs right after the
    relocation so that its loop, too, executes cached from CPU RAM: only the
    2 MB of data still cross the EPROM bus. Without a proven block it runs

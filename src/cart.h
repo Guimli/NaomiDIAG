@@ -12,6 +12,7 @@
 
 void g1_bus_init(void);
 u32  g1_open(void);     /* G1 bus unlock, once; 1 if it ran now */
+u32  g1_devboot_present(void);  /* unlock kilobyte injected at ROM 0x100 */
 void g1_set_board_timing(u32 v);       /* G1GDRC/G1GDWC */
 void cart_seek(u32 offset);
 

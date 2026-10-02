@@ -29,6 +29,11 @@ RELOC ?= 1
 
 # Serial console speed: 57600 (default, +0.47 %) or 115200 (-3.1 %).
 BAUD ?= 57600
+# DEVBOOT=path/to/develop.ic27: copy the G1-unlock kilobyte from your own
+# Naomi development BIOS dump into the image (tools/inject_devboot.py).
+# Without it the cartridge and DIMM tests find the bus locked on real
+# hardware. Never commit or publish an image built this way.
+DEVBOOT ?=
 
 # Anything in src/config.h can be overridden from the command line without
 # editing the file, e.g. make CFLAGS_EXTRA=-DCFG_LANE_BEACON=1
@@ -61,7 +66,7 @@ all: $(BIN)
 # as stray empty files in the tree (DSIM_LANE0x... and the like).
 empty :=
 space := $(empty) $(empty)
-STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)_A$(AUDIO)_B$(BAUD)$(subst $(space),_,$(subst -,,$(subst =,,$(strip $(CFLAGS_EXTRA)))))
+STAMP := .build_$(LANG)_$(QUICK)_$(RELOC)_A$(AUDIO)_B$(BAUD)_D$(if $(DEVBOOT),1,0)$(subst $(space),_,$(subst -,,$(subst =,,$(strip $(CFLAGS_EXTRA)))))
 $(STAMP):
 	rm -f .build_* && touch $@
 
@@ -97,6 +102,7 @@ $(BIN): $(ELF)
 	    echo "$(BIN): $$sz / 2097152 bytes ($$((sz*100/2097152))%)"
 	truncate -s 2M $@
 	python3 tools/patch_crc.py $@
+	@if [ -n "$(DEVBOOT)" ]; then python3 tools/inject_devboot.py $@ "$(DEVBOOT)"; fi
 
 # regenerate both spoken-clip headers (needs Piper venv + sox)
 audio:
