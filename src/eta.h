@@ -26,8 +26,8 @@ enum {
     ETA_MIE,            /* Maple / MIE, settings EEPROM, JVS              */
     ETA_SDRAM,          /* CPU RAM                                        */
     ETA_VRAM,           /* TEX0 + TEX1                                    */
-    ETA_ARAM,           /* sound RAM                                      */
     ETA_N2,             /* PVR-B + Elan RAM (Naomi 2)                     */
+    ETA_ARAM,           /* sound RAM                                      */
     ETA_PERIPH,         /* NVRAM + RTC (+ late MIE stage)                 */
     ETA_SEEPROM,        /* serial EEPROM                                  */
     ETA_END,            /* relocated-code check, summary                  */

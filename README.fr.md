@@ -166,12 +166,12 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
     bus et les trois phases. Dans une région, une puce est une moitié de
     4 Mio et une moitié de 16 bits de données (voir
     [Diagnostic TEX et PVR-A/B](#diagnostic-tex-et-pvr-ab)).
-12. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2), mêmes
-    tests, chaque accès cadencé par la FIFO du bus G2.
-13. **Naomi 2 uniquement** — VRAM du PVR-B (16 Mo, IC111 à IC118S) une fois
+12. **Naomi 2 uniquement** — VRAM du PVR-B (16 Mo, IC111 à IC118S) une fois
     ses fenêtres reconnues indépendantes de celles du PVR-A, et RAM Elan
     (32 Mo, IC106/107/108S/109S) ; voir
     [plus bas](#accès-au-pvr-b-et-ram-elan).
+13. **RAM son** (IC35, 8 Mo, derrière l'AICA IC33 sur le bus G2), mêmes
+    tests, chaque accès cadencé par la FIFO du bus G2.
 14. **NVRAM de sauvegarde (IC29)** — test non destructif
     (sauvegarde/restauration).
 15. **RTC** (interne à l'AICA, IC33) — non destructif : le compteur doit
@@ -364,8 +364,8 @@ parlés compris ; seul le cas sans RAM CPU pour les boucles est extrapolé :
 | MIE, EEPROM des réglages, JVS | 0:19 | sautée |
 | RAM CPU | 0:52 | 12:39 |
 | VRAM TEX0 + TEX1 | 0:53 | 6:25 |
-| RAM son | 8:22 | 8:22 (jamais relogée) |
 | Naomi 2 : PVR-B + RAM Elan | 1:31 | 19:00 |
+| RAM son | 8:22 | 8:22 (jamais relogée) |
 | NVRAM, RTC, EEPROM série, fin | 0:29 | 0:29 |
 | **Total Naomi 1** | **12:07** | **29:04** |
 | **Total Naomi 2** | **13:38** | **48:04** |

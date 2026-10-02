@@ -4462,13 +4462,14 @@ void cmain(void)
     eta_step(ETA_VRAM);
     u32 vram_ok = test_vram();
     suite_check_abort();
-    eta_step(ETA_ARAM);
-    u32 aram_ok = test_aram();
-    suite_check_abort();
-
-    /* Naomi 2 extra memories (no-op on other boards) */
+    /* Naomi 2 extra memories (no-op on other boards), before the sound
+     * RAM: theirs are fast relocated loops, the sound RAM is the long one
+     * (eight minutes across G2), so the graphics verdicts come first. */
     eta_step(ETA_N2);
     test_naomi2_ram();
+    suite_check_abort();
+    eta_step(ETA_ARAM);
+    u32 aram_ok = test_aram();
     suite_check_abort();
 
     /* peripheral stage: backup SRAM (non-destructive), RTC, DIMM, MIE */

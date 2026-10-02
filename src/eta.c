@@ -31,6 +31,8 @@
  *                        (TEX1 passes take 8.9 s, twice TEX0's 4.1 s)
  *   sound RAM            199.83 ->  702.37    502.5   498.8 + 1
  *   PVR-B + Elan RAM     702.37 ->  793.68     91.3    83.9 + 2
+ *   (since v0.18 the PVR-B and Elan RAM run before the sound RAM; the
+ *   step durations are unchanged)
  *   NVRAM + RTC          793.68 ->  807.27     13.6     6.2 + 2
  *   serial EEPROM        807.27 ->  821.85     14.6    10.9 + 1
  *   relocated-code check 821.85 ->  821.93      0.1     0.5

@@ -153,11 +153,11 @@ are reported as they land.
     TEX1 (IC17S/19S/21S/23S), with the same bus tests and three phases.
     Inside a region a chip is a 4 MiB half and a 16-bit data half (see
     [TEX and PVR-A/B diagnostics](#tex-and-pvr-ab-diagnostics)).
-12. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus), same
-    tests, every access paced by the G2 FIFO.
-13. **Naomi 2 only** — PVR-B VRAM (16 MB, IC111 to IC118S) once its windows
+12. **Naomi 2 only** — PVR-B VRAM (16 MB, IC111 to IC118S) once its windows
     are shown independent of PVR-A, and the Elan RAM (32 MB,
     IC106/107/108S/109S); see [below](#pvr-b-access-and-the-elan-ram).
+13. **Sound RAM** (IC35, 8 MB, behind the AICA IC33 on the G2 bus), same
+    tests, every access paced by the G2 FIFO.
 14. **Backup NVRAM (IC29)** — non-destructive save/restore test.
 15. **RTC** (inside the AICA, IC33) — non-destructive: the counter must
     advance by a plausible amount over 2.2 s. A failure is measured again,
@@ -336,8 +336,8 @@ extrapolated:
 | MIE, settings EEPROM, JVS | 0:19 | skipped |
 | CPU RAM | 0:52 | 12:39 |
 | VRAM TEX0 + TEX1 | 0:53 | 6:25 |
-| Sound RAM | 8:22 | 8:22 (never relocated) |
 | Naomi 2: PVR-B + Elan RAM | 1:31 | 19:00 |
+| Sound RAM | 8:22 | 8:22 (never relocated) |
 | NVRAM, RTC, serial EEPROM, end | 0:29 | 0:29 |
 | **Naomi 1 total** | **12:07** | **29:04** |
 | **Naomi 2 total** | **13:38** | **48:04** |
