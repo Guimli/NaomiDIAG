@@ -104,6 +104,12 @@ $(BIN): $(ELF)
 	python3 tools/patch_crc.py $@
 	@if [ -n "$(DEVBOOT)" ]; then python3 tools/inject_devboot.py $@ "$(DEVBOOT)"; fi
 
+# 27C322 (4 MB) in the IC27 socket: the 2 MB image twice, so the chip's
+# extra address line reads the same whatever level the board leaves it at.
+27c322: $(BIN)
+	cat $(BIN) $(BIN) > $(BIN:.bin=_27C322.bin)
+	@echo "$(BIN:.bin=_27C322.bin): 4194304 bytes (2 MB image twice)"
+
 # regenerate both spoken-clip headers (needs Piper venv + sox)
 audio:
 	python3 tools/gen_audio.py fr src/audio_clips_fr.h

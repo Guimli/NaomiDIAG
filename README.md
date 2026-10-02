@@ -702,7 +702,8 @@ can be tested: MAME's `naomi` carries an emulated 837-13551 I/O board.
 
 ## Real hardware notes
 
-- Burn `NaomiDIAG_xx.bin` on a 27C160 (IC27). Serial output is on the SCIF
+- Burn `NaomiDIAG_xx.bin` on a 27C160 (IC27); for a 27C322, `make 27c322`
+  writes `NaomiDIAG_xx_27C322.bin`, the 2 MB image twice. Serial output is on the SCIF
   pins at 3.3 V logic — use a 3.3 V USB-serial adapter, never RS-232 levels.
   For where to connect it on the board, refer to the
   [JinGasa](https://github.com/Tchan0/JinGasa) project: it exists solely to

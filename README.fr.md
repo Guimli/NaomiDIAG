@@ -757,7 +757,8 @@ une carte I/O 837-13551 émulée.
 
 ## Notes pour le vrai matériel
 
-- Gravez `NaomiDIAG_xx.bin` sur une 27C160 (IC27). La sortie série est sur
+- Gravez `NaomiDIAG_xx.bin` sur une 27C160 (IC27) ; pour une 27C322,
+  `make 27c322` produit `NaomiDIAG_xx_27C322.bin`, l'image de 2 Mo deux fois. La sortie série est sur
   les broches SCIF en logique 3,3 V — utilisez un adaptateur USB-série
   3,3 V, jamais des niveaux RS-232. Pour savoir où le brancher sur la carte,
   référez-vous au projet [JinGasa](https://github.com/Tchan0/JinGasa) : il
