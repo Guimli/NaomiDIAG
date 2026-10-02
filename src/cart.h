@@ -11,6 +11,7 @@
 #define CART_ROM_DATA       REG16(0xA05F7008)
 
 void g1_bus_init(void);
+void g1_set_board_timing(u32 v);       /* G1GDRC/G1GDWC */
 void cart_seek(u32 offset);
 
 /* G1 DMA of len bytes (multiple of 32) from the cartridge into system RAM

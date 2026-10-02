@@ -2011,6 +2011,24 @@ static void test_dimm(void)
     g1_bus_init();
     dimm_probe(&di);
 
+    /* A real Naomi 2 with a DIMM the original BIOS sees read all ones here,
+     * mailbox and cartridge space alike, with the 0x1006 cycle. The BIOSes
+     * pick 0x1006 or 0x1106 from a board-dependent test we do not have:
+     * try the other branch (and the slower setup values both use first)
+     * before calling the board absent, and say which one answered. */
+    if (!di.present) {
+        static const u16 tim[3] = { 0x1106, 0x1009, 0x1109 };
+        for (u32 i = 0; i < 3 && !di.present; i++) {
+            g1_set_board_timing(tim[i]);
+            dimm_probe(&di);
+            scif_puts(S_DIMM_TIMING);
+            scif_puthex(tim[i]);
+            scif_puts(di.present ? S_DIMM_TIM_YES : S_DIMM_TIM_NO);
+        }
+        if (!di.present)
+            g1_set_board_timing(0x1006);
+    }
+
     scif_puts(S_DIMM_HDR);
     scif_puts(S_DIMM_REGS);
     scif_puthex(di.command);

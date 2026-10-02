@@ -12,6 +12,16 @@
  * flash timings at their reset values -- a misreading of the BIOS. MAME
  * ignores G1 timings, so nothing showed it there; on a real board the
  * DIMM's mailbox latches would not hold a write. */
+/* The ROM board's read and write cycles. Both BIOSes (Naomi epr-21576h
+ * and Naomi 2 epr-23605c) choose between 0x10xx and 0x11xx from a
+ * board-dependent call this ROM does not reproduce: 0x1006 is what MAME's
+ * runs take, 0x1106 the other branch. */
+void g1_set_board_timing(u32 v)
+{
+    REG32(0xA05F74A0) = v;              /* G1GDRC */
+    REG32(0xA05F74A4) = v;              /* G1GDWC */
+}
+
 void g1_bus_init(void)
 {
     REG32(0xA05F7480) = 0x00000600;     /* G1RRC  system ROM read  */
@@ -20,8 +30,7 @@ void g1_bus_init(void)
     REG32(0xA05F748C) = 0x00000200;     /* G1FWC  flash write      */
     REG32(0xA05F7490) = 0x00000511;     /* G1CRC                   */
     REG32(0xA05F7494) = 0x00000511;     /* G1CWC                   */
-    REG32(0xA05F74A0) = 0x00001006;     /* G1GDRC ROM board read   */
-    REG32(0xA05F74A4) = 0x00001006;     /* G1GDWC ROM board write  */
+    g1_set_board_timing(0x00001006);    /* G1GDRC/G1GDWC ROM board */
     /* G1 DMA protection: the range of system RAM the GD-DMA may write. The
      * BIOS sets 0x8843007F (key 0x8843, the whole of it allowed) before any
      * cartridge or DIMM transfer; left at its reset value, no DMA lands. */
