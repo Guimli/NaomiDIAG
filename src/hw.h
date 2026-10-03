@@ -35,7 +35,7 @@ typedef uint32_t u32;
 /* Values extracted from the original Naomi BIOS (epr-21576h @0xA0000440,
  * literal pool @ROM offset 0x550) and cross-checked against JinGasa SH4.s */
 #define BCR1_VAL        0xA3020008
-#define BCR2_VAL        0x0000
+#define BCR2_VAL        0x0001          /* PORTEN, as the BIOS (and crt0) */
 #define WCR1_VAL        0x01110111
 #define WCR2_VAL        0x018060D8
 #define WCR3_VAL        0x07777777

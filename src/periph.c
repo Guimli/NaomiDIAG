@@ -98,7 +98,9 @@ u16 sega_eeprom_crc(const u8 *data, u32 len)
 
 static void ee_pins(u32 cs, u32 clk, u32 di)
 {
-    PDTRA = (u16)((cs << 5) | (di << 3) | (clk << 2));
+    /* only the EEPROM's three lines move: the other driven pins stay high,
+     * where crt0 put them as the BIOS does */
+    PDTRA = (u16)(0xFFD3u | (cs << 5) | (di << 3) | (clk << 2));
     for (volatile int i = 0; i < 200; i++)
         ;
 }
@@ -126,7 +128,8 @@ static u16 ee_read_word(u32 addr)
 void serial_eeprom_read(u8 *out128)
 {
     BCR2 |= 1;                              /* PORTEN: pins act as GPIO */
-    PCTRA = 0x00000450;                     /* CLK(2)/DI(3)/CS(5) out, DO(4) in */
+    PCTRA = 0x000FEEFE;                     /* CLK(2)/DI(3)/CS(5) out, DO(4) in,
+                                             * the rest as the BIOS sets them */
     for (u32 i = 0; i < 64; i++) {
         u16 w = ee_read_word(i);
         out128[i * 2]     = (u8)(w >> 8);   /* match ROM byte order */

@@ -43,6 +43,21 @@ _start_main:
     mov.l   Lg1rrc, r1
     mov.w   Lg1rrc_v, r0
     mov.l   r0, @r1
+    ! The SH-4's port A as the BIOS leaves it before it reads anything off
+    ! the bus: port function on (BCR2.PORTEN), all lines high, pins 1-3,
+    ! 5 and 7-9 driven (PCTRA 0x000FEEFE, the Naomi 2 BIOS's value). Reset
+    ! leaves them floating inputs, and pins 1, 7 and 8 read low then --
+    ! held down by the board. With a cartridge in, this ROM's EPROM reads
+    ! went wrong at fixed places while the BIOS's never do.
+    mov.l   Lpdtra, r1
+    mov     #-1, r0
+    mov.w   r0, @r1                 ! PDTRA = 0xFFFF
+    mov.l   Lpctra, r1
+    mov.l   Lpctra_v, r0
+    mov.l   r0, @r1                 ! PCTRA
+    mov.l   Lbcr2, r1
+    mov     #1, r0
+    mov.w   r0, @r1                 ! BCR2 = PORTEN
     mov.l   Lsr_init, r0
     ldc     r0, sr              ! MD=1 RB=1 BL=1 IMASK=15
     mov.l   Lmmucr, r1
@@ -222,6 +237,10 @@ asm_puts:
     .align 4
 Lsr_init:   .long 0x700000F0
 Lg1rrc:     .long 0xA05F7480
+Lpdtra:     .long 0xFF800030
+Lpctra:     .long 0xFF80002C
+Lpctra_v:   .long 0x000FEEFE
+Lbcr2:      .long 0xFF800004
 Lg1rrc_v:   .word 0x0700
             .align 2
 Lmmucr:     .long 0xFF000010
