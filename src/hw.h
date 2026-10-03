@@ -37,7 +37,12 @@ typedef uint32_t u32;
 #define BCR1_VAL        0xA3020008
 #define BCR2_VAL        0x0001          /* PORTEN, as the BIOS (and crt0) */
 #define WCR1_VAL        0x01110111
-#define WCR2_VAL        0x018060D8
+/* Area 0 (the boot EPROM, on G1): the BIOS leaves 0 SH-4 wait states
+ * there (0x018060D8), but the BIOS runs from RAM. This ROM executes from
+ * the EPROM, and with a cartridge inserted a literal load right after an
+ * instruction fetch came back with the fetched word instead (real Naomi 2,
+ * every boot at the same place). A0W = 7, the most the SH-4 inserts. */
+#define WCR2_VAL        0x018060DF
 #define WCR3_VAL        0x07777777
 #define RTCSR_VAL       0xA510
 #define RTCOR_VAL       0xA55E
