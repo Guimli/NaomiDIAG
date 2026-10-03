@@ -242,6 +242,12 @@ exc_b_str:
     .asciz S_EXC_B
 exc_c_str:
     .asciz S_EXC_C
+exc_d_str:
+    .asciz "  "
+exc_sp_str:
+    .asciz " "
+exc_nl_str:
+    .asciz "\r\n"
 
 banner_str:
     .ascii S_BANNER_A
@@ -281,6 +287,44 @@ _vec_irq:                       ! VBR + 0x600
 ! once the cause is out on serial does it take a fresh stack and hand over
 ! to exc_report() in C for the screen and the speech.
 exc_common:
+    ! Snapshot first, before any call clobbers PR: the interrupted code's
+    ! PR, SSR, SPC, SGR (its r15), r8-r14, r0-r7 and TEA, the address that
+    ! faulted. This ROM runs on register bank 1 throughout (SR.RB = 1 from
+    ! crt0 on), and so does this handler: r0-r7 are first parked in bank 0,
+    ! which nothing uses, so the handler can then use its own r0 and r1.
+    ! Into the bottom of OC-RAM bank 0, far below the stack.
+    ldc     r0, r0_bank
+    ldc     r1, r1_bank
+    ldc     r2, r2_bank
+    ldc     r3, r3_bank
+    ldc     r4, r4_bank
+    ldc     r5, r5_bank
+    ldc     r6, r6_bank
+    ldc     r7, r7_bank
+    mov.l   Hsave_end, r0
+    mov.l   Htea, r1
+    mov.l   @r1, r1
+    mov.l   r1, @-r0                ! [0]  TEA
+    sts.l   pr, @-r0                ! ...  PR
+    stc.l   ssr, @-r0
+    stc.l   spc, @-r0
+    stc.l   sgr, @-r0               ! r15 at the exception
+    mov.l   r14, @-r0
+    mov.l   r13, @-r0
+    mov.l   r12, @-r0
+    mov.l   r11, @-r0
+    mov.l   r10, @-r0
+    mov.l   r9, @-r0
+    mov.l   r8, @-r0
+    stc.l   r7_bank, @-r0
+    stc.l   r6_bank, @-r0
+    stc.l   r5_bank, @-r0
+    stc.l   r4_bank, @-r0
+    stc.l   r3_bank, @-r0
+    stc.l   r2_bank, @-r0
+    stc.l   r1_bank, @-r0
+    stc.l   r0_bank, @-r0           ! lowest address: r0
+
     mov.l   Hexc_a, r4
     mov.l   Hputs, r0
     jsr     @r0                 ! PR is clobbered: we never return
@@ -300,6 +344,36 @@ exc_common:
     mov.l   Hputs, r0
     jsr     @r0
     nop
+
+    ! the snapshot, lowest address first: r0-r7, then r8-r14 and r15,
+    ! then SPC SSR PR TEA (20 words, 8 + 8 + 4 per line)
+    mov.l   Hsave_lo, r8            ! r8-r14 already saved: free to use
+    mov     #3, r9
+5:  mov.l   Hexc_d, r4
+    mov.l   Hputs, r0
+    jsr     @r0
+    nop
+    mov     #8, r10
+    mov     r9, r0
+    cmp/eq  #1, r0
+    bf      7f
+    mov     #4, r10                 ! last line
+7:
+6:  mov.l   @r8+, r4
+    bsr     asm_puthex
+    nop
+    mov.l   Hexc_sp, r4
+    mov.l   Hputs, r0
+    jsr     @r0
+    nop
+    dt      r10
+    bf      6b
+    mov.l   Hexc_nl, r4
+    mov.l   Hputs, r0
+    jsr     @r0
+    nop
+    dt      r9
+    bf      5b
 
     ! Once only. A fault inside the C report comes back here; the flag says
     ! so, and it stops at the serial report instead of recursing.
@@ -336,6 +410,12 @@ exc_halt:
 Hexc_a:     .long exc_a_str
 Hexc_b:     .long exc_b_str
 Hexc_c:     .long exc_c_str
+Hexc_d:     .long exc_d_str
+Hexc_sp:    .long exc_sp_str
+Hexc_nl:    .long exc_nl_str
+Htea:       .long 0xFF00000C
+Hsave_end:  .long 0x7C000060        ! 24 words below this
+Hsave_lo:   .long 0x7C000010        ! 0x60 - 20 words
 Hputs:      .long asm_puts
 Hexpevt:    .long 0xFF000024
 Hexcflag:   .long _g_exc_active

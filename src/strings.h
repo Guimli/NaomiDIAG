@@ -136,7 +136,7 @@
 #define S_L_VIDEO_QUICK     "VRAM framebuffer (rapide)"
 #define S_EXC_A             "\r\n*** EXCEPTION CPU : EXPEVT="
 #define S_EXC_B             "  PC="
-#define S_EXC_C             "  -- arret ***\r\n"
+#define S_EXC_C             "  -- arret ***\r\n  R0-R7 / R8-R15 / R15 SPC SSR PR TEA :\r\n"
 #define S_EXC_SCREEN        "EXCEPTION CPU "
 
 /* status suffixes / words */
@@ -598,7 +598,7 @@
 #define S_L_VIDEO_QUICK     "VRAM framebuffer quick check"
 #define S_EXC_A             "\r\n*** CPU EXCEPTION: EXPEVT="
 #define S_EXC_B             "  PC="
-#define S_EXC_C             "  -- halted ***\r\n"
+#define S_EXC_C             "  -- halted ***\r\n  R0-R7 / R8-R15 / R15 SPC SSR PR TEA:\r\n"
 #define S_EXC_SCREEN        "CPU EXCEPTION "
 
 #define S_SUF_OK            " ........ OK\n"
