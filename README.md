@@ -203,6 +203,12 @@ take long enough that they have no business delaying the report.
   board's buttons answer (with the blue hint on screen), and in any case
   just before the long memory tests, MIE or not.
   Keys are case-insensitive (caps lock does no harm).
+- **Exception report** — a CPU exception halts with its cause and address
+  on screen, spoken, and on serial with r0-r15, SPC, SSR, PR and TEA (the
+  faulting address). When TEA is a word of the code right around the
+  faulting instruction -- the EPROM handed back a neighbouring word, which
+  is what a faulty cartridge disturbing the G1 bus it shares with the
+  EPROM does -- the report says **Suspect cartridge: remove it**.
 - **Serial monitor** (`!` on the console, from the menu or the idle
   screen) — `r b|w|l ADDR [N]` reads, `w b|w|l ADDR VAL` writes any
   address (P2 alias for registers, e.g. `A05F703C`), `u [BITS]` runs the

@@ -223,6 +223,12 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
   dans tous les cas juste avant les longs tests mémoire, MIE ou pas.
   Majuscules et minuscules sont équivalentes (le verrouillage majuscules ne
   gêne pas).
+- **Rapport d'exception** — une exception CPU arrête la ROM avec sa cause
+  et son adresse à l'écran, à la voix, et sur le port série avec r0-r15,
+  SPC, SSR, PR et TEA (l'adresse fautive). Quand TEA est un mot du code
+  juste autour de l'instruction fautive -- l'EPROM a renvoyé un mot voisin,
+  ce que fait une cartouche défectueuse qui perturbe le bus G1 partagé avec
+  l'EPROM -- le rapport affiche **Cartouche suspecte : la retirer**.
 - **Moniteur série** (`!` sur la console, depuis le menu ou l'écran
   d'attente) — `r b|w|l ADR [N]` lit, `w b|w|l ADR VAL` écrit n'importe
   quelle adresse (alias P2 pour les registres, par ex. `A05F703C`),

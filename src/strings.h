@@ -136,6 +136,8 @@
 #define S_L_VIDEO_QUICK     "VRAM framebuffer (rapide)"
 #define S_EXC_A             "\r\n*** EXCEPTION CPU : EXPEVT="
 #define S_EXC_B             "  PC="
+#define S_EXC_MISREAD       "  L'EPROM a renvoye un mot voisin de celui demande (lecture incoherente).\r\n  Si une cartouche est en place, la retirer et recommencer : une cartouche\r\n  defectueuse perturbe le bus G1 qu'elle partage avec l'EPROM du BIOS.\r\n"
+#define S_SCR_EXC_MISREAD   "Cartouche suspecte : la retirer"
 #define S_EXC_C             "  -- arret ***\r\n  R0-R7 / R8-R15 / R15 SPC SSR PR TEA :\r\n"
 #define S_EXC_SCREEN        "EXCEPTION CPU "
 
@@ -598,6 +600,8 @@
 #define S_L_VIDEO_QUICK     "VRAM framebuffer quick check"
 #define S_EXC_A             "\r\n*** CPU EXCEPTION: EXPEVT="
 #define S_EXC_B             "  PC="
+#define S_EXC_MISREAD       "  The EPROM returned a word next to the one asked for (inconsistent read).\r\n  If a cartridge is inserted, remove it and try again: a faulty cartridge\r\n  disturbs the G1 bus it shares with the BIOS EPROM.\r\n"
+#define S_SCR_EXC_MISREAD   "Suspect cartridge: remove it"
 #define S_EXC_C             "  -- halted ***\r\n  R0-R7 / R8-R15 / R15 SPC SSR PR TEA:\r\n"
 #define S_EXC_SCREEN        "CPU EXCEPTION "
 

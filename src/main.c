@@ -4971,8 +4971,38 @@ static void hex_into(char *d, u32 v, u32 ndigits)
         d[i] = hx[(v >> ((ndigits - 1 - i) * 4)) & 0xF];
 }
 
+/* A fault that comes from the EPROM reading wrong: the address that faulted
+ * (TEA, or the bad register) is a word of the code right around the
+ * faulting instruction -- the read handed back a neighbouring word, as a
+ * cartridge disturbing the G1 bus it shares with the EPROM does. The
+ * snapshot is crt0's (exc_common), in OC-RAM. */
+#define EXC_SNAP        ((const volatile u32 *)0x7C000010u)
+#define EXC_TEA         (EXC_SNAP[19])
+
+static u32 exc_rom_misread(u32 expevt, u32 spc)
+{
+    if (expevt != 0xE0 && expevt != 0x100)      /* address errors only */
+        return 0;
+    if ((spc & 0xE0000000u) != 0xA0000000u && (spc & 0xE0000000u) != 0x80000000u)
+        return 0;
+    if ((spc & 0x1FFFFFFFu) >= 0x00200000u)     /* not executing the EPROM */
+        return 0;
+    u32 tea = EXC_TEA;
+    const volatile u16 *rom = (const volatile u16 *)
+        (0xA0000000u | (spc & 0x001FFFFEu));
+    for (int k = -16; k <= 16; k++) {           /* +-32 bytes, halfword steps */
+        u32 lo = rom[k], hi = rom[k + 1];
+        if ((lo | hi << 16) == tea)
+            return 1;
+    }
+    return 0;
+}
+
 void exc_report(u32 expevt, u32 spc)
 {
+    u32 misread = exc_rom_misread(expevt, spc);
+    if (misread)
+        scif_puts(S_EXC_MISREAD);
     if (g_screen_ready) {
         char line[40];
         u32 n = 0;
@@ -4989,12 +5019,21 @@ void exc_report(u32 expevt, u32 spc)
         line[n] = 0;
         u32 ymax = fb_report_ymax();
         u32 y = g_screen_y + 20 <= ymax ? g_screen_y : ymax - 20;
+        if (misread && y + 40 > ymax)
+            y = ymax - 40;
         fb_text(16, y, line, COL_RED, FB_W);
+        if (misread)
+            fb_text(16, y + 20, S_SCR_EXC_MISREAD, COL_AMBER, FB_W);
     }
     pvr_border(0x00FF0000u);            /* solid red: halted, not pulsing */
 
-    if (g_audio_ready)
+    if (g_audio_ready) {
         say(CLIP_CPU_EXC, 250);
+        if (misread) {                  /* "Game cartridge. defective." */
+            say(CLIP_CART, 250);
+            say(CLIP_DEFECT, 250);
+        }
+    }
 
     pvr_border(0x00FF0000u);            /* the speech wait pulses the border */
     for (;;)
