@@ -34,6 +34,15 @@ _start:
 _devboot:
     .fill   0x400, 1, 0xFF
 _start_main:
+    ! The boot ROM's read cycle first, as the original BIOS's very first
+    ! instruction does (G1RRC = 0x700): the EPROM sits on the G1 bus, and
+    ! left at Holly's reset timing a read can return the previous word.
+    ! Seen on a real Naomi 2 with a cartridge inserted -- the extra load on
+    ! the bus -- as a literal load handing back the instruction fetched just
+    ! before it, every boot at the same place.
+    mov.l   Lg1rrc, r1
+    mov.w   Lg1rrc_v, r0
+    mov.l   r0, @r1
     mov.l   Lsr_init, r0
     ldc     r0, sr              ! MD=1 RB=1 BL=1 IMASK=15
     mov.l   Lmmucr, r1
@@ -212,6 +221,9 @@ asm_puts:
 
     .align 4
 Lsr_init:   .long 0x700000F0
+Lg1rrc:     .long 0xA05F7480
+Lg1rrc_v:   .word 0x0700
+            .align 2
 Lmmucr:     .long 0xFF000010
 Lccr:       .long 0xFF00001C
 Lccr_val:   .long 0x000009A9    ! ICI|ICE|ORA|OIX|OCI|OCE
