@@ -3669,11 +3669,61 @@ static void audio_replay_log(void);   /* defined below */
                                          * sound RAM than speech requires */
 #define FB_ZONE_LEN     ((u32)FB_W * FB_H * 2)   /* 640x480 RGB565 */
 
+#if ROM_PROBE
+/* Diagnostic build only (CFLAGS_EXTRA=-DROM_PROBE=1): data reads of a known
+ * ROM table, through P2, to see whether reading the EPROM goes wrong and
+ * when -- a real Naomi 2 with a cartridge in returned the previous word on
+ * one literal load right after aica_init(). */
+static const u32 rom_probe_tab[64] = {
+#define RP4(i) 0x5A000000u|(i), 0xA5000000u|(i)<<8, 0x0F0F0000u|(i), 0xF0F00000u|(i)<<4
+    RP4(0),RP4(1),RP4(2),RP4(3),RP4(4),RP4(5),RP4(6),RP4(7),
+    RP4(8),RP4(9),RP4(10),RP4(11),RP4(12),RP4(13),RP4(14),RP4(15)
+#undef RP4
+};
+static void rom_probe(u32 tag)
+{
+    const volatile u32 *t = (const volatile u32 *)
+        (0xA0000000u | ((u32)rom_probe_tab & 0x1FFFFFFFu));
+    u32 bad = 0, first = 0xFFFFFFFFu, got = 0;
+    for (u32 pass = 0; pass < 16; pass++)
+        for (u32 i = 0; i < 64; i++) {
+            u32 v = t[i], k = i >> 2, e;   /* expected, computed: no ROM */
+            switch (i & 3) {
+            case 0:  e = 0x5A000000u | k; break;
+            case 1:  e = 0xA5000000u | k << 8; break;
+            case 2:  e = 0x0F0F0000u | k; break;
+            default: e = 0xF0F00000u | k << 4; break;
+            }
+            if (v != e) {
+                if (!bad) { first = i; got = v; }
+                bad++;
+            }
+        }
+    scif_puts("ROM probe ");
+    scif_putdec(tag);
+    scif_puts(": bad reads ");
+    scif_putdec(bad);
+    if (bad) {
+        scif_puts(" first #");
+        scif_putdec(first);
+        scif_puts(" got ");
+        scif_puthex(got);
+    }
+    scif_puts("\n");
+}
+#endif
+
 static void quick_audio_bringup(void)
 {
+#if ROM_PROBE
+    rom_probe(1);
+#endif
     aica_init();                        /* ARM7 held in reset: the data bus
                                          * test below writes offset 0, which
                                          * is where a running ARM7 fetches */
+#if ROM_PROBE
+    rom_probe(2);
+#endif
 
     ram_result res;
     ram_result_clear(&res);
