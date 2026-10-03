@@ -892,7 +892,9 @@ Ce qui marche passe à côté, par le bus G1 :
   « sans CRC » est cassé pour que le DIMM recharge au lieu de démarrer ce
   que le test a laissé. Sans RAM CPU validée par la suite, les 16 Mo du
   haut sont exclus. Sans taille donnée par le DIMM, elle est trouvée par
-  repliement. La présence se décide en écrivant deux motifs dans les
+  repliement. Si rien de tout cela ne répond, le premier message du BIOS est envoyé
+  quand même, et une requête du firmware du DIMM dans les 3 s vaut
+  présence (sur un bus vide, le message se perd). La présence se décide en écrivant deux motifs dans les
   registres OFFSETL/PARAMETERL de la mailbox et en les relisant : après
   un reset, la mailbox d'un DIMM lit 0xFFFF partout, exactement comme un
   bus vide. *Pas encore validé sur vrai matériel* ; sous MAME (un jeu

@@ -2507,25 +2507,50 @@ static void dimm_top_restore(void)
 static void test_dimm(u32 resumed)
 {
     dimm_info di;
+    u32 hello_sent = 0;
     dimm_find(&di, resumed);
     if (!di.present) {
+        /* Second way to find it: the firmware's own answer. The registers
+         * looked empty, but a DIMM waiting for the BIOS's first message
+         * answers it with a request within a moment; on an empty bus the
+         * message is simply lost (STATUS reads all ones: nothing pending,
+         * so nothing is ever served). Sealed first, like the main path:
+         * this message can make the DIMM reset the Naomi. */
         if (!resumed)
-            log_result(S_L_DIMM_ABSENT, CLIP_NONE, T_OK, 0, 0);
-        resume_clear();
-        return;
+            resume_begin();
+        resume_save(RS_HELLO);
+        scif_puts(S_DH_PROBE);
+        dimm_host_start();
+        if (dimm_host_wait(DH_GOT_ANY, 3000)) {
+            scif_puts(S_DH_PROBE_YES);
+            di.present = 1;
+            hello_sent = 1;
+        } else {
+            dimm_host_stop();
+            scif_puts(S_DH_PROBE_NO);
+            if (!resumed)
+                log_result(S_L_DIMM_ABSENT, CLIP_NONE, T_OK, 0, 0);
+            resume_clear();
+            return;
+        }
     }
     if (!resumed) {
-        log_result(S_L_DIMM_PRESENT, CLIP_NONE, T_OK, 0, 0);
-        resume_begin();
+        log_result(hello_sent ? S_L_DIMM_PRESENT_FW : S_L_DIMM_PRESENT,
+                   CLIP_NONE, T_OK, 0, 0);
+        if (!hello_sent)
+            resume_begin();
     }
 
     /* Stand in for the BIOS: first message, then the DIMM's requests. The
      * block is sealed first because this is what can make the DIMM reset
-     * the Naomi; the boot then comes back here (resume_run). */
+     * the Naomi; the boot then comes back here (resume_run). Sent once:
+     * the presence probe above may already have done it. */
     u32 idle = 1, size = 0;
     resume_save(RS_HELLO);
-    scif_puts(S_DH_HELLO);
-    dimm_host_start();
+    if (!hello_sent) {
+        scif_puts(S_DH_HELLO);
+        dimm_host_start();
+    }
     if (dimm_host_wait(DH_GOT_ANY, 5000)) {
         dimm_host_wait(DH_GOT_MEM | DH_GOT_VER, 10000);
         size = dimm_host_size();

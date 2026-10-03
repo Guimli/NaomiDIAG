@@ -826,7 +826,9 @@ What does work goes around it, on the G1 bus:
   put back (checked by reading them back); a game header in "no CRC" mode
   is broken so the DIMM reloads instead of booting what the test left.
   Without a CPU RAM the suite has proven, the top 16 MB are left out. With
-  no size from the DIMM, it is found by aliasing. Presence is decided by writing two patterns into the mailbox's
+  no size from the DIMM, it is found by aliasing. If none of that answers, the BIOS's first message is sent anyway and a
+  request from the DIMM firmware within 3 s counts as presence (on an
+  empty bus the message is simply lost). Presence is decided by writing two patterns into the mailbox's
   OFFSETL/PARAMETERL latches and reading them back: a DIMM's mailbox reads
   0xFFFF in every register after reset, exactly like an empty bus.
   *Not validated on real hardware yet*; under MAME (a GD-ROM game with

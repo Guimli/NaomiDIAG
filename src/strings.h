@@ -216,6 +216,10 @@
 #define S_L_DIMM_MEM_PAT    "DIMM : test cellules + CRC"
 /* hote DIMM (PEEK/POKE), reprise apres reset, 16 Mo du haut */
 #define S_DH_HELLO          "  hote DIMM : premier message envoye (mode test)\n"
+#define S_DH_PROBE          "  registres muets : premier message du BIOS envoye quand meme, attente d'une requete du DIMM (3 s)...\n"
+#define S_DH_PROBE_YES      "  le firmware du DIMM a repondu : carte presente\n"
+#define S_DH_PROBE_NO       "  aucune requete : pas de DIMM\n"
+#define S_L_DIMM_PRESENT_FW "Carte DIMM : presente (firmware)"
 #define S_DH_SILENT         "  hote DIMM : aucune requete du DIMM\n"
 #define S_L_DH_SILENT       "DIMM : aucune requete"
 #define S_DH_FW             "DIMM : firmware "
@@ -672,6 +676,10 @@
 #define S_L_DIMM_MEM_PAT    "DIMM: cell test + CRC"
 /* DIMM host (PEEK/POKE), resume after reset, top 16 MB */
 #define S_DH_HELLO          "  DIMM host: first message sent (test mode)\n"
+#define S_DH_PROBE          "  registers silent: sending the BIOS's first message anyway, waiting for a DIMM request (3 s)...\n"
+#define S_DH_PROBE_YES      "  the DIMM firmware answered: board present\n"
+#define S_DH_PROBE_NO       "  no request: no DIMM\n"
+#define S_L_DIMM_PRESENT_FW "DIMM board: present (firmware)"
 #define S_DH_SILENT         "  DIMM host: no request from the DIMM\n"
 #define S_L_DH_SILENT       "DIMM: no host request"
 #define S_DH_FW             "DIMM: firmware "
