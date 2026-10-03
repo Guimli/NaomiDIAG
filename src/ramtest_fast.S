@@ -907,5 +907,106 @@ _g1_unlock_v:
 .Lg1bcnt:   .long   0x0007FFC0
 .Lg1dev:    .long   0xA0000100
 
+! =============================================================================
+! DIMM SDRAM test over G1-DMA (dimm.c): the two CPU-side loops.
+!
+! The DMA moves the data; the CPU fills the source and poison buffers and
+! checks what came back, 8 K words per 32 KB block. In C from the EPROM that
+! check was a compare plus TWO table CRCs per word. Here the compare is
+! branchless (difference ORed, mismatches counted with movt) and the CRC is
+! left to crc32_rom_block, run once per block on the data read back.
+!
+! Both loops take the expected value as a start and a step: step 0 is a
+! constant pattern, step 4 the word's own DIMM offset (address-in-data), and
+! step -4 from ~start gives the complement of the latter, ~(start + 4i), as
+! poison.
+!
+! Context block (offsets MUST match dimm_chk_ctx in ramtest.h):
+!     0  exp     expected value of the next word, advanced by the routine
+!     4  step    added to exp after every word
+!     8  diff    OR of every (read XOR expected), accumulated
+!    12  nbad    mismatching words, accumulated
+! =============================================================================
+
+! -----------------------------------------------------------------------------
+! void dimm_fill_seq_fast(u32 *dst, u32 nblocks8, u32 first, u32 step)
+!   r4 = destination, r5 = number of 8-word blocks, r6 = first value,
+!   r7 = step. 2 instructions per word.
+! -----------------------------------------------------------------------------
+    .global _dimm_fill_seq_fast
+_dimm_fill_seq_fast:
+    tst     r5, r5
+    bt      9f
+1:  mov.l   r6, @(0, r4)
+    add     r7, r6
+    mov.l   r6, @(4, r4)
+    add     r7, r6
+    mov.l   r6, @(8, r4)
+    add     r7, r6
+    mov.l   r6, @(12, r4)
+    add     r7, r6
+    mov.l   r6, @(16, r4)
+    add     r7, r6
+    mov.l   r6, @(20, r4)
+    add     r7, r6
+    mov.l   r6, @(24, r4)
+    add     r7, r6
+    mov.l   r6, @(28, r4)
+    add     r7, r6
+    dt      r5
+    bf/s    1b
+    add     #32, r4         ! delay slot: pointer advance is free
+9:  rts
+    nop
+
+! -----------------------------------------------------------------------------
+! void dimm_check_seq_fast(const u32 *src, u32 nblocks8, dimm_chk_ctx *c)
+!   r4 = words read back, r5 = number of 8-word blocks, r6 = context.
+! r1 exp  r7 step  r2 diff  r8 words matched  r9 1 if the word matched
+! 7 instructions per word.
+! -----------------------------------------------------------------------------
+    .macro  DCHKWORD
+    mov.l   @r4+, r0
+    xor     r1, r0          ! difference
+    or      r0, r2          ! ... kept, whatever it is
+    tst     r0, r0          ! T = word matched
+    movt    r9
+    add     r9, r8          ! count the matches, branchless
+    add     r7, r1          ! next expected value
+    .endm
+
+    .global _dimm_check_seq_fast
+_dimm_check_seq_fast:
+    mov.l   r8, @-r15
+    mov.l   r9, @-r15
+    mov.l   @(0, r6), r1
+    mov.l   @(4, r6), r7
+    mov.l   @(8, r6), r2
+    mov     #0, r8
+    mov     r5, r3          ! block count, for the total afterwards
+    tst     r5, r5
+    bt      9f
+1:  DCHKWORD
+    DCHKWORD
+    DCHKWORD
+    DCHKWORD
+    DCHKWORD
+    DCHKWORD
+    DCHKWORD
+    DCHKWORD
+    dt      r5
+    bf      1b
+9:  shll2   r3
+    shll    r3              ! words checked = 8 per block
+    sub     r8, r3          ! ... minus those that matched
+    mov.l   @(12, r6), r0
+    add     r3, r0
+    mov.l   r0, @(12, r6)
+    mov.l   r2, @(8, r6)
+    mov.l   r1, @(0, r6)
+    mov.l   @r15+, r9
+    rts
+    mov.l   @r15+, r8
+
     .global _reloc_blk_end
 _reloc_blk_end:

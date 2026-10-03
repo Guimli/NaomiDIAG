@@ -251,17 +251,44 @@ chargé), `SB_GDDIR = 1` **écrit la RAM système vers le DIMM**. Le bit est
 utilisé dans les deux sens par le BIOS compatible DIMM (`epr-23605c.ic27`),
 à trois sites.
 
-`src/dimm.c` s'en sert pour un vrai test mémoire : motifs `0x01010101` puis
-`0x10101010`, écriture DMA, relecture DMA, comparaison mot à mot et CRC-32,
+`src/dimm.c` s'en sert pour un vrai test mémoire : motifs `0x55555555` puis
+`0xAAAAAAAA` (écriture DMA puis relecture DMA, bloc par bloc), puis **adresse-dans-donnée** : chaque mot reçoit son propre offset,
+toute la plage est écrite avant d'être relue, si bien qu'une ligne d'adresse
+collée ou en court-circuit fait apparaître l'offset d'un autre mot.
+Comparaison mot à mot et CRC-32 à chaque passe, en assembleur
+(`dimm_fill_seq_fast`/`dimm_check_seq_fast` dans `ramtest_fast.S`, exécutées
+depuis la RAM CPU quand elle a été validée),
 avec un délai de garde d'une seconde sur `SB_GDST` pour ne pas se figer si
 le DIMM est absent ou non amorcé. Le test est **destructeur pour le jeu
 chargé** (pas pour le firmware, qui tourne depuis sa propre RAM), donc il
 n'est jamais lancé par le balayage automatique : il vit derrière l'action
 `d` du menu opérateur.
 
-Le test RAM *interne* du DIMM (« CHECKING MEMORY %d%% ») n'est, lui, pas
-déclenchable : le firmware ne le lance qu'à son propre amorçage et le rend
-sur sa sortie vidéo, pas vers la Naomi.
+Le test *interne* du DIMM n'est pas un substitut (voir
+`analysis/dimm_dis/DIMM_AUTOTEST.md`) : « CHECKING MEMORY » au boot est un
+CRC du jeu en cache, et le test lancé par le menu « DIMM BOARD TEST » du BIOS
+n'écrit que `0x55555555` sur un seizième de la SDRAM.
+
+Depuis, le test couvre **tout le DIMM**, grâce à deux ajouts :
+
+- **NaomiDIAG sert les PEEK/POKE du DIMM** (`src/dimm_host.c`). Protocole
+  relevé dans la routine de service du BIOS (voir
+  `analysis/dimm_dis/DIMM_AUTOTEST.md` §8). NaomiDIAG envoie le premier
+  message (`0x1E00 | 2`) que le chargeur du DIMM attend, puis répond à
+  chaque requête avec l'état 2 (BIOS en mode test), dans une copie de
+  512 octets de `0x0C01FC00`–`0x0C01FDFF` tenue en OC-RAM. Le DIMM y écrit
+  sa taille mémoire (`0x0C01FC04`) et sa version (`0x0C01FC0C`) ; sa
+  lecture de `0x0C01FC08` signale que son chargeur est au repos. Le service
+  passe par `progress_heartbeat()`, donc par toutes les boucles de la ROM.
+- **Reprise après le reset que le DIMM impose à la Naomi** : un bloc scellé
+  par CRC-32 à `0x0C200000` (rapport, état du test, port MIE, copie des
+  16 Mo du haut) est vérifié juste après `sdram_init`, avant toute écriture
+  en RAM. S'il est valide, le boot saute la suite de base et reprend le test
+  DIMM. Au plus trois reprises de suite.
+
+Les 16 Mo du haut (zone de travail du firmware) sont copiés à `0x0C800000`
+par DMA, testés, restaurés et relus ; un en-tête « sans CRC » est cassé
+après restauration.
 
 ### 2. Flash du firmware DIMM — identification faite, gravure désarmée
 

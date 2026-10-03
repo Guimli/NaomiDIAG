@@ -3,6 +3,7 @@
 #include "scif.h"
 #include "timer.h"
 #include "eta.h"
+#include "dimm_host.h"
 
 /* border colour per phase, 0x00RRGGBB as VO_BORDER_COL wants it */
 static const u32 phase_col[] = {
@@ -28,6 +29,10 @@ static void eta_redraw(void);
 void progress_heartbeat(void)
 {
     timer_ms();                     /* keeps the elapsed clock past its wrap */
+    /* Before the rate limit: every loop of the ROM passes through here, and
+     * a DIMM in session must get its answers wherever the ROM happens to be
+     * (see dimm_host.h). A register read when nothing is pending. */
+    dimm_host_service();
     u32 now = timer_ticks();
     if ((u32)(now - g_hb_last) < HB_TICKS)
         return;

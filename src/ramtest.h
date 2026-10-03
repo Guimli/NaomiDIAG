@@ -47,6 +47,17 @@ typedef struct {
 } find_ctx;
 u32 ram_find_pat_fast(const u32 *p, u32 n, find_ctx *c);
 u32 ram_find_prng_fast(const u32 *p, u32 n, find_ctx *c);
+/* DIMM SDRAM test (dimm.c): expected value = start + step per word, step 0
+ * for a constant pattern, 4 for address-in-data. Offsets MUST match
+ * ramtest_fast.S. */
+typedef struct {
+    u32 exp;                     /* expected value of the next word        */
+    u32 step;                    /* added to exp after every word          */
+    u32 diff;                    /* OR of every (read ^ expected)          */
+    u32 nbad;                    /* mismatching words                      */
+} dimm_chk_ctx;
+void dimm_fill_seq_fast(u32 *dst, u32 nblocks8, u32 first, u32 step);
+void dimm_check_seq_fast(const u32 *src, u32 nblocks8, dimm_chk_ctx *c);
 /* SHA-1 of nblocks x 64 bytes read from the cartridge port (sha1.c) */
 void sha1_pio_blocks(u32 h[5], u32 nblocks, u32 w[80]);
 /* CRC-32 of nquads x 4 words of the boot EPROM (P1 pointer) */

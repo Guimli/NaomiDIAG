@@ -789,7 +789,23 @@ proxy, and one of them is a no-op.
 
 What does work goes around it, on the G1 bus:
 
-- **`d` — DIMM SDRAM test.** Holly's GD-DMA has a direction bit, and the
+- **`d` — DIMM SDRAM test.** It begins by **standing in for the BIOS** on
+  the DIMM's own requests: the DIMM firmware reads and writes the BIOS's
+  work area in Naomi RAM through the mailbox (PEEK/POKE) and waits for a
+  first message from the BIOS before doing anything. NaomiDIAG sends it,
+  answers every request as a BIOS in test mode would (which keeps the DIMM
+  from loading a game), and learns the DIMM's firmware version and memory
+  size from what it posts — "DIMM: firmware 4.03, 512 MB". The session
+  then runs until the next reset, answered from every loop of the ROM. It
+  waits for the DIMM's loader to settle (it may be checking the game it
+  holds) before writing anything. The DIMM firmware **resets the Naomi**
+  when its loader starts, and again when a network-mode board finds no
+  valid game: the report and the test's state are sealed in CPU RAM first,
+  and the boot that follows such a reset skips the base suite, brings back
+  the screen, the board identification and the MIE program (so the buttons
+  work), puts the report back with a "Resumed after a DIMM reset" line and
+  carries on. At most three resumes in a row, then a normal boot. Holly's
+  GD-DMA has a direction bit, and the
   sources disagree on it: the DIMM reversing had 0 = read, while the
   original BIOS loads cartridges with `SB_GDDIR = 1`. The count register
   (0x5F7014) is in 8-byte units in one, 32-byte units in the other. So the
@@ -801,15 +817,25 @@ What does work goes around it, on the G1 bus:
   units are tried on a read, and 32 KB are timed. The serial log gives
   every outcome; the screen gives "G1 DMA read GDDIR=n" and "G1 DMA write
   GDDIR=n". Only with both directions established, and after SERVICE/START
-  (TEST skips), does the destructive memory test run (`0x01010101`,
-  `0x10101010`, CRC-32, one-second DMA timeout) — it overwrites the loaded
-  game. Presence is decided by writing two patterns into the mailbox's
+  (TEST skips), does the destructive memory test run over **the whole
+  DIMM** (`0x55555555`, `0xAAAAAAAA`, then address-in-data with the whole
+  span written before it is read back, CRC-32, one-second DMA timeout) —
+  it overwrites the loaded game. The question gives the size and the
+  expected time. The DIMM's top 16 MB, its working area, are copied into
+  CPU RAM first (checked against a second read), tested with the rest and
+  put back (checked by reading them back); a game header in "no CRC" mode
+  is broken so the DIMM reloads instead of booting what the test left.
+  Without a CPU RAM the suite has proven, the top 16 MB are left out. With
+  no size from the DIMM, it is found by aliasing. Presence is decided by writing two patterns into the mailbox's
   OFFSETL/PARAMETERL latches and reading them back: a DIMM's mailbox reads
   0xFFFF in every register after reset, exactly like an empty bus.
   *Not validated on real hardware yet*; under MAME (a GD-ROM game with
   NaomiDIAG staged as `naomigd.zip`'s epr-21576h, `-bios bios2`) the board
   is found and the probe reads, but MAME ignores the direction bit and
-  cannot show a write.
+  cannot show a write. MAME's full DIMM emulation (its debug-only "Full
+  emulation" setting) does not talk to any BIOS, so the PEEK/POKE session is
+  not testable there either; the resume after a reset is, with
+  `mame/dimm_resume.lua`, which stands a soft reset in for the DIMM's.
 - **`f` — DIMM firmware flash.** The flash is reachable through the G1
   ROM-board PIO with AMD commands. The ROM performs a read-ID, which is
   non-destructive, and offers a 3.17 / 4.01 / 4.03 selection. The screen

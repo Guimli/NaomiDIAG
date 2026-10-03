@@ -1,7 +1,8 @@
 /* DIMM board (G1 bus): mailbox probe (read-only) and, when the operator
  * asks for it, a destructive SDRAM cell test over the GD-DMA path. */
 #include "dimm.h"
-#include "ramtest.h"        /* crc32_word */
+#include "ramtest.h"        /* dimm_chk_ctx */
+#include "reloc.h"          /* p_dimm_*_fast, p_crc32_rom_block */
 #include "timer.h"          /* timer_ticks, TIMER_HZ */
 #include "progress.h"       /* progress_tick, progress_aborted */
 
@@ -255,13 +256,8 @@ u32 dimm_scratch_ok(void)
     return 1;
 }
 
-void dimm_mem_test(u32 span, u32 pattern, dimm_mem_result *r,
-                   u32 dir_write, u32 dir_read)
+static void mem_result_init(dimm_mem_result *r)
 {
-    volatile u32 *wbuf = P2(SCRATCH_PHYS_W);
-    volatile u32 *rbuf = P2(SCRATCH_PHYS_R);
-    const u32 nw = DIMM_DMA_BLK / 4;
-
     r->blocks = 0;
     r->errors = 0;
     r->badbits = 0;
@@ -271,41 +267,201 @@ void dimm_mem_test(u32 span, u32 pattern, dimm_mem_result *r,
     r->first_addr = 0;
     r->first_exp = 0;
     r->first_got = 0;
+}
 
+/* Check one read-back block: words off.. expected to hold first + step*i.
+ * The compare and the CRC run in assembly (ramtest_fast.S, relocated to CPU
+ * RAM when it was proven). Only on a block with a mismatch, and only until
+ * the first one is located, does C walk the words.
+ *
+ * One CRC per block, not two: on a clean block the data read back IS the
+ * data written, so while both CRC chains are still equal they stay equal
+ * and the read-side result serves for both. Once they part, or on a block
+ * with a mismatch, the expected data is rebuilt in wbuf and CRCed on its
+ * own. */
+static void mem_check_block(dimm_mem_result *r, dimm_chk_ctx *c,
+                            u32 *wbuf, u32 *rbuf, u32 off)
+{
+    const u32 nw = DIMM_DMA_BLK / 4;
+    u32 first = c->exp, nbad = c->nbad, crc_r0 = r->crc_r;
+
+    p_dimm_check_seq_fast(rbuf, nw / 8, c);
+    r->crc_r = p_crc32_rom_block(rbuf, nw / 4, crc_r0);
+
+    if (c->nbad == nbad && r->crc_w == crc_r0) {
+        r->crc_w = r->crc_r;
+    } else {
+        p_dimm_fill_seq_fast(wbuf, nw / 8, first, c->step);
+        r->crc_w = p_crc32_rom_block(wbuf, nw / 4, r->crc_w);
+    }
+    if (c->nbad != nbad && r->errors == 0) {
+        for (u32 i = 0; i < nw; i++) {
+            u32 exp = first + i * c->step;
+            if (rbuf[i] != exp) {
+                r->first_addr = off + i * 4;
+                r->first_exp = exp;
+                r->first_got = rbuf[i];
+                break;
+            }
+        }
+    }
+    r->errors = c->nbad;
+    r->badbits = c->diff;
+    r->blocks++;
+}
+
+void dimm_mem_test(u32 span, u32 pattern, dimm_mem_result *r,
+                   u32 dir_write, u32 dir_read)
+{
+    u32 *wbuf = (u32 *)P2(SCRATCH_PHYS_W);
+    u32 *rbuf = (u32 *)P2(SCRATCH_PHYS_R);
+    const u32 nw = DIMM_DMA_BLK / 4;
+    dimm_chk_ctx c = { pattern, 0, 0, 0 };
+
+    mem_result_init(r);
     if (!dimm_scratch_ok())
         return;                         /* r->blocks == 0 flags "not run" */
-
-    for (u32 i = 0; i < nw; i++)
-        wbuf[i] = pattern;              /* constant source for every block */
 
     for (u32 off = 0; off + DIMM_DMA_BLK <= span; off += DIMM_DMA_BLK) {
         progress_tick(off);
         if (progress_aborted())
             break;
 
-        for (u32 i = 0; i < nw; i++)
-            rbuf[i] = ~pattern;         /* poison so a dead read shows up  */
+        /* the source again each block: a failed check rebuilds wbuf */
+        p_dimm_fill_seq_fast(wbuf, nw / 8, pattern, 0);
+        /* poison so a dead read shows up */
+        p_dimm_fill_seq_fast(rbuf, nw / 8, ~pattern, 0);
 
         if (dimm_dma(off, SCRATCH_PHYS_W, DIMM_DMA_BLK, dir_write) ||
             dimm_dma(off, SCRATCH_PHYS_R, DIMM_DMA_BLK, dir_read)) {
             r->timeout = 1;
             return;
         }
-
-        for (u32 i = 0; i < nw; i++) {
-            u32 got = rbuf[i];
-            r->crc_w = crc32_word(r->crc_w, pattern);
-            r->crc_r = crc32_word(r->crc_r, got);
-            if (got != pattern) {
-                r->badbits |= got ^ pattern;
-                if (r->errors == 0) {
-                    r->first_addr = off + i * 4;
-                    r->first_exp = pattern;
-                    r->first_got = got;
-                }
-                r->errors++;
-            }
-        }
-        r->blocks++;
+        c.exp = pattern;
+        mem_check_block(r, &c, wbuf, rbuf, off);
     }
+}
+
+void dimm_mem_test_addr(u32 span, dimm_mem_result *r,
+                        u32 dir_write, u32 dir_read)
+{
+    u32 *wbuf = (u32 *)P2(SCRATCH_PHYS_W);
+    u32 *rbuf = (u32 *)P2(SCRATCH_PHYS_R);
+    const u32 nw = DIMM_DMA_BLK / 4;
+    dimm_chk_ctx c = { 0, 4, 0, 0 };
+
+    mem_result_init(r);
+    if (!dimm_scratch_ok())
+        return;
+
+    /* Pass 1: every word of the span gets its own offset. Nothing is read
+     * back yet: a write that lands on another address because of a stuck
+     * or shorted address line must have the chance to overwrite a word
+     * written earlier, or the aliasing goes unseen. */
+    for (u32 off = 0; off + DIMM_DMA_BLK <= span; off += DIMM_DMA_BLK) {
+        progress_tick(off >> 1);
+        if (progress_aborted())
+            return;
+        p_dimm_fill_seq_fast(wbuf, nw / 8, off, 4);
+        if (dimm_dma(off, SCRATCH_PHYS_W, DIMM_DMA_BLK, dir_write)) {
+            r->timeout = 1;
+            return;
+        }
+    }
+
+    /* Pass 2: read the whole span back. */
+    for (u32 off = 0; off + DIMM_DMA_BLK <= span; off += DIMM_DMA_BLK) {
+        progress_tick((span >> 1) + (off >> 1));
+        if (progress_aborted())
+            break;
+        /* poison ~(off + 4i), so a dead read shows up on every word */
+        p_dimm_fill_seq_fast(rbuf, nw / 8, ~off, (u32)-4);
+        if (dimm_dma(off, SCRATCH_PHYS_R, DIMM_DMA_BLK, dir_read)) {
+            r->timeout = 1;
+            return;
+        }
+        c.exp = off;
+        mem_check_block(r, &c, wbuf, rbuf, off);
+    }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Whole-range helpers: saving and restoring part of the DIMM in CPU RAM,     */
+/* checking it, finding its size.                                             */
+
+u32  dimm_count32(void)        { return g_count32; }
+void dimm_set_count32(u32 on)  { g_count32 = on ? 1 : 0; }
+
+/* [dimm_off, +len) <-> CPU RAM at sysram_phys, 32 KB per transfer, in the
+ * direction dir. Not abortable: a restore stopped halfway would leave the
+ * DIMM worse off than either end. Ticks the progress bar with bytes done. */
+u32 dimm_copy(u32 dimm_off, u32 sysram_phys, u32 len, u32 dir)
+{
+    for (u32 done = 0; done < len; done += DIMM_DMA_BLK) {
+        progress_tick(done);
+        if (dimm_dma(dimm_off + done, sysram_phys + done, DIMM_DMA_BLK, dir))
+            return 1;
+    }
+    return 0;
+}
+
+/* CRC-32 (running, not inverted) of [dimm_off, +len) read back from the
+ * DIMM through the scratch block. Returns 1 if a DMA timed out. */
+u32 dimm_crc(u32 dimm_off, u32 len, u32 dir_read, u32 *crc)
+{
+    u32 *rbuf = (u32 *)P2(SCRATCH_PHYS_R);
+    for (u32 done = 0; done < len; done += DIMM_DMA_BLK) {
+        progress_tick(done);
+        if (dimm_dma(dimm_off + done, SCRATCH_PHYS_R, DIMM_DMA_BLK, dir_read))
+            return 1;
+        *crc = p_crc32_rom_block(rbuf, DIMM_DMA_BLK / 16, *crc);
+    }
+    return 0;
+}
+
+/* One 32-byte block of the DIMM, read or written through the scratch area
+ * (the smallest the DMA moves). dimm_off must be 32-byte aligned. */
+u32 dimm_block32(u32 dimm_off, u32 w[8], u32 dir, u32 write)
+{
+    volatile u32 *b = P2(SCRATCH_PHYS_W + DIMM_DMA_BLK - 32);
+    u32 phys = SCRATCH_PHYS_W + DIMM_DMA_BLK - 32;
+    if (write)
+        for (u32 i = 0; i < 8; i++)
+            b[i] = w[i];
+    if (dimm_dma(dimm_off, phys, 32, dir))
+        return 1;
+    if (!write)
+        for (u32 i = 0; i < 8; i++)
+            w[i] = b[i];
+    return 0;
+}
+
+/* Size by aliasing, for when the DIMM does not tell us: a marker at 0, then
+ * a different one at each power of two from 32 MB to 1 GB. The first power
+ * whose write lands on 0, or that does not hold its own marker, is the end
+ * of the memory. DESTRUCTIVE (36 words). Returns the size in bytes, or 0 if
+ * the DIMM did not answer at all. */
+u32 dimm_size_probe(u32 dir_write, u32 dir_read)
+{
+    u32 w[8], r[8];
+    for (u32 i = 0; i < 8; i++)
+        w[i] = 0x51A5E000u + i;
+    if (dimm_block32(0, w, dir_write, 1))
+        return 0;
+    for (u32 sz = 0x02000000u; sz && sz <= 0x40000000u; sz <<= 1) {
+        for (u32 i = 0; i < 8; i++)
+            w[i] = sz ^ (0xA5000000u + i);
+        if (dimm_block32(sz, w, dir_write, 1))
+            return sz;                  /* no answer past the end */
+        if (dimm_block32(sz, r, dir_read, 0))
+            return sz;
+        for (u32 i = 0; i < 8; i++)
+            if (r[i] != w[i])
+                return sz;              /* nothing there */
+        if (dimm_block32(0, r, dir_read, 0))
+            return 0;
+        if (r[0] == w[0])
+            return sz;                  /* wrapped onto 0 */
+    }
+    return 0x40000000u;
 }

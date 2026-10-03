@@ -22,6 +22,7 @@
 #include "periph.h"
 #include "dimm.h"
 #include "dimm_flash.h"
+#include "dimm_host.h"
 #include "maple.h"
 #include "board.h"
 #include "cart.h"
@@ -686,6 +687,159 @@ static void log_screen_line(u32 kind, const char *name, u32 detail, u32 line,
     e.dq = count;
     log_store(&e);
     screen_append(&e);
+}
+
+/* ------------------------------------------------------------------ */
+/* Surviving a reset ordered by the DIMM.
+ *
+ * The DIMM's loader resets the Naomi when it starts, and once more when a
+ * network-mode board finds no valid game after the first message (see
+ * dimm_host.h). Without help the ROM would restart from the top, run the
+ * whole suite again and lose the DIMM test's report. So the report and the
+ * state of the DIMM session are sealed in CPU RAM before anything that can
+ * provoke that reset, and the boot looks for them right after the SDRAM
+ * controller is programmed -- before any RAM is written. A valid block (its
+ * CRC holds) means a resume: the base suite is skipped, the screen, the
+ * board identification and the MIE are brought back, and the DIMM test
+ * carries on where it was.
+ *
+ * SDRAM is not refreshed while the SH-4 is held in reset and until
+ * sdram_init runs again; it keeps its content far longer than that gap in
+ * practice, but nothing here depends on it: a block that decayed fails its
+ * CRC and the boot is a normal one.
+ *
+ * CPU RAM map of the DIMM test (physical):
+ *   0x0C200000  this block (16 KB)       0x0C400000  DMA scratch (dimm.c)
+ *   0x0C800000  16 MB copy of the DIMM top
+ * clear of the Maple buffers (0x0C0FF000 or the relocation window) and of
+ * the relocation scan (top megabyte). */
+/* The suite's CPU RAM verdict (bytes proven, 0 = not proven): the copy of
+ * the DIMM's top 16 MB is only made into memory the suite has tested. */
+static u32 g_ram_usable;
+
+#define RESUME_P2       0xAC200000u
+#define RESUME_MAGIC    0x4E444D52u     /* "RMDN" */
+#define RESUME_VERSION  1u
+#define RESUME_POOL     2048u
+#define RESUME_MAX_RESETS 3u            /* then a normal boot: no reset loop */
+#define BACKUP_PHYS     0x0C800000u
+#define BACKUP_LEN      0x01000000u
+
+enum { RS_HELLO = 1, RS_SESSION, RS_TEST, RS_DONE };
+
+typedef struct {
+    u32 magic, crc, version, size;      /* header: crc covers what follows */
+    u32 step, resets;
+    u32 mie_port1, ram_usable;
+    u32 dir_read, dir_write, count32;   /* what the G1 probe found */
+    u32 dimm_size;
+    u32 bk_valid, bk_off, bk_crc;       /* 16 MB copy of the DIMM top */
+    u32 log_n, pool_n;
+    u32 pad;
+    log_entry log[LOG_MAX];
+    char rtc[20];
+    char pool[RESUME_POOL];             /* report strings not in ROM */
+} resume_blk;
+
+#define RB ((resume_blk *)RESUME_P2)
+#define RB_BODY_LEN ((sizeof(resume_blk) - 16 + 15) & ~15u)  /* whole quads */
+
+static u32 resume_crc(void)
+{
+    return p_crc32_rom_block((const u32 *)(RESUME_P2 + 16), RB_BODY_LEN / 16,
+                             0xFFFFFFFFu);
+}
+
+static void resume_seal(void)
+{
+    RB->magic = RESUME_MAGIC;
+    RB->version = RESUME_VERSION;
+    RB->size = sizeof(resume_blk);
+    RB->crc = resume_crc();
+}
+
+static void resume_clear(void)
+{
+    RB->magic = 0;
+}
+
+/* Valid block: magic, version, size and CRC all agree. */
+static u32 resume_valid(void)
+{
+    return RB->magic == RESUME_MAGIC && RB->version == RESUME_VERSION &&
+           RB->size == sizeof(resume_blk) && RB->crc == resume_crc();
+}
+
+static u32 in_rom(const void *p)
+{
+    return ((u32)p & 0x1FFFFFFFu) < 0x00200000u;
+}
+
+static u32 in_pool(const void *p)
+{
+    u32 a = (u32)p, b = (u32)RB->pool;
+    return a >= b && a < b + RESUME_POOL;
+}
+
+/* A fresh session: empty pool, no backup, no resets counted. */
+static void resume_begin(void)
+{
+    RB->resets = 0;
+    RB->pool_n = 0;
+    RB->bk_valid = 0;
+    RB->dimm_size = 0;
+}
+
+/* The report as it stands, and the step reached. Names that live in RAM
+ * buffers (formatted lines) are copied into the pool, which only grows
+ * during a session: a name already pointing into it stays where it is. */
+static void resume_save(u32 step)
+{
+    resume_blk *b = RB;
+    b->step = step;
+    b->mie_port1 = g_mie_port1;
+    b->ram_usable = g_ram_usable;
+    b->log_n = g_log_n;
+    for (u32 i = 0; i < g_log_n; i++) {
+        const u32 *src = (const u32 *)&g_log[i];
+        u32 *dst = (u32 *)&b->log[i];
+        for (u32 k = 0; k < sizeof(log_entry) / 4; k++)
+            dst[k] = src[k];
+        const char *n = g_log[i].name;
+        if (!n || in_rom(n) || in_pool(n))
+            continue;
+        u32 len = 0;
+        while (n[len])
+            len++;
+        if (b->pool_n + len + 1 > RESUME_POOL) {
+            b->log[i].name = S_L_RESUME_LOST;   /* pool full: a placeholder */
+            continue;
+        }
+        char *d = &b->pool[b->pool_n];
+        for (u32 k = 0; k <= len; k++)
+            d[k] = n[k];
+        b->log[i].name = d;
+        b->pool_n += len + 1;
+    }
+    for (u32 k = 0; k < sizeof(b->rtc); k++)
+        b->rtc[k] = g_rtc_str[k];
+    resume_seal();
+}
+
+/* Back into the live report. */
+static void resume_restore_log(void)
+{
+    resume_blk *b = RB;
+    g_log_n = b->log_n <= LOG_MAX ? b->log_n : LOG_MAX;
+    for (u32 i = 0; i < g_log_n; i++) {
+        const u32 *src = (const u32 *)&b->log[i];
+        u32 *dst = (u32 *)&g_log[i];
+        for (u32 k = 0; k < sizeof(log_entry) / 4; k++)
+            dst[k] = src[k];
+    }
+    for (u32 k = 0; k < sizeof(g_rtc_str); k++)
+        g_rtc_str[k] = b->rtc[k];
+    g_rtc_str[sizeof(g_rtc_str) - 1] = 0;
 }
 
 /* Sound RAM is ONE 16-bit chip behind the AICA, not four chips on a 64-bit
@@ -2161,13 +2315,21 @@ static void dimm_probe_report(const dimm_g1_probe_result *r)
         log_result(S_L_DP_RESTORE, CLIP_NONE, T_FAIL, 0, 0);
 }
 
-/* SERVICE/START runs it, TEST (or any key but y/o) passes */
-static u32 dimm_confirm_destructive(void)
+static u32 dec_into(char *d, u32 v);
+static void hms_into(char *d, u32 ms);
+static void hex_into(char *d, u32 v, u32 ndigits);
+static u32 udiv(u32 n, u32 d);
+
+/* SERVICE/START runs it, TEST (or any key but y/o) passes. detail: a
+ * second line under the question (size, expected time), or 0. */
+static u32 dimm_confirm_destructive(const char *detail)
 {
     scif_puts(S_DIMM_ASK);
     u32 y = g_screen_y + 12;
     if (g_screen_ready) {
         fb_text(16, y, S_SCR_DIMM_ASK, COL_AMBER, FB_W);
+        if (detail)
+            fb_text(16, y + 18, detail, COL_AMBER, FB_W);
         fb_text(16, fb_hint_y(), S_SCR_DIMM_ASK_HINT, COL_HINT, FB_W);
     }
     u32 go = 0;
@@ -2194,50 +2356,208 @@ static u32 dimm_confirm_destructive(void)
     return go;
 }
 
-static void test_dimm(void)
+/* Finds the board on the G1 bus, retrying the other cycle settings the
+ * BIOSes use. quiet: no serial dump (a resume has printed it already). */
+static void dimm_find(dimm_info *di, u32 quiet)
 {
-    dimm_info di;
     g1_bus_init();
-    dimm_probe(&di);
+    dimm_probe(di);
 
     /* A real Naomi 2 with a DIMM the original BIOS sees read all ones here,
      * mailbox and cartridge space alike, with the 0x1006 cycle. The BIOSes
      * pick 0x1006 or 0x1106 from a board-dependent test we do not have:
      * try the other branch (and the slower setup values both use first)
      * before calling the board absent, and say which one answered. */
-    if (!di.present) {
+    if (!di->present) {
         static const u16 tim[3] = { 0x1106, 0x1009, 0x1109 };
-        for (u32 i = 0; i < 3 && !di.present; i++) {
+        for (u32 i = 0; i < 3 && !di->present; i++) {
             g1_set_board_timing(tim[i]);
-            dimm_probe(&di);
-            scif_puts(S_DIMM_TIMING);
-            scif_puthex(tim[i]);
-            scif_puts(di.present ? S_DIMM_TIM_YES : S_DIMM_TIM_NO);
+            dimm_probe(di);
+            if (!quiet) {
+                scif_puts(S_DIMM_TIMING);
+                scif_puthex(tim[i]);
+                scif_puts(di->present ? S_DIMM_TIM_YES : S_DIMM_TIM_NO);
+            }
         }
-        if (!di.present)
+        if (!di->present)
             g1_set_board_timing(0x1006);
     }
-
+    if (quiet)
+        return;
     scif_puts(S_DIMM_HDR);
     scif_puts(S_DIMM_REGS);
-    scif_puthex(di.command);
+    scif_puthex(di->command);
     scif_putc(' ');
-    scif_puthex(di.offsetl);
+    scif_puthex(di->offsetl);
     scif_putc(' ');
-    scif_puthex(di.paraml);
+    scif_puthex(di->paraml);
     scif_putc(' ');
-    scif_puthex(di.paramh);
+    scif_puthex(di->paramh);
     scif_putc(' ');
-    scif_puthex(di.status);
+    scif_puthex(di->status);
     scif_puts(S_DIMM_SIG);
-    scif_puthex(di.signature);
-    scif_puts(di.latch ? S_DIMM_LATCH_OK : S_DIMM_LATCH_KO);
+    scif_puthex(di->signature);
+    scif_puts(di->latch ? S_DIMM_LATCH_OK : S_DIMM_LATCH_KO);
+}
 
-    if (!di.present) {
-        log_result(S_L_DIMM_ABSENT, CLIP_NONE, T_OK, 0, 0);
+/* Serves the DIMM until it has done everything in `want`, or ms run out,
+ * or the operator presses a key or TEST. 1 = done. */
+static u32 dimm_host_wait(u32 want, u32 ms)
+{
+    u32 t0 = timer_ms();
+    for (;;) {
+        dimm_host_service();
+        if ((dimm_host_got() & want) == want)
+            return 1;
+        if (timer_ms() - t0 > ms)
+            return 0;
+        input_event ev;
+        if (input_poll(&ev) &&
+            (ev.kind == INPUT_SELECT || ev.kind == INPUT_KEY))
+            return 0;
+        progress_heartbeat();
+        delay_ms(2);
+    }
+}
+
+/* "DIMM: firmware 4.03, 512 MB" from what the DIMM posted. */
+static void dimm_host_report(u32 size)
+{
+    u32 ver = dimm_host_word(0x0C01FC0Cu) >> 16;
+    u32 mem = dimm_host_word(0x0C01FC04u);
+    char *d = g_dimmbuf[2];
+    u32 n = 0;
+    for (const char *t = S_DH_FW; *t; t++)
+        d[n++] = *t;
+    if (dimm_host_got() & DH_GOT_VER) {
+        hex_into(&d[n], ver >> 8, (ver >> 8) > 0xF ? 2 : 1);
+        n += (ver >> 8) > 0xF ? 2 : 1;
+        d[n++] = '.';
+        hex_into(&d[n], ver & 0xFF, 2);
+        n += 2;
+    } else {
+        d[n++] = '?';
+    }
+    if (size) {
+        d[n++] = ',';
+        d[n++] = ' ';
+        n += dec_into(&d[n], size >> 20);
+        for (const char *t = S_DH_MB; *t; t++)
+            d[n++] = *t;
+    }
+    d[n] = 0;
+    log_result(d, CLIP_NONE, T_OK, 0, 0);
+
+    scif_puts(S_DH_SOCKETS);
+    scif_putdec(64u << ((mem >> 16) & 0xF));
+    scif_putc('/');
+    scif_putdec(64u << ((mem >> 20) & 0xF));
+    scif_puts(S_DH_WORDS);
+    scif_puthex(mem);
+    scif_putc(' ');
+    scif_puthex(dimm_host_word(0x0C01FC0Cu));
+    scif_puts("\n");
+}
+
+/* The game header the DIMM keeps 0x10010 below its top: two words followed
+ * by their complements mean "no CRC check, boot it as it is". Restoring
+ * that onto a memory the test has just overwritten would have the DIMM
+ * start garbage, so the marker is broken -- it will check, fail and reload,
+ * which is what it does for any game that went bad. */
+static void dimm_break_noncrc(u32 size, u32 dir_read, u32 dir_write)
+{
+    u32 w[8];
+    u32 at = size - 0x10020u;           /* 32-byte aligned; header at w[4] */
+    if (dimm_block32(at, w, dir_read, 0))
+        return;
+    if (w[4] == ~w[6] && w[5] == ~w[7]) {
+        w[4] = w[5] = w[6] = w[7] = 0;
+        dimm_block32(at, w, dir_write, 1);
+        scif_puts(S_DIMM_NONCRC);
+    }
+}
+
+/* Puts the CPU RAM copy of the DIMM's top 16 MB back and checks it: the
+ * copy's CRC first (has CPU RAM kept it?), then the DIMM read back. */
+static void dimm_top_restore(void)
+{
+    resume_blk *b = RB;
+    u32 crc = p_crc32_rom_block((const u32 *)(0xA0000000u | BACKUP_PHYS),
+                                BACKUP_LEN / 16, 0xFFFFFFFFu);
+    if (crc != b->bk_crc) {
+        scif_puts(S_DIMM_RS_LOST);
+        log_result(S_L_DIMM_TOP, CLIP_NONE, T_FAIL, 0, 0);
+        b->bk_valid = 0;
         return;
     }
-    log_result(S_L_DIMM_PRESENT, CLIP_NONE, T_OK, 0, 0);
+    progress_begin(S_P_DIMM_RS, BACKUP_LEN * 2);
+    u32 t = dimm_copy(b->bk_off, BACKUP_PHYS, BACKUP_LEN, b->dir_write);
+    u32 back = 0xFFFFFFFFu;
+    if (!t)
+        t = dimm_crc(b->bk_off, BACKUP_LEN, b->dir_read, &back);
+    progress_end();
+    u32 ok = !t && back == b->bk_crc;
+    scif_puts(ok ? S_DIMM_RS_OK : S_DIMM_RS_KO);
+    if (ok)
+        dimm_break_noncrc(b->bk_off + BACKUP_LEN, b->dir_read, b->dir_write);
+    log_result(S_L_DIMM_TOP, CLIP_NONE, ok ? T_OK : T_FAIL, 0, 0);
+    b->bk_valid = 0;
+}
+
+static void test_dimm(u32 resumed)
+{
+    dimm_info di;
+    dimm_find(&di, resumed);
+    if (!di.present) {
+        if (!resumed)
+            log_result(S_L_DIMM_ABSENT, CLIP_NONE, T_OK, 0, 0);
+        resume_clear();
+        return;
+    }
+    if (!resumed) {
+        log_result(S_L_DIMM_PRESENT, CLIP_NONE, T_OK, 0, 0);
+        resume_begin();
+    }
+
+    /* Stand in for the BIOS: first message, then the DIMM's requests. The
+     * block is sealed first because this is what can make the DIMM reset
+     * the Naomi; the boot then comes back here (resume_run). */
+    u32 idle = 1, size = 0;
+    resume_save(RS_HELLO);
+    scif_puts(S_DH_HELLO);
+    dimm_host_start();
+    if (dimm_host_wait(DH_GOT_ANY, 5000)) {
+        dimm_host_wait(DH_GOT_MEM | DH_GOT_VER, 10000);
+        size = dimm_host_size();
+        dimm_host_report(size);
+        /* Its loader may still be checking the game it holds (a CRC over
+         * the whole memory) and would take anything written meanwhile for
+         * a bad game: wait until it sits in its request loop. */
+        if (!(dimm_host_got() & DH_GOT_IDLE)) {
+            scif_puts(S_DH_WAIT);
+            if (g_screen_ready)
+                fb_text(16, g_screen_y + 12, S_SCR_DH_WAIT, COL_AMBER, FB_W);
+            idle = dimm_host_wait(DH_GOT_IDLE, 180000);
+            if (g_screen_ready)
+                fb_fill_rows(g_screen_y + 12, g_screen_y + 30, 0);
+        }
+        scif_puts(idle ? S_DH_IDLE : S_DH_NOTIDLE);
+        if (!idle)
+            log_result(S_L_DH_BUSY, CLIP_NONE, T_SKIP, 0, 0);
+    } else {
+        /* No request at all: an older firmware, or a DIMM that is not
+         * waiting for a BIOS. It loads nothing either way. Keep answering
+         * in case it wakes up; the size will come from the aliasing probe. */
+        scif_puts(S_DH_SILENT);
+        log_result(S_L_DH_SILENT, CLIP_NONE, T_SKIP, 0, 0);
+    }
+    scif_puts(S_DH_REQS);
+    scif_putdec(dimm_host_requests());
+    scif_putc('/');
+    scif_putdec(dimm_host_refused());
+    scif_puts("\n");
+    RB->dimm_size = size;
+    resume_save(RS_SESSION);
 
     /* Read-twice-and-compare over as much of the board as the operator is
      * willing to wait for; TEST or a key stops it at the next block. */
@@ -2277,33 +2597,126 @@ static void test_dimm(void)
     if (pr.dir_read == DP_UNKNOWN || pr.dir_write == DP_UNKNOWN) {
         scif_puts(S_DIMM_NO_DIRS);
         log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, T_SKIP, 0, 0);
+        resume_save(RS_DONE);
         return;
     }
-    /* It overwrites the game image: asked, not assumed. */
-    if (!dimm_confirm_destructive()) {
-        scif_puts(S_DIMM_SKIPPED);
+    /* A loader that never settled may still decide the game is bad and
+     * reset the Naomi in the middle of the test. */
+    if (!idle) {
         log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, T_SKIP, 0, 0);
+        resume_save(RS_DONE);
         return;
     }
 
-    /* Destructive cell test: write the requested patterns over the DIMM
-     * SDRAM via G1-DMA and read them back with a CRC. Overwrites the game
-     * image, hence gated behind this operator-initiated test. dimm_mem_test
-     * checks its own system-RAM scratch, so it is safe to call here without
-     * threading the main-RAM verdict. */
+    /* The question, with what it will cost. */
+    char detail[40];
+    {
+        u32 n = 0;
+        if (size) {
+            n += dec_into(&detail[n], size >> 20);
+            for (const char *t = S_DH_MB; *t; t++)
+                detail[n++] = *t;
+        } else {
+            for (const char *t = S_DIMM_SIZE_UNK; *t; t++)
+                detail[n++] = *t;
+        }
+        if (size && pr.ticks_32k) {
+            /* every block crosses twice per pass, three passes, plus the
+             * copy of the top: out, read twice to check it, back, read */
+            u32 xfers = (size >> 15) * 6 + (BACKUP_LEN >> 15) * 4;
+            u32 ms = udiv(xfers * udiv(pr.ticks_32k, 125), 100);
+            for (const char *t = S_SCR_DIMM_ETA; *t; t++)
+                detail[n++] = *t;
+            hms_into(&detail[n], ms);
+            while (detail[n])
+                n++;
+        }
+        detail[n] = 0;
+        scif_puts("  ");
+        scif_puts(detail);
+        scif_puts("\n");
+    }
+    /* It overwrites the game image: asked, not assumed. */
+    if (!dimm_confirm_destructive(detail)) {
+        scif_puts(S_DIMM_SKIPPED);
+        log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, T_SKIP, 0, 0);
+        resume_save(RS_DONE);
+        return;
+    }
+
+    if (!size) {
+        size = dimm_size_probe(pr.dir_write, pr.dir_read);
+        scif_puts(S_DIMM_SIZE_PROBE);
+        scif_putdec(size >> 20);
+        scif_puts(S_DH_MB);
+        scif_puts("\n");
+        if (!size) {
+            log_result(S_L_DIMM_NOSIZE, CLIP_NONE, T_FAIL, 0, 0);
+            resume_save(RS_DONE);
+            return;
+        }
+        RB->dimm_size = size;
+    }
+
+    /* The whole memory, the DIMM's own top 16 MB included: that part holds
+     * its working data (mailboxes, game header, network settings), so it is
+     * copied into CPU RAM first and put back afterwards. Only into CPU RAM
+     * the suite has proven, and only on a 32 MB board. */
 #if QUICK_TEST
-    const u32 mspan = 0x00040000;       /* 256 KB */
+    u32 mspan = 0x00040000;             /* 256 KB, nowhere near the top */
+    u32 top_saved = 0;
 #else
-    const u32 mspan = 0x00400000;       /* 4 MB, abortable at each block */
+    u32 mspan = size;
+    u32 top_saved = 0;
+    if (size >= 2 * BACKUP_LEN &&
+        g_ram_usable >= BACKUP_PHYS + BACKUP_LEN - 0x0C000000u) {
+        resume_blk *b = RB;
+        b->bk_off = size - BACKUP_LEN;
+        b->dir_read = pr.dir_read;
+        b->dir_write = pr.dir_write;
+        b->count32 = dimm_count32();
+        scif_puts(S_DIMM_BK);
+        progress_begin(S_P_DIMM_BK, BACKUP_LEN * 2);
+        u32 t = dimm_copy(b->bk_off, BACKUP_PHYS, BACKUP_LEN, pr.dir_read);
+        u32 again = 0xFFFFFFFFu;
+        if (!t)
+            t = dimm_crc(b->bk_off, BACKUP_LEN, pr.dir_read, &again);
+        progress_end();
+        u32 crc = p_crc32_rom_block((const u32 *)(0xA0000000u | BACKUP_PHYS),
+                                    BACKUP_LEN / 16, 0xFFFFFFFFu);
+        /* the copy must equal a second read of the DIMM, or it is not one */
+        if (!t && crc == again) {
+            b->bk_crc = crc;
+            b->bk_valid = 1;
+            top_saved = 1;
+        }
+    }
+    if (!top_saved) {
+        scif_puts(S_DIMM_BK_KO);
+        log_result(S_L_DIMM_TOP_SKIP, CLIP_NONE, T_SKIP, 0, 0);
+        mspan = size - BACKUP_LEN;
+    }
 #endif
-    static const u32 patterns[2] = { 0x01010101u, 0x10101010u };
+    resume_save(RS_TEST);
+    scif_puts(S_DIMM_SPAN);
+    scif_puthex(mspan);
+    scif_puts("\n");
+
+    /* Alternating bits, then their complement: between them every data
+     * bit is written both ways, so a bit stuck at either level shows, and
+     * neighbouring bits always differ. Then address-in-data, for the
+     * folded addresses no constant can show. */
+    static const u32 patterns[2] = { 0x55555555u, 0xAAAAAAAAu };
     u32 mem_fail = 0, mem_ran = 0, aborted = 0;
 
     scif_puts(S_DIMM_MEM_HDR);
-    for (u32 p = 0; p < 2; p++) {
+    for (u32 p = 0; p < 3; p++) {
         dimm_mem_result mr;
         progress_begin(S_P_DIMM, mspan);
-        dimm_mem_test(mspan, patterns[p], &mr, pr.dir_write, pr.dir_read);
+        if (p < 2)
+            dimm_mem_test(mspan, patterns[p], &mr, pr.dir_write, pr.dir_read);
+        else
+            dimm_mem_test_addr(mspan, &mr, pr.dir_write, pr.dir_read);
         progress_end();
 
         /* An operator abort stops dimm_mem_test between blocks, and what it
@@ -2318,16 +2731,20 @@ static void test_dimm(void)
             break;
         }
 
-        scif_puts(S_DIMM_MEM_PAT);
-        scif_puthex(patterns[p]);
-        scif_puts("\n");
+        if (p < 2) {
+            scif_puts(S_DIMM_MEM_PAT);
+            scif_puthex(patterns[p]);
+            scif_puts("\n");
+        } else {
+            scif_puts(S_DIMM_MEM_ADDR);
+        }
 
         if (mr.timeout) {               /* present but DMA never completed */
             scif_puts(S_DIMM_MEM_TIMEOUT);
             mem_fail = 1;
-            break;                      /* the second pattern would only stall too */
+            break;                      /* the next pattern would only stall too */
         }
-        if (mr.blocks == 0) {           /* scratch RAM bad: same both passes */
+        if (mr.blocks == 0) {           /* scratch RAM bad: same every pass */
             scif_puts(S_DIMM_SCRATCH_BAD);
             break;
         }
@@ -2361,6 +2778,29 @@ static void test_dimm(void)
     }
     if (mem_fail || (mem_ran && !aborted))
         log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, mem_fail ? T_FAIL : T_OK, 0, 0);
+
+    /* Whatever stopped the passes, the DIMM's working area goes back. */
+    if (top_saved)
+        dimm_top_restore();
+    resume_save(RS_DONE);
+}
+
+/* The DIMM reset the Naomi in the middle of the destructive test (it should
+ * not, once its loader is idle and answered, but power and firmware have
+ * their own ideas). The passes are not resumed -- the operator decides --
+ * but the DIMM's top 16 MB are put back from CPU RAM if the copy survived. */
+static void dimm_resume_interrupted(void)
+{
+    dimm_info di;
+    log_result(S_L_DIMM_INTERRUPTED, CLIP_NONE, T_FAIL, 0, 0);
+    dimm_find(&di, 1);
+    dimm_host_start();                  /* it waits for this after a reset */
+    dimm_host_wait(DH_GOT_IDLE, 60000);
+    if (RB->bk_valid && di.present) {
+        dimm_set_count32(RB->count32);
+        dimm_top_restore();
+    }
+    resume_save(RS_DONE);
 }
 
 /* ------------------------------------------------------------------ */
@@ -3748,6 +4188,7 @@ static void menu_run(void)
  * leave the boot report where it is. */
 static void report_restart(void)
 {
+    resume_clear();                     /* a new report: nothing to resume */
     g_log_n = 0;
     screen_render();
 }
@@ -4234,7 +4675,7 @@ static void run_action(u32 act)
     }
     case ACT_DIMM:
         report_restart();
-        test_dimm();
+        test_dimm(0);
         break;
     case ACT_GAME:
         report_restart();
@@ -4521,6 +4962,79 @@ static void suite_check_abort(void)
     console_idle();                     /* never returns */
 }
 
+/* The MIE again after a reset, without the suite's report lines. If our
+ * Z80 program is still running (a reset that did not reach the MIE), it
+ * answers at once; otherwise the MIE is back on its boot ROM and gets the
+ * program again, exactly as the suite uploads it. */
+static void mie_quiet_bringup(u32 port1)
+{
+    u8 in5;
+    if (port1 && maple_mie_inputs(port1 - 1, &in5) == 0) {
+        g_mie_port1 = port1;
+        g_mie_prog = 1;
+        input_set_mie_port(port1);
+        scif_puts(S_RESUME_MIE_KEPT);
+        return;
+    }
+    maple_result mr;
+    maple_scan(&mr);
+    if (mr.found_port == 0xFFFFFFFF || mr.response_cmd != 0x83) {
+        scif_puts(S_RESUME_MIE_NONE);
+        return;
+    }
+    g_mie_port1 = mr.found_port + 1;
+    input_set_mie_port(g_mie_port1);
+    if (maple_mie_upload(g_mie_port1 - 1)) {
+        scif_puts(S_MIE_UP_FAIL);
+        scif_puts("\n");
+        return;
+    }
+    for (u32 t = 0; t < 10 && !g_mie_prog; t++) {
+        if (maple_mie_inputs(g_mie_port1 - 1, &in5) == 0)
+            g_mie_prog = 1;
+        else
+            delay_ms(10);
+    }
+    scif_puts(g_mie_prog ? S_RESUME_MIE_UP : S_MIE_NO_ANSWER);
+}
+
+/* Boot after a reset the DIMM ordered (see resume_blk): no suite. The
+ * screen, the board identification, the relocated loops, the G1 bus and
+ * the MIE are brought back -- what the report and the buttons need -- the
+ * report is put back as it was, and the DIMM test goes on. Audio stays off:
+ * its bring-up would replay and speak the whole report again. */
+static void resume_run(void)
+{
+    scif_puts(S_RESUME);
+    quick_video_bringup();
+    test_board();
+    progress_phase(PH_BOARD_ID);
+    relocate_fast_loops();
+    g1_open();
+    g_ram_usable = RB->ram_usable;
+    mie_quiet_bringup(RB->mie_port1);
+    resume_restore_log();
+    progress_phase(PH_DONE);
+    progress_retire();                  /* the state the suite ends in */
+    hint_retire();
+    screen_render();
+    log_screen_line(LK_INFO, S_L_RESUMED, 0, 0, 0);
+    switch (RB->step) {
+    case RS_HELLO:
+    case RS_SESSION:
+        test_dimm(1);
+        break;
+    case RS_TEST:
+        dimm_resume_interrupted();
+        break;
+    default:                            /* RS_DONE: the report only */
+        dimm_host_start();              /* keep the DIMM answered */
+        resume_save(RS_DONE);
+        break;
+    }
+    console_idle();                     /* never returns */
+}
+
 void cmain(void)
 {
     timer_init();
@@ -4555,6 +5069,19 @@ void cmain(void)
      * BIOS CRC below used to run at that crippled speed. */
     sdram_setup();
     progress_phase(PH_BUS_READY);       /* cyan */
+
+    /* A reset the DIMM ordered in the middle of its test: the report and
+     * the session were sealed in CPU RAM, and nothing has written RAM yet.
+     * Bounded, so a DIMM that keeps resetting cannot hold the ROM in a loop. */
+    if (resume_valid()) {
+        if (++RB->resets > RESUME_MAX_RESETS) {
+            resume_clear();
+            scif_puts(S_RESUME_GIVEUP);
+        } else {
+            resume_seal();
+            resume_run();               /* never returns */
+        }
+    }
 
     /* light up the audio and video channels within seconds, by proving
      * only the region each one needs (see quick_*_bringup above) */
@@ -4643,6 +5170,7 @@ void cmain(void)
     keys_box();                         /* if the MIE did not answer */
     eta_step(ETA_SDRAM);
     u32 usable = test_sdram_cells();
+    g_ram_usable = usable;
     suite_check_abort();
     eta_step(ETA_VRAM);
     u32 vram_ok = test_vram();

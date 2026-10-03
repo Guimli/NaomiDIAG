@@ -48,6 +48,10 @@ extern void (*p_g1_unlock)(void);
 extern void (*p_g1_unlock_v)(u32 flags);
 extern void (*p_sha1_mem_blocks)(u32 h[5], u32 nblocks, u32 w[80],
                                  const u32 *src);
+extern void (*p_dimm_fill_seq_fast)(u32 *dst, u32 nblocks8, u32 first,
+                                   u32 step);
+extern void (*p_dimm_check_seq_fast)(const u32 *src, u32 nblocks8,
+                                    dimm_chk_ctx *c);
 
 void reloc_init(void);              /* point everything at the ROM copies */
 

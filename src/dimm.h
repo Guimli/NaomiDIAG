@@ -71,6 +71,15 @@ typedef struct {
 void dimm_mem_test(u32 span, u32 pattern, dimm_mem_result *r,
                    u32 dir_write, u32 dir_read);
 
+/* Address-in-data: each word of [0, span) holds its own DIMM offset. The
+ * whole span is written before any of it is read back, so a stuck or
+ * shorted address line, which folds two offsets onto one cell, shows up as
+ * a word holding the other offset. first_exp/first_got then name the two
+ * addresses involved. Same contract as dimm_mem_test otherwise; it only
+ * reaches the address lines the span covers. */
+void dimm_mem_test_addr(u32 span, dimm_mem_result *r,
+                        u32 dir_write, u32 dir_read);
+
 /* What the G1 DMA does with the DIMM, found on the board itself rather
  * than taken from the reversing, which disagrees with the BIOS on the
  * direction bit (the DIMM notes: 0 reads; the BIOS cartridge loader: 1
@@ -101,6 +110,20 @@ typedef struct {
     u32 ticks_32k;          /* one 32 KB read, timer ticks             */
 } dimm_g1_probe_result;
 void dimm_g1_probe(dimm_g1_probe_result *r);
+
+/* Whole-range helpers (dimm.c). dimm_copy moves [dimm_off, +len) to or
+ * from CPU RAM at sysram_phys in 32 KB transfers, not abortable; dimm_crc
+ * reads a range back and folds it into a running CRC-32; dimm_block32 reads
+ * or writes one aligned 32-byte block; dimm_size_probe finds the memory's
+ * end by aliasing (DESTRUCTIVE: a few words at 0 and at powers of two).
+ * All return 1 on a DMA time-out, dimm_size_probe the size or 0. */
+u32  dimm_copy(u32 dimm_off, u32 sysram_phys, u32 len, u32 dir);
+u32  dimm_crc(u32 dimm_off, u32 len, u32 dir_read, u32 *crc);
+u32  dimm_block32(u32 dimm_off, u32 w[8], u32 dir, u32 write);
+u32  dimm_size_probe(u32 dir_write, u32 dir_read);
+/* the count unit dimm_g1_probe settled, to carry it across a reset */
+u32  dimm_count32(void);
+void dimm_set_count32(u32 on);
 
 /* Quick CPU-side sanity check of the system-RAM scratch the DMA test needs.
  * Returns 1 if the scratch holds data, 0 if main RAM there is unusable. */

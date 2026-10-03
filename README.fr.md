@@ -851,7 +851,24 @@ mandataire de sockets BSD, et l'une des trois ne fait rien.
 
 Ce qui marche passe à côté, par le bus G1 :
 
-- **`d` — test SDRAM du DIMM.** Le GD-DMA de Holly a un bit de sens, et
+- **`d` — test SDRAM du DIMM.** Il commence par **tenir le rôle du BIOS**
+  face aux requêtes du DIMM : le firmware du DIMM lit et écrit la zone de
+  travail du BIOS en RAM Naomi par la mailbox (PEEK/POKE) et attend un
+  premier message du BIOS avant de faire quoi que ce soit. NaomiDIAG
+  l'envoie, répond à chaque requête comme un BIOS en mode test (ce qui
+  empêche le DIMM de charger un jeu), et apprend la version du firmware et
+  la taille mémoire de ce que le DIMM y écrit — « DIMM : firmware 4.03,
+  512 Mo ». La session dure ensuite jusqu'au prochain reset, servie depuis
+  toutes les boucles de la ROM. Rien n'est écrit avant que le chargeur du
+  DIMM soit au repos (il vérifie peut-être le jeu qu'il contient). Le
+  firmware du DIMM **redémarre la Naomi** au lancement de son chargeur, et
+  de nouveau quand une carte en mode réseau ne trouve pas de jeu valide :
+  le rapport et l'état du test sont scellés en RAM CPU avant, et le boot qui
+  suit un tel reset saute la suite de base, rétablit l'écran,
+  l'identification de la carte et le programme du MIE (donc les boutons),
+  remet le rapport avec une ligne « Reprise apres reset du DIMM » et
+  continue. Trois reprises de suite au plus, puis un boot normal. Le GD-DMA
+  de Holly a un bit de sens, et
   les sources se contredisent : le reverse du DIMM donnait 0 = lecture,
   alors que le BIOS d'origine charge les cartouches avec `SB_GDDIR = 1`. Le
   compteur (0x5F7014) est en unités de 8 octets dans l'un, de 32 dans
@@ -864,16 +881,28 @@ Ce qui marche passe à côté, par le bus G1 :
   la référence et vérifiée. Puis les deux unités du compteur sont essayées
   en lecture, et 32 Ko sont chronométrés. Le log série donne chaque
   résultat ; l'écran affiche « DMA G1 lecture GDDIR=n » et « DMA G1
-  ecriture GDDIR=n ». Le test mémoire destructif (`0x01010101`,
-  `0x10101010`, CRC-32, délai de garde d'une seconde) ne se lance qu'avec
-  les deux sens établis et après SERVICE/START (TEST le passe) — il écrase
-  le jeu chargé. La présence se décide en écrivant deux motifs dans les
+  ecriture GDDIR=n ». Le test mémoire destructif, sur **tout le DIMM**
+  (`0x55555555`, `0xAAAAAAAA`, puis adresse-dans-donnée avec toute la plage
+  écrite avant d'être relue, CRC-32, délai de garde d'une seconde), ne se
+  lance qu'avec les deux sens établis et après SERVICE/START (TEST le passe)
+  — il écrase le jeu chargé. La question donne la taille et la durée
+  estimée. Les 16 Mo du haut du DIMM, sa zone de travail, sont copiés en
+  RAM CPU avant (copie vérifiée par une seconde lecture), testés avec le
+  reste puis restaurés (vérifiés en relisant) ; un en-tête de jeu en mode
+  « sans CRC » est cassé pour que le DIMM recharge au lieu de démarrer ce
+  que le test a laissé. Sans RAM CPU validée par la suite, les 16 Mo du
+  haut sont exclus. Sans taille donnée par le DIMM, elle est trouvée par
+  repliement. La présence se décide en écrivant deux motifs dans les
   registres OFFSETL/PARAMETERL de la mailbox et en les relisant : après
   un reset, la mailbox d'un DIMM lit 0xFFFF partout, exactement comme un
   bus vide. *Pas encore validé sur vrai matériel* ; sous MAME (un jeu
   GD-ROM avec NaomiDIAG à la place de l'epr-21576h de `naomigd.zip`,
   `-bios bios2`) la carte est détectée et la sonde lit, mais MAME ignore
-  le bit de sens et ne peut pas montrer d'écriture.
+  le bit de sens et ne peut pas montrer d'écriture. L'émulation complète
+  du DIMM de MAME (réglage « Full emulation », réservé au débogage) ne
+  dialogue avec aucun BIOS : la session PEEK/POKE n'y est pas testable non
+  plus ; la reprise après reset l'est, avec `mame/dimm_resume.lua`, qui
+  remplace le reset du DIMM par un reset logiciel.
 - **`f` — flash du firmware DIMM.** La flash s'atteint par le PIO ROM-board
   du G1 avec des commandes AMD. La ROM fait un read-ID, non destructeur, et
   propose un choix entre 3.17, 4.01 et 4.03. L'écran affiche le fabricant
