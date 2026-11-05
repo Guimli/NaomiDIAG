@@ -12,7 +12,21 @@
 
 void g1_bus_init(void);
 u32  g1_open(void);     /* G1 bus unlock, once; 1 if it ran now */
-u32  g1_devboot_present(void);  /* unlock kilobyte injected at ROM 0x100 */
+u32  g1_devboot_present(void);  /* dev BIOS bytes injected at ROM 0x100 */
+
+/* G1 bus unlock: Holly's status register 0x5F74EC, the key g1_open last
+ * tried and the status it left. */
+#define G1_ST_CHECKING      0u
+#define G1_ST_FAILED        2u
+#define G1_ST_OPEN          3u
+#define G1_KEY_NONE         0u
+#define G1_KEY_DEV          0x000003FFu
+#define G1_KEY_RETAIL       0x001FFFFFu
+#define G1_UNLOCK_RETAIL    0x43u   /* g1_unlock_v: G1RRC, key, P2 read */
+#define G1_DEVBOOT_WORDS    0x7C0u  /* ROM 0x100-0x1FFF */
+u32  g1_status(void);
+u32  g1_open_key(void);
+u32  g1_open_status(void);
 void g1_set_board_timing(u32 v);       /* G1GDRC/G1GDWC */
 void cart_seek(u32 offset);
 

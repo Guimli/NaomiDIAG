@@ -45,5 +45,6 @@ SECTIONS
     /DISCARD/ : { *(.comment) *(.note*) }
 }
 
-ASSERT(_devboot == ORIGIN(ROM) + 0x100, "the unlock kilobyte must sit at ROM 0x100")
+ASSERT(_devboot == ORIGIN(ROM) + 0x100, "the dev BIOS bytes must sit at ROM 0x100")
+ASSERT(_start_main == ORIGIN(ROM) + 0x2000, "crt0 jumps to ROM 0x2000")
 ASSERT(SIZEOF(.data) == 0, "no writable .data allowed (ROM runs without RAM)")

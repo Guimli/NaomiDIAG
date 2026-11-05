@@ -17,47 +17,56 @@
 #include "version.inc"
 #include "strings.h"
 
-! The first 256 bytes only jump over the next 1 KB: ROM 0x100-0x4FF is kept
-! for the G1 bus unlock (see g1_unlock in ramtest_fast.S and
+! The first 256 bytes only jump over the next 7.75 KB: ROM 0x100-0x1FFF is
+! kept for the G1 bus unlock (see g1_unlock in ramtest_fast.S and
 ! tools/inject_devboot.py). Holly opens the bus to the cartridge or DIMM
 ! only after the key is written to 0x5F74E4 and a known stretch of boot ROM
-! is read through it; the Naomi development BIOS keys 0x3FF, which checks
-! exactly that kilobyte. It ships as 0xFF: the bytes are SEGA's and are
+! is read through it; the Naomi development BIOS keys 0x3FF and reads its
+! bytes 0x100-0x1FFF, all of which are reproduced here, how much of them the
+! key covers being unknown. They ship as 0xFF: the bytes are SEGA's and are
 ! put there locally, from the owner's own dump, never in this repository.
+!
+! 0x2000 is out of bra's reach (+-4 KB), and a literal load would be the
+! first data read off the EPROM at reset bus timing (see G1RRC below), so
+! the read cycle is set and the P2 entry built from immediates only.
     .section .text.start, "ax"
     .global _start
 _start:
-    bra     _start_main
+    mov     #-96, r0                ! 0xFFFFFFA0
+    shll8   r0
+    or      #0x5F, r0
+    shll8   r0
+    or      #0x74, r0
+    shll8   r0
+    or      #0x80, r0               ! 0xA05F7480 = G1RRC
+    mov     r0, r1
+    mov     #7, r0
+    shll8   r0                      ! 0x700
+    mov.l   r0, @r1
+    mov     #-96, r0                ! 0xFFFFFFA0
+    shll16  r0
+    shll8   r0                      ! 0xA0000000
+    mov     #0x20, r1
+    shll8   r1                      ! 0x2000
+    or      r1, r0                  ! P2 _start_main (linker.ld asserts it)
+    jmp     @r0
     nop
     .balign 0x100, 0x09             ! nop-filled up to ROM 0x100
     .global _devboot
 _devboot:
-    .fill   0x400, 1, 0xFF
+    .fill   0x1F00, 1, 0xFF
+    .global _start_main
 _start_main:
-    ! The boot ROM's read cycle first, as the original BIOS's very first
-    ! instruction does (G1RRC = 0x700): the EPROM sits on the G1 bus, and
-    ! left at Holly's reset timing a read can return the previous word.
-    ! Seen on a real Naomi 2 with a cartridge inserted -- the extra load on
-    ! the bus -- as a literal load handing back the instruction fetched just
-    ! before it, every boot at the same place.
+    ! The boot ROM's read cycle, as the original BIOS's very first
+    ! instruction does (G1RRC = 0x700), already set at _start before any
+    ! data read: the EPROM sits on the G1 bus, and left at Holly's reset
+    ! timing a read can return the previous word. Seen on a real Naomi 2
+    ! with a cartridge inserted -- the extra load on the bus -- as a literal
+    ! load handing back the instruction fetched just before it, every boot
+    ! at the same place. Written again here, now through a literal.
     mov.l   Lg1rrc, r1
     mov.w   Lg1rrc_v, r0
     mov.l   r0, @r1
-    ! The SH-4's port A as the BIOS leaves it before it reads anything off
-    ! the bus: port function on (BCR2.PORTEN), all lines high, pins 1-3,
-    ! 5 and 7-9 driven (PCTRA 0x000FEEFE, the Naomi 2 BIOS's value). Reset
-    ! leaves them floating inputs, and pins 1, 7 and 8 read low then --
-    ! held down by the board. With a cartridge in, this ROM's EPROM reads
-    ! went wrong at fixed places while the BIOS's never do.
-    mov.l   Lpdtra, r1
-    mov     #-1, r0
-    mov.w   r0, @r1                 ! PDTRA = 0xFFFF
-    mov.l   Lpctra, r1
-    mov.l   Lpctra_v, r0
-    mov.l   r0, @r1                 ! PCTRA
-    mov.l   Lbcr2, r1
-    mov     #1, r0
-    mov.w   r0, @r1                 ! BCR2 = PORTEN
     mov.l   Lsr_init, r0
     ldc     r0, sr              ! MD=1 RB=1 BL=1 IMASK=15
     mov.l   Lmmucr, r1
@@ -237,10 +246,6 @@ asm_puts:
     .align 4
 Lsr_init:   .long 0x700000F0
 Lg1rrc:     .long 0xA05F7480
-Lpdtra:     .long 0xFF800030
-Lpctra:     .long 0xFF80002C
-Lpctra_v:   .long 0x000FEEFE
-Lbcr2:      .long 0xFF800004
 Lg1rrc_v:   .word 0x0700
             .align 2
 Lmmucr:     .long 0xFF000010

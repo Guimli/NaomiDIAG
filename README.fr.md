@@ -112,15 +112,18 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
    d'intégrité du BIOS, le verrou GD-ROM de la Dreamcast, toujours présent
    dans la Naomi. Le BIOS commercial écrit `0x1FFFFF` et contrôle ses 2 Mo,
    ce qu'une autre ROM ne peut pas passer ; le BIOS de **développement**
-   Naomi écrit `0x3FF` et ne contrôle que ses octets `0x100`–`0x4FF`.
-   NaomiDIAG garde ce kilo-octet libre et refait la lecture du BIOS de
-   développement. **Ce kilo-octet appartient à SEGA et n'est pas dans ce
-   dépôt** : compilez avec `DEVBOOT=chemin/develop.ic27` (jeu `naomi` de
-   MAME, `develop.ic27` ou `develop110.ic27`) et `tools/inject_devboot.py`
-   le copie depuis votre propre dump dans votre image locale et corrige le
-   CRC. Sans lui, le log de démarrage le signale et les tests cartouche et
-   DIMM trouvent le bus fermé sur vrai matériel (MAME ne simule pas ce
-   contrôle, d'où leur bon fonctionnement sous MAME). Ne publiez jamais une
+   Naomi écrit `0x3FF` puis relit ses octets `0x100`–`0x1FFF`. Combien
+   d'entre eux la clé couvre n'est pas connu : NaomiDIAG garde donc toute
+   cette plage libre et refait la lecture du BIOS de développement ; si
+   Holly la refuse, il essaie la clé commerciale `0x1FFFFF` avec une
+   lecture de 2 Mo. Le verdict de Holly est relu en `0x5F74EC` (3 ouvert,
+   2 refusé) et affiché avec la clé qui a marché. **Ces octets
+   appartiennent à SEGA et ne sont pas dans ce dépôt** : compilez avec
+   `DEVBOOT=chemin/develop.ic27` (jeu `naomi` de MAME, `develop.ic27` ou
+   `develop110.ic27`) et `tools/inject_devboot.py` les copie depuis votre
+   propre dump dans votre image locale et corrige le CRC. Sans eux, le log
+   de démarrage le signale et les tests cartouche et DIMM trouvent le bus
+   fermé sur vrai matériel (MAME ne simule pas ce contrôle, d'où leur bon fonctionnement sous MAME). Ne publiez jamais une
    image compilée avec `DEVBOOT`.
 6. **EPROM BIOS (IC27)** — auto-contrôle CRC32. Il s'exécute juste après la
    relocalisation pour que sa boucle tourne elle aussi en cache depuis la

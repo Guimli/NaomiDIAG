@@ -29,7 +29,7 @@ RELOC ?= 1
 
 # Serial console speed: 57600 (default, +0.47 %) or 115200 (-3.1 %).
 BAUD ?= 57600
-# DEVBOOT=path/to/develop.ic27: copy the G1-unlock kilobyte from your own
+# DEVBOOT=path/to/develop.ic27: copy the G1-unlock bytes (0x100-0x1FFF) from your own
 # Naomi development BIOS dump into the image (tools/inject_devboot.py).
 # Without it the cartridge and DIMM tests find the bus locked on real
 # hardware. Never commit or publish an image built this way.

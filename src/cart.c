@@ -23,26 +23,74 @@ void g1_set_board_timing(u32 v)
     REG32(0xA05F74A4) = v;              /* G1GDWC */
 }
 
-/* Once per boot: the unlock reads 2 MB of EPROM. Done after the loop
+/* Holly's verdict on the unlock, at 0x5F74EC: 0 while it checks, 2 when
+ * the bytes read through did not match the key, 3 when the bus is open
+ * (KallistiOS's G1_ATA_BUS_PROTECTION_STATUS). Read back from the CPU, so
+ * it is waited for: the check ends with the last read of the loop, but the
+ * register may lag it. */
+#define G1_STATUS_TIMEOUT   (TIMER_HZ / 10)     /* 100 ms */
+
+u32 g1_status(void)
+{
+    return REG32(0xA05F74EC);
+}
+
+static u32 g1_status_wait(void)
+{
+    u32 t0 = timer_ticks();
+    u32 st;
+    while ((st = g1_status()) == G1_ST_CHECKING &&
+           timer_ticks() - t0 < G1_STATUS_TIMEOUT)
+        ;
+    return st;
+}
+
+/* Once per boot: the development key first (8 KB read), then the retail
+ * one (2 MB) only if Holly turned the first down. Done after the loop
  * relocation in the suite, and here too for a menu action reached before
- * it (the suite stopped early). */
+ * it (the suite stopped early). Each try writes its key again, which
+ * restarts the check without a reset (MetalliC and SWAT's tests on the
+ * Dreamcast). */
 static u32 g_g1_open;
+static u32 g_g1_key;
+static u32 g_g1_status;
 
 u32 g1_open(void)
 {
     if (g_g1_open)
         return 0;
-    p_g1_unlock();
     g_g1_open = 1;
+    g_g1_key = G1_KEY_NONE;
+    g_g1_status = g1_status();
+    if (g1_devboot_present()) {
+        p_g1_unlock();
+        g_g1_status = g1_status_wait();
+        g_g1_key = G1_KEY_DEV;
+        if (g_g1_status == G1_ST_OPEN)
+            return 1;
+    }
+    p_g1_unlock_v(G1_UNLOCK_RETAIL);
+    g_g1_status = g1_status_wait();
+    g_g1_key = G1_KEY_RETAIL;
     return 1;
 }
 
-/* The kilobyte at ROM 0x100 the unlock depends on: 0xFF as built, the
- * development BIOS's bytes once tools/inject_devboot.py has run. */
+u32 g1_open_key(void)
+{
+    return g_g1_key;
+}
+
+u32 g1_open_status(void)
+{
+    return g_g1_status;
+}
+
+/* The bytes at ROM 0x100-0x1FFF the development key reads: 0xFF as built,
+ * the development BIOS's once tools/inject_devboot.py has run. */
 u32 g1_devboot_present(void)
 {
     const volatile u32 *p = (const volatile u32 *)0xA0000100u;
-    for (u32 i = 0; i < 0x100; i++)
+    for (u32 i = 0; i < G1_DEVBOOT_WORDS; i++)
         if (p[i] != 0xFFFFFFFFu)
             return 1;
     return 0;

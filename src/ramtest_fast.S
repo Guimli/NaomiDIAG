@@ -821,27 +821,32 @@ _crc32_rom_block:
 ! closed after reset -- every read returns all ones, writes are dropped --
 ! until a key is written to 0x5F74E4 and the boot ROM is read through: an
 ! integrity check of the BIOS, the Dreamcast's GD-ROM lock, still in the
-! Naomi. The key is how much of what follows is checked: the retail BIOS
-! writes 0x1FFFFF and reads its whole 2 MB from 0x100 (through P1), the
-! development BIOS writes 0x3FF and reads 0x7C0 words from 0xA0000100
-! (through P2) -- only its first kilobyte there counts. Both traced under
-! MAME, which does not model the check (so the cartridge and DIMM tests
-! always worked there and saw nothing on a real board).
+! Naomi. Its outcome is at 0x5F74EC (0 checking, 2 failed, 3 passed; see
+! g1_open in cart.c). The key is how much of what follows is checked: the
+! retail BIOS writes 0x1FFFFF and reads its whole 2 MB from 0x100 (through
+! P1), the development BIOS writes 0x3FF and copies 0x7C0 words from
+! 0xA0000100 (through P2) into RAM. Both traced under MAME, which does not
+! model the check (so the cartridge and DIMM tests always worked there and
+! saw nothing on a real board).
 !
 ! This ROM cannot pass the 2 MB check, being a different 2 MB; it uses the
-! development BIOS's: ROM 0x100-0x4FF holds that kilobyte once
-! tools/inject_devboot.py has copied it from the owner's dump. The loops
-! run from the relocated block so no instruction fetch from the EPROM
-! comes in between.
+! development BIOS's: ROM 0x100-0x1FFF holds the bytes that BIOS reads once
+! tools/inject_devboot.py has copied them from the owner's dump -- the whole
+! range, not knowing how much of it the 0x3FF key covers. The loops run from
+! the relocated block so no instruction fetch from the EPROM comes in
+! between.
 !
-! void g1_unlock_v(u32 flags) -- in parts, for the serial monitor:
+! void g1_unlock_v(u32 flags) -- in parts, for g1_open and the serial monitor:
 !   bit 0  G1RRC (0x5F7480) = 0x700 first, as the BIOS's first instruction
 !   bit 1  retail key, 0x001FFFFF to 0x5F74E4
 !   bit 2  2 MB read through P2 from 0xA0000000
 !   bit 3  retail BIOS read: 0x7FFC0 words through P1 from 0x80000100
 !   bit 4  development key, 0x000003FF to 0x5F74E4
 !   bit 5  development BIOS read: 0x7C0 words through P2 from 0xA0000100
-! g1_unlock() is bits 0, 4 and 5.
+!   bit 6  retail BIOS read through P2: 0x7FFC0 words from 0xA0000100 --
+!          bit 3's addresses without the operand cache, whose lines of this
+!          ROM's own constants would never reach the bus
+! g1_unlock() is bits 0, 4 and 5; the retail attempt in g1_open bits 0, 1, 6.
 ! =============================================================================
     .global _g1_unlock
     .global _g1_unlock_v
@@ -891,7 +896,15 @@ _g1_unlock_v:
 8:  mov.l   @r4+, r0
     dt      r5
     bf      8b
-9:  rts
+9:  mov     #64, r0
+    tst     r0, r6
+    bt      11f
+    mov.l   .Lg1dev, r4             ! 0xA0000100
+    mov.l   .Lg1bcnt, r5
+10: mov.l   @r4+, r0
+    dt      r5
+    bf      10b
+11: rts
     nop
     .align 2
 .Lg1700:    .word   0x0700

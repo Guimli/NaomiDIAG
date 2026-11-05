@@ -4789,7 +4789,8 @@ static void idle_screen(void)
  * be put to a real board without burning an EPROM for each guess. Lines:
  *   r b|w|l ADDR [N]    read N bytes/words/longs (hex), 8 per line
  *   w b|w|l ADDR VAL    write
- *   u [FLAGS]           G1 unlock, g1_unlock_v bits (default F)
+ *   u [FLAGS]           G1 unlock, g1_unlock_v bits (default 31), then
+ *                       Holly's status 0x5F74EC
  *   x                   X76F100 response-to-reset (board-ID register)
  *   d                   DIMM mailbox, signature and latch probe
  *   q                   back
@@ -4893,7 +4894,9 @@ static void monitor_run(void)
             if (!mon_hex(&s, &f))
                 f = 0x31;
             p_g1_unlock_v(f);
-            scif_puts(S_MON_DONE);
+            scif_puts(S_MON_G1ST);
+            scif_puthex(g1_status());
+            scif_puts("\n");
         } else if (cmd == 'x' || cmd == 'X') {
             scif_puthex(x76f100_rtr());
             scif_puts("\n");
@@ -5112,6 +5115,24 @@ static void mie_quiet_bringup(u32 port1)
     scif_puts(g_mie_prog ? S_RESUME_MIE_UP : S_MIE_NO_ANSWER);
 }
 
+/* What g1_open got from Holly (0x5F74EC), and with which key. */
+static void g1_report(void)
+{
+    if (g1_open_status() == G1_ST_OPEN) {
+        scif_puts(g1_open_key() == G1_KEY_DEV ? S_G1_OPEN_DEV
+                                              : S_G1_OPEN_RETAIL);
+        return;
+    }
+    scif_puts(g1_open_status() == G1_ST_CHECKING ? S_G1_NOVERDICT
+                                                 : S_G1_CLOSED);
+    scif_puthex(g1_open_status());
+    scif_puts("\n");
+    if (!g1_devboot_present())
+        scif_puts(S_G1_NODEVBOOT);
+    if (!reloc_active())
+        scif_puts(S_G1_UNLOCKED_ROM);
+}
+
 /* Boot after a reset the DIMM ordered (see resume_blk): no suite. The
  * screen, the board identification, the relocated loops, the G1 bus and
  * the MIE are brought back -- what the report and the buttons need -- the
@@ -5238,8 +5259,7 @@ void cmain(void)
      * checksum, from the relocated block when there is one (see g1_unlock
      * in ramtest_fast.S). Without it every ROM-board access reads 0xFFFF. */
     if (g1_open())
-        scif_puts(!g1_devboot_present() ? S_G1_NODEVBOOT :
-                  reloc_active() ? S_G1_UNLOCKED : S_G1_UNLOCKED_ROM);
+        g1_report();
 
     /* Only now the 2 MB ROM checksum: it is the single longest test in the
      * whole suite (4.2 M table steps), it must never run while the operator
