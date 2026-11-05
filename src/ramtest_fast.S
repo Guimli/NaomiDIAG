@@ -829,6 +829,10 @@ _crc32_rom_block:
 ! model the check (so the cartridge and DIMM tests always worked there and
 ! saw nothing on a real board).
 !
+! NOT USED AT BOOT ANY MORE: the bus is unlocked by crt0.S (ROM 0x000-0x017,
+! key 0x15) and g1_open only reads the verdict. Kept for the serial monitor's
+! `u` experiments, which close that bus again.
+!
 ! This ROM cannot pass the 2 MB check, being a different 2 MB; it uses the
 ! development BIOS's: ROM 0x100-0x1FFF holds the bytes that BIOS reads once
 ! tools/inject_devboot.py has copied them from the owner's dump -- the whole

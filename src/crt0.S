@@ -17,21 +17,50 @@
 #include "version.inc"
 #include "strings.h"
 
-! The first 256 bytes only jump over the next 7.75 KB: ROM 0x100-0x1FFF is
-! kept for the G1 bus unlock (see g1_unlock in ramtest_fast.S and
-! tools/inject_devboot.py). Holly opens the bus to the cartridge or DIMM
-! only after the key is written to 0x5F74E4 and a known stretch of boot ROM
-! is read through it; the Naomi development BIOS keys 0x3FF and reads its
-! bytes 0x100-0x1FFF, all of which are reproduced here, how much of them the
-! key covers being unknown. They ship as 0xFF: the bytes are SEGA's and are
-! put there locally, from the owner's own dump, never in this repository.
+! ---------------------------------------------------------------------------
+! G1 bus unlock, at the very first instruction (g1min, ROM 0x000-0x017).
 !
-! 0x2000 is out of bra's reach (+-4 KB), and a literal load would be the
-! first data read off the EPROM at reset bus timing (see G1RRC below), so
-! the read cycle is set and the P2 entry built from immediates only.
+! Holly opens the bus to the cartridge or DIMM only once the CPU has written
+! a key (the size of a ROM range) to 0x5F74E4 and Holly has checked the bytes
+! of that range, as they cross the bus from reset. Here the key is 0x15: Holly
+! checks ROM 0x000-0x015, the 22 bytes below, and nothing else of this image.
+! Validated on a real Naomi 2 (0x5F74EC = 3, ROM board reads go through).
+!
+!  - executed straight from the reset vector, uncached P2, strictly linear: no
+!    literal pool, no data read, every value built from immediates;
+!  - the key write leaves the bus one 32-bit fetch after the mov.l (between the
+!    reads of 0x13 and 0x14); Holly must still read at least one byte of the
+!    range after it, hence 0x15 as the smallest size;
+!  - the v5 sum of ROM 0x000-0x015 must be 0: 0x14/0x15 are compensation
+!    bytes (never executed), with the immediates at 0x0E and 0x12;
+!  - bra lands on 0x18, 32-bit aligned: the reads stay linear, no word is
+!    fetched twice.
+! Not one byte of this block may change: tools/check_g1min.py checks it at
+! build time. No other code may write 0x5F74E4 afterwards: a new key restarts
+! Holly's check, which this image would then fail.
+! ---------------------------------------------------------------------------
     .section .text.start, "ax"
     .global _start
 _start:
+    mov     #95, r0                 ! 0x00  0x5F
+    shll8   r0                      ! 0x02
+    or      #116, r0                ! 0x04  0x5F74
+    shll8   r0                      ! 0x06
+    or      #228, r0                ! 0x08  r0 = 0x005F74E4 (P0: MMU, cache off)
+    mov     #21, r5                 ! 0x0A  r5 = 0x15, key = size of the range
+    mov.l   r5, @r0                 ! 0x0C  KEY WRITE
+    mov     #0, r8                  ! 0x0E  compensation (immediate)
+    bra     g1min_end               ! 0x10  to 0x18
+    mov     #9, r8                  ! 0x12  delay slot, compensation
+    .byte   0x4B, 0x6B              ! 0x14  compensation: v5(0x000-0x015) = 0
+    nop                             ! 0x16  read with the 0x14 word, not run
+g1min_end:                          ! 0x18
+    .global _g1min_end
+_g1min_end:
+
+! The boot ROM's read cycle (G1RRC = 0x700) before the first data read, from
+! immediates (see _start_main below). Holly's check is over by now: the last
+! byte of its range, 0x15, crossed the bus with the word fetched before this.
     mov     #-96, r0                ! 0xFFFFFFA0
     shll8   r0
     or      #0x5F, r0
@@ -43,18 +72,7 @@ _start:
     mov     #7, r0
     shll8   r0                      ! 0x700
     mov.l   r0, @r1
-    mov     #-96, r0                ! 0xFFFFFFA0
-    shll16  r0
-    shll8   r0                      ! 0xA0000000
-    mov     #0x20, r1
-    shll8   r1                      ! 0x2000
-    or      r1, r0                  ! P2 _start_main (linker.ld asserts it)
-    jmp     @r0
-    nop
-    .balign 0x100, 0x09             ! nop-filled up to ROM 0x100
-    .global _devboot
-_devboot:
-    .fill   0x1F00, 1, 0xFF
+    .balignw 4, 0x0009
     .global _start_main
 _start_main:
     ! The boot ROM's read cycle, as the original BIOS's very first

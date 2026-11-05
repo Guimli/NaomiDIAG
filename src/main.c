@@ -4790,6 +4790,7 @@ static void idle_screen(void)
  *   r b|w|l ADDR [N]    read N bytes/words/longs (hex), 8 per line
  *   w b|w|l ADDR VAL    write
  *   u [FLAGS]           G1 unlock, g1_unlock_v bits (default 31), then
+ *                       (writes a key again: closes the bus crt0 opened)
  *                       Holly's status 0x5F74EC
  *   x                   X76F100 response-to-reset (board-ID register)
  *   d                   DIMM mailbox, signature and latch probe
@@ -5115,22 +5116,17 @@ static void mie_quiet_bringup(u32 port1)
     scif_puts(g_mie_prog ? S_RESUME_MIE_UP : S_MIE_NO_ANSWER);
 }
 
-/* What g1_open got from Holly (0x5F74EC), and with which key. */
+/* Holly's verdict on the unlock done at reset (crt0.S, key 0x15). */
 static void g1_report(void)
 {
     if (g1_open_status() == G1_ST_OPEN) {
-        scif_puts(g1_open_key() == G1_KEY_DEV ? S_G1_OPEN_DEV
-                                              : S_G1_OPEN_RETAIL);
+        scif_puts(S_G1_OPEN);
         return;
     }
     scif_puts(g1_open_status() == G1_ST_CHECKING ? S_G1_NOVERDICT
                                                  : S_G1_CLOSED);
     scif_puthex(g1_open_status());
     scif_puts("\n");
-    if (!g1_devboot_present())
-        scif_puts(S_G1_NODEVBOOT);
-    if (!reloc_active())
-        scif_puts(S_G1_UNLOCKED_ROM);
 }
 
 /* Boot after a reset the DIMM ordered (see resume_blk): no suite. The
@@ -5255,9 +5251,9 @@ void cmain(void)
     eta_set_mie_early(g_maple_safe);
     suite_check_abort();
 
-    /* Open the G1 bus to the cartridge or DIMM now, before the EPROM
-     * checksum, from the relocated block when there is one (see g1_unlock
-     * in ramtest_fast.S). Without it every ROM-board access reads 0xFFFF. */
+    /* The G1 bus to the cartridge or DIMM was unlocked at reset (crt0.S,
+     * key 0x15): Holly's verdict is read back and reported here. Without
+     * it every ROM-board access reads 0xFFFF. */
     if (g1_open())
         g1_report();
 

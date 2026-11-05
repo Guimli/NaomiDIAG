@@ -45,14 +45,13 @@ static u32 g1_status_wait(void)
     return st;
 }
 
-/* Once per boot: the development key first (8 KB read), then the retail
- * one (2 MB) only if Holly turned the first down. Done after the loop
- * relocation in the suite, and here too for a menu action reached before
- * it (the suite stopped early). Each try writes its key again, which
- * restarts the check without a reset (MetalliC and SWAT's tests on the
- * Dreamcast). */
+/* The bus is unlocked by the first instructions of the ROM (crt0.S,
+ * ROM 0x000-0x017: key 0x15 written at reset, Holly checks those 22 bytes).
+ * Nothing is written here: a new key would restart Holly's check, which
+ * this image fails for any other range. Only Holly's verdict is read, once
+ * per boot -- after the loop relocation in the suite, and for a menu action
+ * reached before it. */
 static u32 g_g1_open;
-static u32 g_g1_key;
 static u32 g_g1_status;
 
 u32 g1_open(void)
@@ -60,40 +59,18 @@ u32 g1_open(void)
     if (g_g1_open)
         return 0;
     g_g1_open = 1;
-    g_g1_key = G1_KEY_NONE;
-    g_g1_status = g1_status();
-    if (g1_devboot_present()) {
-        p_g1_unlock();
-        g_g1_status = g1_status_wait();
-        g_g1_key = G1_KEY_DEV;
-        if (g_g1_status == G1_ST_OPEN)
-            return 1;
-    }
-    p_g1_unlock_v(G1_UNLOCK_RETAIL);
     g_g1_status = g1_status_wait();
-    g_g1_key = G1_KEY_RETAIL;
     return 1;
 }
 
 u32 g1_open_key(void)
 {
-    return g_g1_key;
+    return G1_KEY_BOOT;
 }
 
 u32 g1_open_status(void)
 {
     return g_g1_status;
-}
-
-/* The bytes at ROM 0x100-0x1FFF the development key reads: 0xFF as built,
- * the development BIOS's once tools/inject_devboot.py has run. */
-u32 g1_devboot_present(void)
-{
-    const volatile u32 *p = (const volatile u32 *)0xA0000100u;
-    for (u32 i = 0; i < G1_DEVBOOT_WORDS; i++)
-        if (p[i] != 0xFFFFFFFFu)
-            return 1;
-    return 0;
 }
 
 void g1_bus_init(void)

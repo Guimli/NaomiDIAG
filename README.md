@@ -100,23 +100,18 @@ are reported as they land.
    block of CPU RAM, tested first, and run from there cached (see
    [Where the test loops execute](#where-the-test-loops-execute)).
 5. **G1 bus unlock** — Holly keeps the bus to the cartridge or DIMM closed
-   after reset (every read 0xFFFF, writes dropped) until a key is written
-   to `0x5F74E4` and a known stretch of the boot ROM is read through it:
-   an integrity check of the BIOS, the Dreamcast's GD-ROM lock, still in
-   the Naomi. The retail BIOS keys `0x1FFFFF` and checks all its 2 MB,
-   which a different ROM cannot pass; the Naomi **development** BIOS keys
-   `0x3FF` and then reads its bytes `0x100`–`0x1FFF`. How many of them
-   the key covers is not known, so NaomiDIAG keeps that whole range free
-   and does the development BIOS's read; if Holly turns it down it tries
-   the retail key `0x1FFFFF` with a 2 MB read. Holly's verdict is read
-   back from `0x5F74EC` (3 open, 2 refused) and printed with the key that
-   worked. **Those bytes are SEGA's and are not in this repository**:
-   build with `DEVBOOT=path/to/develop.ic27` (from MAME's `naomi` set,
-   `develop.ic27` or `develop110.ic27`) and `tools/inject_devboot.py`
-   copies them from your own dump into your local image and fixes the
-   CRC. Without them the boot log says so and the cartridge and DIMM tests
-   find the bus closed on real hardware (MAME does not model the check,
-   which is why they always worked there). Never publish an image built with `DEVBOOT`.
+   after reset (every read 0xFFFF, writes dropped) until the CPU writes a
+   key, the size of a ROM range, to `0x5F74E4` and Holly has checked the
+   bytes of that range as they cross the bus from reset. NaomiDIAG does it
+   with its **very first instructions** (`src/crt0.S`, ROM `0x000`–`0x017`):
+   key `0x15`, so Holly checks only those 22 bytes, which are NaomiDIAG's
+   own code — no SEGA byte is needed any more. The block runs straight from
+   the reset vector, strictly linear (no literal pool, no data read), and
+   its last bytes make the check sum come out right; `tools/check_g1min.py`
+   refuses the build if a single byte of it changes. Nothing writes a key
+   after it: a new key would restart the check and close the bus. The suite
+   only reads Holly's verdict back from `0x5F74EC` (3 open, 2 refused, 0 no
+   verdict — MAME does not model the check). Validated on a real Naomi 2.
 6. **BIOS EPROM (IC27)** — CRC32 self-check. It runs right after the
    relocation so that its loop, too, executes cached from CPU RAM: only the
    2 MB of data still cross the EPROM bus. Without a proven block it runs
