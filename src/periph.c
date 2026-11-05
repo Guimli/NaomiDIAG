@@ -126,11 +126,7 @@ static u16 ee_read_word(u32 addr)
 void serial_eeprom_read(u8 *out128)
 {
     BCR2 |= 1;                              /* PORTEN: pins act as GPIO */
-    PCTRA = 0x00000450;                     /* CLK(2)/DI(3)/CS(5) out, DO(4) in.
-                                             * Nothing else on port A: driving
-                                             * pins 1, 7-9 high as the BIOS does
-                                             * cut the console's receive path
-                                             * on a real Naomi 2 */
+    PCTRA = 0x00000450;                     /* CLK(2)/DI(3)/CS(5) out, DO(4) in */
     for (u32 i = 0; i < 64; i++) {
         u16 w = ee_read_word(i);
         out128[i * 2]     = (u8)(w >> 8);   /* match ROM byte order */
