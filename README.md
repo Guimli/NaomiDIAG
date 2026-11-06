@@ -726,10 +726,11 @@ can be tested: MAME's `naomi` carries an emulated 837-13551 I/O board.
 - Burn `NaomiDIAG_xx.bin` on a 27C160 (IC27); for a 27C322, `make 27c322`
   writes `NaomiDIAG_xx_27C322.bin`, the 2 MB image twice. Serial output is on the SCIF
   pins at 3.3 V logic — use a 3.3 V USB-serial adapter, never RS-232 levels.
-  For where to connect it on the board, refer to the
-  [JinGasa](https://github.com/Tchan0/JinGasa) project: it exists solely to
-  talk to a Naomi over the serial port and documents the wiring, which is
-  more than can be said for the pinouts circulating elsewhere.
+  See the [Naomi 2 debug serial pinout](docs/NAOMI2_SERIAL.md) for the
+  annotated board photo: green connects to PC RX (SH-4 TX), white to PC TX
+  (SH-4 RX), and purple to GND. **Do not connect the adapter's VCC pin.**
+  The [JinGasa](https://github.com/Tchan0/JinGasa) project also documents
+  serial wiring for communicating with a Naomi.
 - **Set the terminal to 57600 baud, 8N1, no flow control.** The ROM says so
   itself in its first lines, once the console is up.
 
