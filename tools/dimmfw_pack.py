@@ -20,9 +20,16 @@ from its start up to the image wanted.
   2.17                217_203.bin  upper half       1
   2.13                213_203.bin  upper half       1
   2.06                fpr23718.ic36 upper half      1  (version word 0x02060000, built Jul 11 2001)
+  3.03                fpr23905.ic36 lower half      0  (version word 0x03030000, built Aug 21 2002)
+  3.01                fpr23905c.ic36 lower half     0  (version word 0x03010000, built Jul 24 2002)
   extra entries, no data:
   4.03 CD-R           FW_Netdimm_403.bin upper half = 4.01 + byte patch, slot 1
   2.03                203_203.bin upper half == its lower half: slot 1 alias
+  3.03, 3.01          slot 1 aliases of the two images above: in fpr23905(c)
+                      the upper half is the same image with a wrong check
+                      word (slot CRC != 0, the loader always falls back to
+                      slot 0); the valid lower half is used for both slots,
+                      as 203_203.bin holds one valid image in both
 FW_Netdimm_403.bin's LOWER half is the Naomi updater program, not a DIMM
 slot 0: it is never packed.
 
@@ -56,7 +63,8 @@ def main():
     zpath, f403, out = sys.argv[1:4]
     z = zipfile.ZipFile(zpath)
     rd = {n: z.read(n) for n in ('401_203.bin', '317_312.bin', '217_203.bin',
-                                 '213_203.bin', '203_203.bin', 'fpr23718.ic36')}
+                                 '213_203.bin', '203_203.bin', 'fpr23718.ic36',
+                                 'fpr23905.ic36', 'fpr23905c.ic36')}
     rd['FW_Netdimm_403.bin'] = open(f403, 'rb').read()
     for n, d in rd.items():
         if len(d) != 2 * SLOT:
@@ -71,6 +79,8 @@ def main():
         (1, '2.17', hi('217_203.bin')),
         (1, '2.13', hi('213_203.bin')),
         (1, '2.06', hi('fpr23718.ic36')),       # fpr23718.ic36: version word 0x02060000
+        (0, '3.03', lo('fpr23905.ic36')),       # version word 0x03030000
+        (0, '3.01', lo('fpr23905c.ic36')),      # version word 0x03010000
     ]
     for slot, lab, d in stream:
         if boot_crc(d) != 0:
@@ -79,6 +89,9 @@ def main():
             sys.exit(f'slot 0 {lab}: ne commence pas par le code d\'amorcage DIMM')
     if hi('203_203.bin') != lo('401_203.bin'):
         sys.exit('203_203.bin : slot 1 different du slot 0 2.03, alias refuse')
+    for n in ('fpr23905.ic36', 'fpr23905c.ic36'):   # upper half = lower half but the check word
+        if hi(n)[:SLOT - 4] != lo(n)[:SLOT - 4]:
+            sys.exit(f'{n} : moitie haute differente de la moitie basse, alias slot 1 refuse')
     d403 = hi('FW_Netdimm_403.bin')
     if boot_crc(d403) != 0:
         sys.exit('4.03 : CRC-32 du slot != 0')
@@ -91,6 +104,8 @@ def main():
     pat = [(k << 8) | d403[k] for k in range(SLOT) if d403[k] != ref[k]]
     ents.append([1, '4.03 CD-R', 0, 0, pat, word(d403)])
     ents.append([1, '2.03', 1 * SLOT, 0xFFFFFFFF, [], word(lo('401_203.bin'))])
+    ents.append([1, '3.03', 7 * SLOT, 0xFFFFFFFF, [], word(lo('fpr23905.ic36'))])
+    ents.append([1, '3.01', 8 * SLOT, 0xFFFFFFFF, [], word(lo('fpr23905c.ic36'))])
 
     raw = b''.join(d for _, _, d in stream)
     filt = [{'id': lzma.FILTER_LZMA1, 'preset': 9 | lzma.PRESET_EXTREME,

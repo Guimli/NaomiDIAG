@@ -3038,39 +3038,64 @@ static void test_dimm_flash(void)
         return;
     }
 
-    /* the choice: "Slot 1: 4.01" ... and Cancel */
-    if (nimg > FW_MAXCH)
-        nimg = FW_MAXCH;
-    scif_puts(S_FW_MENU);
-    for (u32 i = 0; i < nimg; i++) {
-        const dfw_entry *e = dfw_get(i);
-        u32 n = 0;
-        const char *pfx = e->slot ? S_SCR_FW_S1 : S_SCR_FW_S0;
-        while (*pfx && n < 20)
-            g_fwlab[i][n++] = *pfx++;
-        for (u32 k = 0; k < 20 && e->label[k] && n < 27; k++)
-            g_fwlab[i][n++] = e->label[k];
-        g_fwlab[i][n] = 0;
-        g_fwch[i] = g_fwlab[i];
-        scif_puts("    ");
-        scif_putc((char)('1' + i));
-        scif_puts("  ");
-        scif_puts(g_fwlab[i]);
-        scif_puts("\n");
-    }
-    g_fwch[nimg] = S_FW_CANCEL;
-    int pick = fw_choose(g_fwch, nimg + 1, 0);
-    if (pick < 0) {
+    /* the choice, in two steps: the slot, then its versions, newest first */
+    static const char *const slot_ch[3] = { S_FW_PICK_S1, S_FW_PICK_S0, S_FW_CANCEL };
+    scif_puts(S_FW_MENU_SLOT);
+    int sp = fw_choose(slot_ch, 3, 0);
+    if (sp < 0) {
         scif_puts(S_FW_ABORT);
         log_screen_line(LK_INFO, S_SCR_FW_CANCEL, 0, 0, 0);
         return;
     }
+    u32 want_slot = sp == 0 ? 1 : 0;
+    u32 idx[FW_MAXCH], n_ch = 0;
+    for (u32 i = 0; i < nimg && n_ch < FW_MAXCH - 1; i++) {
+        const dfw_entry *c = dfw_get(i);
+        if (c->slot != want_slot)
+            continue;
+        /* insertion by label, descending: "4.03 CD-R" before "4.01" ... */
+        u32 k = n_ch++;
+        while (k > 0) {
+            const char *x = dfw_get(idx[k - 1])->label, *y = c->label;
+            while (*x && *x == *y) { x++; y++; }
+            if ((u8)*x >= (u8)*y)
+                break;
+            idx[k] = idx[k - 1];
+            k--;
+        }
+        idx[k] = i;
+    }
+    scif_puts(S_FW_MENU);
+    for (u32 j = 0; j < n_ch; j++) {
+        const dfw_entry *c = dfw_get(idx[j]);
+        u32 n = 0;
+        const char *pfx = c->slot ? S_SCR_FW_S1 : S_SCR_FW_S0;
+        while (*pfx && n < 20)
+            g_fwlab[j][n++] = *pfx++;
+        for (u32 k = 0; k < 20 && c->label[k] && n < 27; k++)
+            g_fwlab[j][n++] = c->label[k];
+        g_fwlab[j][n] = 0;
+        g_fwch[j] = g_fwlab[j];
+        scif_puts("    ");
+        scif_putc((char)('1' + j));
+        scif_puts("  ");
+        scif_puts(g_fwlab[j]);
+        scif_puts("\n");
+    }
+    g_fwch[n_ch] = S_FW_CANCEL;
+    int ch = fw_choose(g_fwch, n_ch + 1, 0);
+    if (ch < 0) {
+        scif_puts(S_FW_ABORT);
+        log_screen_line(LK_INFO, S_SCR_FW_CANCEL, 0, 0, 0);
+        return;
+    }
+    int pick = (int)idx[ch];
     const dfw_entry *e = dfw_get((u32)pick);
     u32 slot = e->slot;
     scif_puts(S_FW_SEL);
-    scif_puts(g_fwlab[pick]);
+    scif_puts(g_fwlab[ch]);
     scif_puts("\n");
-    log_screen_line(LK_INFO, g_fwlab[pick], 0, 0, 0);
+    log_screen_line(LK_INFO, g_fwlab[ch], 0, 0, 0);
     if (e->check == (slot ? w1 : w0))
         scif_puts(S_FW_SAME);
 
