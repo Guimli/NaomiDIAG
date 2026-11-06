@@ -22,6 +22,7 @@
 #include "periph.h"
 #include "dimm.h"
 #include "dimm_flash.h"
+#include "dimm_fw.h"
 #include "dimm_host.h"
 #include "maple.h"
 #include "board.h"
@@ -2829,15 +2830,23 @@ static void dimm_resume_interrupted(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* DIMM firmware update: identify the flash, then let the operator pick a
- * version. Reversed from Sega's own DIMM FIRMWARE UPDATE program; the flash
- * is driven over the G1 PIO (see dimm_flash.c). Only the non-destructive
- * identify + the version menu are wired: the write path is a single AMD
- * chip-erase + full-image reprogram, which wipes the recovery slot too, so
- * it stays disarmed until validated on real hardware. */
-static const char *const g_fw_ver[3] = { "3.17", "4.01", "4.03" };
-static const char *const g_fw_label[3] = { S_FW_V317, S_FW_V401, S_FW_V403 };
-static char g_fwbuf[40], g_fwbuf2[40];  /* report lines, kept for repaints */
+/* DIMM firmware update (dimm_flash.c, dimm_fw.c).
+ * Always: identify the flash and name the versions in place from the slot
+ * check words. Only a LOCAL build carries firmware images (make ... AUDIO=0
+ * DIMMFW=1): then one slot at a time can be erased (sector erase, the other
+ * slot untouched), programmed and verified. Slot 1 is the main firmware; a
+ * bad slot 1 falls back to slot 0 at boot. Slot 0 holds the boot loader: it
+ * asks for a second confirmation, and a failure there needs a programmer. */
+#define FWBUF_PHYS  0x0C500000u             /* 1 MB, clear of every other use */
+#define FWBUF       ((u8 *)(0x80000000u | FWBUF_PHYS))
+#define FW_MAXCH    8
+static char g_fwbuf[40], g_fws0[40], g_fws1[40], g_fwres[32];
+/* menu labels: main RAM (validated before the menu is reached), clear of the
+ * slot buffer and of the inflate tables that follow it */
+typedef struct { char lab[FW_MAXCH][28]; const char *ch[FW_MAXCH + 1]; } fw_menu;
+#define FWMENU      ((fw_menu *)(0x80000000u | (FWBUF_PHYS + 0x00180000u)))
+#define g_fwlab     (FWMENU->lab)
+#define g_fwch      (FWMENU->ch)
 static void hex_into(char *d, u32 v, u32 ndigits);
 
 /* JEDEC manufacturer, from the low byte of the read-ID answer (the DIMM's
@@ -2855,21 +2864,96 @@ static const char *flash_maker(u32 mfr)
     }
 }
 
-/* The version chooser, under the report lines: the three versions and
- * "cancel", TEST to move, SERVICE or START to pick, as in the menu. */
-#define FW_CHOICES 4
-static void fw_choice_draw(u32 y0, u32 sel)
+static u32 str_cat(char *d, u32 n, const char *t)
+{
+    while (*t && n < 39)
+        d[n++] = *t++;
+    d[n] = 0;
+    return n;
+}
+
+/* A chooser under the report lines: TEST moves, SERVICE/START picks, keys
+ * 1..n pick on the console, any other key cancels. Returns the index, or
+ * -1 for cancel. */
+static void fw_choice_draw(u32 y0, const char *const *t, u32 n, u32 sel)
 {
     if (!g_screen_ready)
         return;
     fb_fill_rows(y0, fb_hint_y() + 18, 0);
-    for (u32 i = 0; i < FW_CHOICES; i++) {
+    for (u32 i = 0; i < n; i++) {
         u32 y = y0 + i * 22;
-        const char *t = i < 3 ? g_fw_label[i] : S_FW_CANCEL;
         fb_text(16, y, i == sel ? ">" : " ", COL_TITLE, FB_W);
-        fb_text(48, y, t, i == sel ? COL_TITLE : COL_WHITE, FB_W);
+        fb_text(48, y, t[i], i == sel ? COL_TITLE : COL_WHITE, FB_W);
     }
     fb_text(16, fb_hint_y(), S_MENU_HINT, COL_HINT, FB_W);
+}
+
+static int fw_choose(const char *const *t, u32 n, int key_yes)
+{
+    u32 y0 = g_screen_y + 12, sel = 0;
+    int pick = -1;
+    fw_choice_draw(y0, t, n, sel);
+    for (;;) {
+        input_event ev;
+        if (input_poll(&ev)) {
+            if (ev.kind == INPUT_KEY) {
+                if (key_yes) {
+                    if (ev.key == 'Y' || ev.key == 'y')
+                        pick = 0;
+                } else if (ev.key >= '1' && ev.key < (int)('1' + n - 1)) {
+                    pick = ev.key - '1';
+                }
+                break;
+            }
+            if (ev.kind == INPUT_SELECT) {
+                sel = sel + 1 < n ? sel + 1 : 0;   /* no division: no libgcc */
+                fw_choice_draw(y0, t, n, sel);
+            } else if (ev.kind == INPUT_CONFIRM) {
+                if (sel + 1 < n)
+                    pick = (int)sel;
+                break;
+            }
+        }
+        progress_heartbeat();
+        delay_ms(20);
+    }
+    if (g_screen_ready)
+        fb_fill_rows(y0, fb_hint_y() + 18, 0);
+    return pick;
+}
+
+static u32 g_fw_phase;                  /* phase + 1 shown, 0 = none (.bss) */
+static void fw_progress(u32 phase, u32 done, u32 total)
+{
+    static const char *const lab[] = { S_P_FW_CHECK, S_P_FW_ERASE, S_P_FW_BLANK,
+                                        S_P_FW_PROG, S_P_FW_VERIFY, S_P_FW_READ,
+                                        S_P_FW_VERIFY };
+    if (phase + 1 != g_fw_phase) {
+        if (g_fw_phase)
+            progress_end();
+        g_fw_phase = 0;
+        if (phase < DF_PH_DONE) {
+            g_fw_phase = phase + 1;
+            progress_begin(lab[phase], total);
+        }
+    }
+    if (phase < DF_PH_DONE)
+        progress_tick(done);
+}
+
+/* "Slot 0 : 2.03" or "Slot 0 : ? (check word 1234ABCD)" */
+static void fw_slot_line(char *d, const char *pfx, u32 slot, u32 word)
+{
+    u32 n = str_cat(d, 0, pfx);
+    const char *nm = dfw_name(slot, word);
+    if (nm) {
+        str_cat(d, n, nm);
+    } else {
+        n = str_cat(d, n, S_SCR_FW_UNK);
+        hex_into(d + n, word, 8);
+        d[n + 8] = 0;
+        str_cat(d, n + 8, ")");
+    }
 }
 
 static void test_dimm_flash(void)
@@ -2895,75 +2979,150 @@ static void test_dimm_flash(void)
     scif_putc('/');
     scif_puthex(fi.dev);
     scif_puts("\n");
-    {
-        /* "Flash DIMM : Fujitsu 0004/22C4" */
-        u32 n = 0;
-        for (const char *t = S_SCR_FW_ID; *t; t++)
-            g_fwbuf[n++] = *t;
+    {   /* "DIMM flash: Fujitsu 0004/22C4" */
+        u32 n = str_cat(g_fwbuf, 0, S_SCR_FW_ID);
         const char *mk = flash_maker(fi.mfr);
         if (mk) {
-            while (*mk)
-                g_fwbuf[n++] = *mk++;
-            g_fwbuf[n++] = ' ';
+            n = str_cat(g_fwbuf, n, mk);
+            n = str_cat(g_fwbuf, n, " ");
         }
         hex_into(g_fwbuf + n, fi.mfr, 4);
-        n += 4;
-        g_fwbuf[n++] = '/';
-        hex_into(g_fwbuf + n, fi.dev, 4);
-        n += 4;
-        g_fwbuf[n] = 0;
+        g_fwbuf[n + 4] = '/';
+        hex_into(g_fwbuf + n + 5, fi.dev, 4);
+        g_fwbuf[n + 9] = 0;
         log_screen_line(LK_INFO, g_fwbuf, 0, 0, 0);
     }
 
-    /* the choice: board or cabinet buttons on screen, 1/2/3 on the console
-     * (any other key cancels, as before) */
-    scif_puts(S_FW_MENU);
-    u32 y0 = g_screen_y + 12;
-    u32 sel = 0;
-    int pick = -1;
-    fw_choice_draw(y0, sel);
-    for (;;) {
-        input_event ev;
-        if (input_poll(&ev)) {
-            if (ev.kind == INPUT_KEY) {
-                if (ev.key >= '1' && ev.key <= '3')
-                    pick = ev.key - '1';
-                break;
-            }
-            if (ev.kind == INPUT_SELECT) {
-                sel = (sel + 1) % FW_CHOICES;
-                fw_choice_draw(y0, sel);
-            } else if (ev.kind == INPUT_CONFIRM) {
-                if (sel < 3)
-                    pick = (int)sel;
-                break;
-            }
-        }
-        progress_heartbeat();
-        delay_ms(20);
+    /* the versions in place, from the slot check words */
+    u32 w0, w1;
+    dimm_flash_check_words(&w0, &w1);
+    scif_puts(S_FW_WORDS);
+    scif_puthex(w0);
+    scif_puts(" / ");
+    scif_puthex(w1);
+    scif_puts("\n");
+    fw_slot_line(g_fws0, S_SCR_FW_S0, 0, w0);
+    fw_slot_line(g_fws1, S_SCR_FW_S1, 1, w1);
+    scif_puts("  ");
+    scif_puts(g_fws0);
+    scif_puts("\n  ");
+    scif_puts(g_fws1);
+    scif_puts("\n");
+    log_screen_line(LK_INFO, g_fws0, 0, 0, 0);
+    log_screen_line(LK_INFO, g_fws1, 0, 0, 0);
+
+    /* writing needs: images in this build, a known flash, validated RAM */
+    u32 nimg = dfw_count();
+    if (!nimg) {
+        scif_puts(S_FW_NOIMG);
+        log_result(S_L_FW_NOIMG, CLIP_NONE, T_SKIP, 0, 0);
+        return;
     }
-    if (g_screen_ready)
-        fb_fill_rows(y0, fb_hint_y() + 18, 0);
+    if (!fi.layout_ok) {
+        scif_puts(S_FW_BADCHIP);
+        log_result(S_L_FW_CHIP, CLIP_NONE, T_FAIL, 0, 0);
+        return;
+    }
+    if (g_ram_usable < FWBUF_PHYS + DIMM_SLOT_SIZE - 0x0C000000u) {
+        scif_puts(S_FW_NORAM);
+        log_result(S_L_FW_RAM, CLIP_NONE, T_SKIP, 0, 0);
+        return;
+    }
+
+    /* the choice: "Slot 1: 4.01" ... and Cancel */
+    if (nimg > FW_MAXCH)
+        nimg = FW_MAXCH;
+    scif_puts(S_FW_MENU);
+    for (u32 i = 0; i < nimg; i++) {
+        const dfw_entry *e = dfw_get(i);
+        u32 n = 0;
+        const char *pfx = e->slot ? S_SCR_FW_S1 : S_SCR_FW_S0;
+        while (*pfx && n < 20)
+            g_fwlab[i][n++] = *pfx++;
+        for (u32 k = 0; k < 20 && e->label[k] && n < 27; k++)
+            g_fwlab[i][n++] = e->label[k];
+        g_fwlab[i][n] = 0;
+        g_fwch[i] = g_fwlab[i];
+        scif_puts("    ");
+        scif_putc((char)('1' + i));
+        scif_puts("  ");
+        scif_puts(g_fwlab[i]);
+        scif_puts("\n");
+    }
+    g_fwch[nimg] = S_FW_CANCEL;
+    int pick = fw_choose(g_fwch, nimg + 1, 0);
     if (pick < 0) {
         scif_puts(S_FW_ABORT);
         log_screen_line(LK_INFO, S_SCR_FW_CANCEL, 0, 0, 0);
         return;
     }
+    const dfw_entry *e = dfw_get((u32)pick);
+    u32 slot = e->slot;
     scif_puts(S_FW_SEL);
-    scif_puts(g_fw_ver[pick]);
+    scif_puts(g_fwlab[pick]);
     scif_puts("\n");
-    scif_puts(S_FW_PENDING);
-    {
-        u32 n = 0;
-        for (const char *t = S_SCR_FW_SEL; *t; t++)
-            g_fwbuf2[n++] = *t;
-        for (const char *t = g_fw_ver[pick]; *t; t++)
-            g_fwbuf2[n++] = *t;
-        g_fwbuf2[n] = 0;
-        log_screen_line(LK_INFO, g_fwbuf2, 0, 0, 0);
+    log_screen_line(LK_INFO, g_fwlab[pick], 0, 0, 0);
+    if (e->check == (slot ? w1 : w0))
+        scif_puts(S_FW_SAME);
+
+    /* confirmation: once for slot 1, twice for slot 0 */
+    static const char *const yes_no[2] = { S_FW_YES, S_FW_CANCEL };
+    scif_puts(slot ? S_FW_WARN1 : S_FW_WARN0);
+    log_screen_line(LK_INFO, slot ? S_SCR_FW_WARN1 : S_SCR_FW_WARN0, 0, 0, 0);
+    if (fw_choose(yes_no, 2, 1) != 0 ||
+        (slot == 0 && (scif_puts(S_FW_WARN0B),
+                       log_screen_line(LK_INFO, S_SCR_FW_WARN0B, 0, 0, 0),
+                       fw_choose(yes_no, 2, 1) != 0))) {
+        scif_puts(S_FW_ABORT);
+        log_screen_line(LK_INFO, S_SCR_FW_CANCEL, 0, 0, 0);
+        return;
     }
-    /* amber and silent: nothing failed, nothing was written */
-    log_result(S_L_FW_WRITE, CLIP_NONE, T_SKIP, 0, 0);
+
+    /* unpack and check the image before touching the flash */
+    scif_puts(S_FW_UNPACK);
+    int ue = dfw_unpack((u32)pick, FWBUF);
+    if (ue != DFW_OK) {
+        scif_puts(S_FW_UNPACK_BAD);
+        scif_putdec((u32)ue);
+        scif_puts("\n");
+        log_result(S_L_FW_IMAGE, CLIP_NONE, T_FAIL, 0, 0);
+        return;
+    }
+    scif_puts(S_FW_UNPACK_OK);
+
+    df_report r;
+    g_fw_phase = 0;
+    int fe = dimm_flash_write_slot(slot, FWBUF, slot == 0 ? DF_ALLOW_SLOT0 : 0,
+                                   fw_progress, &r);
+    if (g_fw_phase)
+        progress_end();
+    progress_clear_abort();            /* nothing could stop it anyway */
+    if (fe == DF_OK) {
+        scif_puts(S_FW_DONE);
+        log_result(S_L_FW_WRITE, CLIP_NONE, T_OK, 0, 0);
+        log_screen_line(LK_INFO, S_SCR_FW_POWER, 0, 0, 0);
+        return;
+    }
+    scif_puts(S_FW_ERR);
+    scif_putdec((u32)fe);
+    scif_puts(S_FW_ERR_STAGE);
+    scif_putdec(r.stage);
+    scif_puts(S_FW_ERR_ADDR);
+    scif_puthex(r.addr);
+    scif_puts(S_FW_ERR_GOT);
+    scif_puthex(r.got);
+    scif_puts(S_FW_ERR_WANT);
+    scif_puthex(r.want);
+    scif_puts("\n");
+    scif_puts(r.stage <= DF_PH_CHECK ? S_FW_UNTOUCHED :
+              slot ? S_FW_FAIL1 : S_FW_FAIL0);
+    {
+        u32 n = str_cat(g_fwres, 0, S_SCR_FW_ERRAT);
+        hex_into(g_fwres + n, r.addr, 6);
+        g_fwres[n + 6] = 0;
+        log_screen_line(LK_INFO, g_fwres, 0, 0, 0);
+    }
+    log_result(S_L_FW_WRITE, CLIP_NONE, T_FAIL, 0, 0);
 }
 
 /* ------------------------------------------------------------------ */
