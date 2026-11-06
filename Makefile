@@ -12,9 +12,8 @@ OBJDUMP := $(CROSS)objdump
 LANG    ?= EN
 QUICK   ?= 0
 
-# AUDIO=1 (default) embeds the spoken-report PCM (~1.7 MB). AUDIO=0 builds a
-# silent ROM from a stub clip table, freeing that space -- used by the DIMM
-# firmware-update variant, which spends the room on compressed firmware images.
+# AUDIO=1 (default) embeds the spoken-report clips. AUDIO=0 builds a silent
+# ROM from a stub clip table, freeing that space.
 AUDIO   ?= 1
 
 # lowercase language tag for the generated audio header / clip source
@@ -22,15 +21,13 @@ lang_lc := $(shell echo $(LANG) | tr A-Z a-z)
 # DIMMFW=1 -- LOCAL TEST BUILD ONLY: embeds SEGA NetDIMM firmware images,
 # packed from your own dumps (SEGADIMM = MAME segadimm.zip, FW403 = the
 # CD-R's FW_Netdimm_403.bin) by tools/dimmfw_pack.py into local/dimmfw.bin
-# (git-ignored). Needs AUDIO=0 for the room. The image gets its own name,
+# (git-ignored): seven slot images in one LZMA stream, ~475 KB, so the
+# speech stays in. The image gets its own name,
 # NaomiDIAG_<LANG>_DIMMFW_LOCAL.bin, and must NEVER be published.
 DIMMFW   ?= 0
 SEGADIMM ?= ../roms_gd/segadimm.zip
 FW403    ?= ../analysis/sega_dimm_cdr/Updater/FW_Netdimm_403.bin
 ifeq ($(DIMMFW),1)
-ifneq ($(AUDIO),0)
-$(error DIMMFW=1 needs AUDIO=0: the firmware images take the room of the speech)
-endif
 BIN     := NaomiDIAG_$(LANG)_DIMMFW_LOCAL.bin
 else
 BIN     := NaomiDIAG_$(LANG).bin
@@ -64,12 +61,12 @@ LDFLAGS := -nostdlib -Wl,-T,linker.gen.ld -Wl,--build-id=none -Wl,-Map,$(ELF).ma
 OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.o src/ramtest_fast.o src/reloc.o \
         src/timer.o src/aica.o src/pvr.o src/pvr2.o src/vram_diag.o src/vram_scan.o src/periph.o src/dimm.o src/maple.o \
         src/input.o src/eta.o src/board.o src/sha1.o src/cart.o src/dimm_flash.o \
-        src/dimm_host.o src/inflate.o src/dimm_fw.o src/dimmfw_blob.o
+        src/dimm_host.o src/lzma_dec.o src/dimm_fw.o src/dimmfw_blob.o
 
 HDRS := src/config.h src/version.inc src/hw.h src/scif.h src/sdram.h src/ramtest.h src/vram_mapping.h src/timer.h src/aica.h \
         src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/sha1.h \
         src/cart.h src/cartdb.h src/eta.h src/strings.h src/mie_prog.h src/arm_prog.h src/input.h src/dimm_host.h \
-        src/dimm_flash.h src/dimm_fw.h src/inflate.h
+        src/dimm_flash.h src/dimm_fw.h src/lzma_dec.h
 
 all: $(BIN)
 

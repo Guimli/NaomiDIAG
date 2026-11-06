@@ -1,32 +1,38 @@
 /* NetDIMM firmware images of a local build: table, unpack, checks.
- * See dimm_fw.h and tools/dimmfw_pack.py for the blob format. */
+ * See dimm_fw.h and tools/dimmfw_pack.py for the blob format ("DFW2"). */
 #include "dimm_fw.h"
 #include "dimm_flash.h"
-#include "inflate.h"
+#include "lzma_dec.h"
 
 extern const u8 dimmfw_blob[];
 extern const u8 dimmfw_blob_end[];
 
-static const u8 *blob_hdr(void)
+typedef struct {
+    char magic[4];
+    u32 count, stream_off, stream_len, total_out, lc, lp, pb;
+} dfw_hdr;
+
+static const dfw_hdr *hdr(void)
 {
-    const u8 *b = dimmfw_blob;
-    if (dimmfw_blob_end - dimmfw_blob < 8 ||
-        b[0] != 'D' || b[1] != 'F' || b[2] != 'W' || b[3] != '1')
+    const dfw_hdr *h = (const dfw_hdr *)dimmfw_blob;
+    if (dimmfw_blob_end - dimmfw_blob < (int)sizeof(dfw_hdr) ||
+        h->magic[0] != 'D' || h->magic[1] != 'F' || h->magic[2] != 'W' ||
+        h->magic[3] != '2')
         return 0;
-    return b;
+    return h;
 }
 
 u32 dfw_count(void)
 {
-    const u8 *b = blob_hdr();
-    return b ? *(const u32 *)(b + 4) : 0;
+    const dfw_hdr *h = hdr();
+    return h ? h->count : 0;
 }
 
 const dfw_entry *dfw_get(u32 i)
 {
     if (i >= dfw_count())
         return 0;
-    return (const dfw_entry *)(dimmfw_blob + 8 + 48 * i);
+    return (const dfw_entry *)(dimmfw_blob + sizeof(dfw_hdr) + 48 * i);
 }
 
 const char *dfw_name(u32 slot, u32 word)
@@ -39,24 +45,32 @@ const char *dfw_name(u32 slot, u32 word)
     return 0;
 }
 
-int dfw_unpack(u32 i, u8 *out)
+static const dfw_entry *data_entry(u32 i)
 {
     const dfw_entry *e = dfw_get(i);
-    if (!e)
+    if (e && e->base != 0xFFFFFFFFu)
+        e = dfw_get(e->base);
+    return (e && e->base == 0xFFFFFFFFu) ? e : 0;
+}
+
+u32 dfw_need(u32 i)
+{
+    const dfw_entry *d = data_entry(i);
+    return d ? d->out_off + DIMM_SLOT_SIZE : 0;
+}
+
+int dfw_unpack(u32 i, u8 *out, u8 *dec, void *work)
+{
+    const dfw_hdr *h = hdr();
+    const dfw_entry *e = dfw_get(i), *d = data_entry(i);
+    if (!h || !e || !d || dfw_need(i) > h->total_out)
         return DFW_ERR_INDEX;
-    const dfw_entry *src = e;
-    if (e->base != 0xFFFFFFFFu) {
-        src = dfw_get(e->base);
-        if (!src || src->base != 0xFFFFFFFFu)
-            return DFW_ERR_INDEX;
-    }
-    u32 got = 0;
-    /* Huffman tables right after the 1 MB slot buffer, in main RAM */
-    if (inflate_raw(dimmfw_blob + src->off, src->len, out, DIMM_SLOT_SIZE, &got,
-                    out + DIMM_SLOT_SIZE))
-        return DFW_ERR_INFLATE;
-    if (got != DIMM_SLOT_SIZE)
-        return DFW_ERR_SIZE;
+    if (lzma_decode(dimmfw_blob + h->stream_off, h->stream_len, h->lc, h->lp,
+                    h->pb, dec, dfw_need(i), work) != LZMA_OK)
+        return DFW_ERR_DECODE;
+    const u8 *src = dec + d->out_off;
+    for (u32 k = 0; k < DIMM_SLOT_SIZE; k++)
+        out[k] = src[k];
     const u32 *pw = (const u32 *)(dimmfw_blob + e->poff);
     for (u32 k = 0; k < e->npatch; k++)
         out[pw[k] >> 8] = (u8)pw[k];

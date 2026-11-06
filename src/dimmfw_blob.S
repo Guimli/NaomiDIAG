@@ -1,4 +1,4 @@
-! NetDIMM firmware blob of a LOCAL build (make ... AUDIO=0 DIMMFW=1): SEGA
+! NetDIMM firmware blob of a LOCAL build (make ... DIMMFW=1): SEGA
 ! code packed from the owner's own dumps by tools/dimmfw_pack.py into
 ! local/dimmfw.bin (git-ignored). Without DIMMFW the blob is empty and the
 ! firmware-update action can only identify the flash.

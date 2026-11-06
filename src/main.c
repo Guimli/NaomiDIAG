@@ -2832,17 +2832,22 @@ static void dimm_resume_interrupted(void)
 /* ------------------------------------------------------------------ */
 /* DIMM firmware update (dimm_flash.c, dimm_fw.c).
  * Always: identify the flash and name the versions in place from the slot
- * check words. Only a LOCAL build carries firmware images (make ... AUDIO=0
- * DIMMFW=1): then one slot at a time can be erased (sector erase, the other
+ * check words. Only a LOCAL build carries firmware images (make ... DIMMFW=1,
+ * a local test build): then one slot at a time can be erased (sector erase, the other
  * slot untouched), programmed and verified. Slot 1 is the main firmware; a
  * bad slot 1 falls back to slot 0 at boot. Slot 0 holds the boot loader: it
  * asks for a second confirmation, and a failure there needs a programmer. */
-#define FWBUF_PHYS  0x0C500000u             /* 1 MB, clear of every other use */
+#define FWBUF_PHYS  0x0C500000u             /* 1 MB slot image to write        */
 #define FWBUF       ((u8 *)(0x80000000u | FWBUF_PHYS))
-#define FW_MAXCH    8
+#define FWWORK      ((void *)(0x80000000u | (FWBUF_PHYS + 0x00100000u)))  /* LZMA probs */
+/* the decoded LZMA stream, up to 7 MB: the area the DIMM SDRAM test keeps its
+ * 16 MB copy in (BACKUP_PHYS), unused by this action */
+#define FWDEC_PHYS  0x0C800000u
+#define FWDEC       ((u8 *)(0x80000000u | FWDEC_PHYS))
+#define FW_MAXCH    10
 static char g_fwbuf[40], g_fws0[40], g_fws1[40], g_fwres[32];
 /* menu labels: main RAM (validated before the menu is reached), clear of the
- * slot buffer and of the inflate tables that follow it */
+ * slot buffer and of the LZMA probabilities that follow it */
 typedef struct { char lab[FW_MAXCH][28]; const char *ch[FW_MAXCH + 1]; } fw_menu;
 #define FWMENU      ((fw_menu *)(0x80000000u | (FWBUF_PHYS + 0x00180000u)))
 #define g_fwlab     (FWMENU->lab)
@@ -3023,7 +3028,11 @@ static void test_dimm_flash(void)
         log_result(S_L_FW_CHIP, CLIP_NONE, T_FAIL, 0, 0);
         return;
     }
-    if (g_ram_usable < FWBUF_PHYS + DIMM_SLOT_SIZE - 0x0C000000u) {
+    u32 need_ram = FWDEC_PHYS - 0x0C000000u;
+    for (u32 i = 0; i < nimg; i++)
+        if (FWDEC_PHYS + dfw_need(i) - 0x0C000000u > need_ram)
+            need_ram = FWDEC_PHYS + dfw_need(i) - 0x0C000000u;
+    if (g_ram_usable < need_ram) {
         scif_puts(S_FW_NORAM);
         log_result(S_L_FW_RAM, CLIP_NONE, T_SKIP, 0, 0);
         return;
@@ -3080,7 +3089,7 @@ static void test_dimm_flash(void)
 
     /* unpack and check the image before touching the flash */
     scif_puts(S_FW_UNPACK);
-    int ue = dfw_unpack((u32)pick, FWBUF);
+    int ue = dfw_unpack((u32)pick, FWBUF, FWDEC, FWWORK);
     if (ue != DFW_OK) {
         scif_puts(S_FW_UNPACK_BAD);
         scif_putdec((u32)ue);
