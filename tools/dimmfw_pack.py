@@ -19,7 +19,7 @@ from its start up to the image wanted.
   3.12                317_312.bin  lower half       0
   2.17                217_203.bin  upper half       1
   2.13                213_203.bin  upper half       1
-  fpr23718            fpr23718.ic36 upper half      1
+  2.06                fpr23718.ic36 upper half      1  (version word 0x02060000, built Jul 11 2001)
   extra entries, no data:
   4.03 CD-R           FW_Netdimm_403.bin upper half = 4.01 + byte patch, slot 1
   2.03                203_203.bin upper half == its lower half: slot 1 alias
@@ -70,7 +70,7 @@ def main():
         (0, '3.12', lo('317_312.bin')),
         (1, '2.17', hi('217_203.bin')),
         (1, '2.13', hi('213_203.bin')),
-        (1, 'fpr23718', hi('fpr23718.ic36')),
+        (1, '2.06', hi('fpr23718.ic36')),       # fpr23718.ic36: version word 0x02060000
     ]
     for slot, lab, d in stream:
         if boot_crc(d) != 0:
