@@ -336,7 +336,7 @@ données de la puce (DQ), et comme la **broche du boîtier** à sonder :
 
 - port série : `Ligne D13 coupee sur IC9 DQ13, broche 50`, et comment elle
   se lit (toujours 0, toujours 1, ou flottante) ;
-- écran : `Ligne D13 DQ13 ....... IC9 Broche 50 ECHEC` ;
+- écran : `IC9 DQ13 Broche 50 ECHEC`, aligné à droite sur sa propre ligne ;
 - voix : « Ligne D, treize, coupée sur, I C neuf, D Q, treize ».
 
 La broche dépend de la puce : la RAM CPU est une Hitachi HM5264165
@@ -366,7 +366,7 @@ et un bit de ligne :
 | 23, 24 | BA0, BA1, banque | A15, A16 |
 
 Les lignes d'adresse sont communes aux quatre puces :
-`Adresse A5 coupee sur IC10, broche 30` (écran `IC10 Broche 30 ECHEC`,
+`Adresse A5 coupee sur IC10, broche 30` (écran `IC10 A5 Broche 30 ECHEC`,
 voix « Ligne d'adresse A, cinq, coupée sur, I C dix ») désigne la broche
 de cette puce, `Adresse BA0 coupee, 4 puces, broche 20` la piste commune ou
 le SH-4. Le port série ajoute la broche du SH-4 et les

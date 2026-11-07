@@ -357,17 +357,10 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
     const char *label = e->name;
     if ((e->kind == LK_DATA || e->kind == LK_ADDR || e->kind == LK_BANK) &&
         e->pin) {
-        /* a located line: short label, then "IC9 Pin 50" in red --
-         * "Line D13 DQ13 .... IC9 Pin 50 FAIL" */
-        u32 k = 0;
-        scr_cat(lbuf, &k, e->kind == LK_DATA ? S_SCR_LINE_D :
-                          e->kind == LK_ADDR ? S_SCR_ADDR : S_SCR_BANK, 39);
-        scr_num(lbuf, &k, e->line);
-        if (e->kind == LK_DATA) {
-            scr_cat(lbuf, &k, " DQ", 39);
-            scr_num(lbuf, &k, e->dq);
-        }
-        lbuf[k] = 0;
+        /* a located line: only "IC9 DQ13 Pin 50" in red, then FAIL, from
+         * the right -- nothing on the left to collide with. The bus line
+         * (D13) is on serial and in the speech. */
+        lbuf[0] = 0;
         label = lbuf;
         if (e->ic) {
             scr_cat(chips, &n, e->ic, 23);
@@ -375,6 +368,9 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
             scr_num(chips, &n, e->dq);
             scr_cat(chips, &n, S_SCR_NICS, 23);
         }
+        scr_cat(chips, &n, e->kind == LK_DATA ? " DQ" :
+                           e->kind == LK_ADDR ? " A" : " BA", 23);
+        scr_num(chips, &n, e->kind == LK_DATA ? e->dq : e->line);
         scr_cat(chips, &n, S_SCR_PIN, 23);
         scr_num(chips, &n, e->pin);
     } else if (e->detail && e->comps && e->kind == LK_NONE) {

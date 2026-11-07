@@ -307,7 +307,7 @@ the **package pin** to probe:
 
 - serial: `Line D13 cut on IC9 DQ13, pin 50`, and how it reads (always 0,
   always 1, or floating);
-- screen: `Line D13 DQ13 ......... IC9 Pin 50 FAIL`;
+- screen: `IC9 DQ13 Pin 50 FAIL`, right-aligned on its own line;
 - speech: "Line D, thirteen, cut on, I C nine, D Q, thirteen".
 
 The pin depends on the part: the CPU RAM is the Hitachi HM5264165
@@ -335,7 +335,7 @@ for 16 MB). One pin carries a column bit and a row bit:
 | 23, 24 | BA0, BA1, bank | A15, A16 |
 
 Address lines are common to the four chips: `Address A5 cut on IC10, pin
-30` (screen `IC10 Pin 30 FAIL`, speech "Address line A, five, cut on, I C
+30` (screen `IC10 A5 Pin 30 FAIL`, speech "Address line A, five, cut on, I C
 ten") points at that chip's pin, `Address BA0 cut, all 4 chips, pin 20` at
 the shared trace or the SH-4. The serial
 console adds the SH-4 pin and the CPU bits behind the SDRAM pin. VRAM, Elan
