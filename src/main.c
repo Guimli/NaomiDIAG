@@ -3198,7 +3198,7 @@ static void test_maple_mie(u32 ram_ok)
         scif_puthex(st_word);
         scif_puts("\n");
         input_set_mie_port(g_mie_port1);
-    log_result(S_L_MIE_SELFTEST, CLIP_JVS,
+    log_result(S_L_MIE_SELFTEST, CLIP_MIE_SELF,
                    bad ? T_FAIL : T_OK, 0, 0);
     }
 }

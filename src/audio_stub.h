@@ -110,6 +110,7 @@ enum {
     CLIP_RTC_DATE,
     CLIP_CART_UNCHK,
     CLIP_ARM7,
+    CLIP_MIE_SELF,
     CLIP_COUNT
 };
 
