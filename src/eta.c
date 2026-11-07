@@ -59,6 +59,22 @@
  * the from-ROM figures stay as measured below: they are the yardstick of
  * the EPROM execution speed (g_romk).
  *
+ * Loops from ROM, measured too (v0.19 built with RELOC=0 on the same board,
+ * capture/naomidiag_v019_reloc0_EN.log, 14:36 to DIAG COMPLETE):
+ *
+ *   step                 from -> to (s)        total   base + results
+ *   BIOS CRC from ROM     19.17 ->   35.47     16.3    12.6 + 1
+ *   CPU RAM               35.53 ->  332.66    297.1   293.4 + 1
+ *   VRAM TEX0 + TEX1     332.66 ->  496.98    164.3   156.9 + 2
+ *   Elan RAM             505.07 ->  801.93    296.9   (PVR-B skipped again)
+ *   sound RAM, by ARM7   806.10 ->  839.67     33.6    26.2 + 2  (as cached)
+ *   serial EEPROM        ~868.2 ->  875.38      7.2     3.5 + 1
+ * Naomi 2 from ROM = Elan RAM measured + the PVR-B's 16 MB at the TEX rate
+ * from ROM (157 s): 455 s, an estimate. These replace the figures below,
+ * extrapolated from a 14.5 s quick VRAM check that now takes 6.3 s (screen
+ * up at 6.3 s, speaker at 15.5 s in both v0.19 runs). The relocation scan
+ * over 128 blocks, run only when the CPU RAM is bad, stays extrapolated.
+ *
  * The Naomi 1 has the same steps but the PVR-B and Elan RAM. The first
  * version of this table came from the PR #2 log, which had a fault on
  * TEX1, a MIE that did not answer and no Naomi 2 memories tested; it was
@@ -96,21 +112,21 @@ typedef struct {
 } step_est;
 
 static const step_est est[ETA_STEPS] = {
-    [ETA_VIDEO]   = { 14500, 14500, 0, 3, 0 },
-    [ETA_AUDIO]   = {  7400,  7400, 2, 3, 0 },
+    [ETA_VIDEO]   = {  6300,  6300, 0, 3, 0 },
+    [ETA_AUDIO]   = {  1800,  1800, 2, 3, 0 },
     [ETA_BOARD]   = {   300,   300, 1, 1, 0 },
-    [ETA_RELOC]   = {   500, 24000, 2, 0, 0 },
-    [ETA_BIOS]    = {  1100,  3600, 0, 0, 0 },
+    [ETA_RELOC]   = {   500, 24000, 1, 0, 0 },
+    [ETA_BIOS]    = {  1100, 12600, 1, 0, 0 },
     [ETA_MIE]     = {  4500,     0, 4, 0, 0 },
-    [ETA_SDRAM]   = { Q(20200, 32), Q(755000, 32), 1, 3, 1 },
-    [ETA_VRAM]    = { Q(22300, 8),  Q(378000, 8),  2, 6, 1 },
+    [ETA_SDRAM]   = { Q(20200, 32), Q(293400, 32), 1, 3, 1 },
+    [ETA_VRAM]    = { Q(22300, 8),  Q(156900, 8),  2, 6, 1 },
     /* tested by the AICA's ARM7 from its own side of the bus: 26.2 s on a
      * real Naomi 2 (v0.19). The SH-4 fallback, if the ARM7 fails, is the
      * 498.8 s measured on v0.16; the progress tracking corrects then. */
     [ETA_ARAM]    = { Q(26200, 8),  Q(26200, 8),   2, 3, 0 },
-    [ETA_N2]      = { Q(48000, 24), Q(1133000, 24), 2, 6, 1 },
+    [ETA_N2]      = { Q(48000, 24), Q(455000, 24),  2, 6, 1 },
     [ETA_PERIPH]  = {  6200,  6200, 2, 0, 0 },
-    [ETA_SEEPROM] = {  2900, 10900, 1, 0, 0 },
+    [ETA_SEEPROM] = {  2900,  3500, 1, 0, 0 },
     [ETA_END]     = {   500,   500, 0, 0, 0 },
 };
 

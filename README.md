@@ -353,35 +353,34 @@ no — and the rows it occupied go to the report instead.
 
 The top right corner of the screen counts down to the end of the boot
 suite, and the serial console prints the estimate once the plan is known.
-Each step has a duration taken from the serial log of a real Naomi 2
-running v0.19 (spoken results included); the quick VRAM check and the case
-without CPU RAM for the loops keep the figures of the earlier v0.16 run:
+Each step has a duration taken from the serial logs of a real Naomi 2
+running v0.19, spoken results included: once as built, once built with
+`RELOC=0` so that every memory loop runs from the boot EPROM:
 
 | Step | Loops relocated | No CPU RAM for the loops |
 |---|---|---|
-| Screen + speaker bring-up | 0:29 | 0:29 |
+| Screen + speaker bring-up | 0:16 | 0:16 |
 | Board identification | 0:04 | 0:04 |
-| Loop relocation | 0:08 | 0:31 (up to 128 blocks scanned from ROM) |
-| BIOS CRC | 0:01 (measured: 1.06 s) | 0:04 |
-| MIE, settings EEPROM, JVS | 0:19 | skipped |
-| CPU RAM | 0:24 | 12:39 |
-| VRAM TEX0 + TEX1 | 0:30 | 6:25 |
-| Naomi 2: PVR-B + Elan RAM | 0:55 | 19:00 |
+| Loop relocation | 0:04 | 0:28 (up to 128 blocks scanned from ROM, extrapolated) |
+| BIOS CRC | 0:05 | 0:16 |
+| MIE, settings EEPROM, JVS | 0:19 | 0:19, run after the RTC |
+| CPU RAM | 0:24 | 4:57 |
+| VRAM TEX0 + TEX1 | 0:30 | 2:44 |
+| Naomi 2: PVR-B + Elan RAM | 0:55 | 7:42 |
 | Sound RAM (by the ARM7) | 0:34 | 0:34 (never relocated) |
-| NVRAM, RTC, serial EEPROM, end | 0:21 | 0:29 |
-| **Naomi 1 total** | **2:50** | **21:15** |
-| **Naomi 2 total** | **3:45** | **40:15** |
+| NVRAM, RTC, serial EEPROM, end | 0:21 | 0:21 |
+| **Naomi 1 total** | **2:36** | **9:59** |
+| **Naomi 2 total** | **3:31** | **17:42** |
 
-- The v0.19 run took 3:07 to DIAG COMPLETE. On that board the PVR-B address
-  bus fails and its cell test is skipped, so the Naomi 2 step is the Elan
-  RAM as measured plus the PVR-B at the TEX rate, an estimate. The sound RAM
-  is tested by the AICA's ARM7 in 26 s, where the SH-4 across G2 took 8:22;
-  the loop relocation now takes tenths of a second. The Naomi 1 total is the
-  same without the PVR-B and Elan RAM.
-- Without a CPU RAM block the loops run from the boot EPROM. The quick VRAM
-  check always does: 3 passes over 600 KB in 14.5 s, 7.9 s per
-  megabyte-pass, about 14 times the cached rate. Instruction fetch then
-  dominates, so that rate is applied to every memory the loops test.
+- The two runs took 3:07 and 14:36 to DIAG COMPLETE. On that board the
+  PVR-B address bus fails and its cell test is skipped, so the Naomi 2 step
+  is the Elan RAM as measured plus the PVR-B at the TEX rate, an estimate.
+  The sound RAM is tested by the AICA's ARM7 in 26 s either way, where the
+  SH-4 across G2 took 8:22; the loop relocation now takes tenths of a
+  second. The Naomi 1 total is the same without the PVR-B and Elan RAM.
+- Without a CPU RAM block the MIE stage waits for the CPU RAM verdict and
+  runs after the RTC. Only the relocation scan over 128 blocks, which runs
+  only when the CPU RAM is bad, is extrapolated.
 - The count corrects itself as it goes: inside a memory step it follows the
   passes' progress, the measured duration of the quick VRAM check rescales
   the ROM case, and the CPU RAM test rescales the later memory steps.
