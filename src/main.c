@@ -23,6 +23,7 @@
 #include "dimm.h"
 #include "dimm_flash.h"
 #include "dimm_fw.h"
+#include "ram_pins.h"
 #include "dimm_host.h"
 #include "maple.h"
 #include "board.h"
@@ -251,6 +252,8 @@ typedef struct {
     u32 kind;                       /* LK_*: what a line report names     */
     u32 line;                       /* D number, SDRAM pin, or CPU bit    */
     u32 dq;                         /* data line: the chip's own DQ pin   */
+    u32 pin;                        /* line: package pin on the chip, 0 = none */
+    const char *ic;                 /* line: the chip it names, or NULL    */
 } log_entry;
 
 static log_entry g_log[LOG_MAX];
@@ -278,6 +281,19 @@ static u32 g_screen_y;
 /* Draw one entry at y and return the y the next one starts at, or 0 if it
  * did not fit. Shared by the append path and the full repaint so the two
  * cannot lay the screen out differently. */
+static void scr_cat(char *d, u32 *o, const char *s, u32 max)
+{
+    while (*s && *o < max)
+        d[(*o)++] = *s++;
+}
+
+static void scr_num(char *d, u32 *o, u32 v)
+{
+    if (v >= 10)
+        d[(*o)++] = (char)('0' + v / 10);
+    d[(*o)++] = (char)('0' + v % 10);
+}
+
 static u32 screen_draw_entry(const log_entry *e, u32 y)
 {
     /* The screen holds fewer lines than the suite produces results, so the
@@ -335,9 +351,33 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
     /* A failure names its chips on its own line, in red just before FAIL,
      * rather than on a line of their own: a Naomi 2 report is one line
      * short of the screen already. The label gives way to them. */
-    char chips[20];
+    char chips[24];
     u32 n = 0;
-    if (e->detail && e->comps && e->kind == LK_NONE) {
+    char lbuf[40];
+    const char *label = e->name;
+    if ((e->kind == LK_DATA || e->kind == LK_ADDR || e->kind == LK_BANK) &&
+        e->pin) {
+        /* a located line: short label, then "IC9 Pin 50" in red --
+         * "Line D13 DQ13 .... IC9 Pin 50 FAIL" */
+        u32 k = 0;
+        scr_cat(lbuf, &k, e->kind == LK_DATA ? S_SCR_LINE_D :
+                          e->kind == LK_ADDR ? S_SCR_ADDR : S_SCR_BANK, 39);
+        scr_num(lbuf, &k, e->line);
+        if (e->kind == LK_DATA) {
+            scr_cat(lbuf, &k, " DQ", 39);
+            scr_num(lbuf, &k, e->dq);
+        }
+        lbuf[k] = 0;
+        label = lbuf;
+        if (e->ic) {
+            scr_cat(chips, &n, e->ic, 23);
+        } else {                        /* several chips: how many */
+            scr_num(chips, &n, e->dq);
+            scr_cat(chips, &n, S_SCR_NICS, 23);
+        }
+        scr_cat(chips, &n, S_SCR_PIN, 23);
+        scr_num(chips, &n, e->pin);
+    } else if (e->detail && e->comps && e->kind == LK_NONE) {
         const char *last = 0;
         u32 distinct = 0;
         u32 ncomps = e->comps == pvrb_comps ? 8u : 4u;
@@ -367,17 +407,17 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
         }
     }
     chips[n] = 0;
-    u32 fail_x = FB_W - 16 * 6;
+    /* FAIL ends where OK ends, one character in from the edge, whatever its
+     * length in this language ("FAIL" 4, "ECHEC" 5) */
+    u32 fail_x = FB_W - 16 * ((u32)sizeof(S_SCR_FAIL) - 1 + 1);
     u32 chips_x = n ? fail_x - 16 * (n + 1) : fail_x;
     /* A label too long for the chips beside it drops its parenthesis --
      * on the memories it lists the region's chips, which the red names
      * now say better -- rather than being cut mid-word. */
-    const char *label = e->name;
-    char lbuf[40];
     u32 llen = 0;
     while (label[llen])
         llen++;
-    if (16 + llen * 16 > chips_x - 16) {
+    if (label == e->name && 16 + llen * 16 > chips_x - 16) {
         u32 i = 0;
         while (label[i] && i < sizeof lbuf - 1 &&
                !(label[i] == ' ' && label[i + 1] == '('))
@@ -655,6 +695,8 @@ static void log_result_q(const char *name, u32 clip, t_status st, u32 detail,
     e.kind = LK_NONE;
     e.line = 0;
     e.dq = 0;
+    e.pin = 0;
+    e.ic = 0;
     log_store(&e);
 
     scif_puts(name);
@@ -686,6 +728,8 @@ static void log_screen_line(u32 kind, const char *name, u32 detail, u32 line,
     e.kind = kind;
     e.line = line;
     e.dq = count;
+    e.pin = 0;
+    e.ic = 0;
     log_store(&e);
     screen_append(&e);
 }
@@ -720,7 +764,7 @@ static u32 g_ram_usable;
 
 #define RESUME_P2       0xAC200000u
 #define RESUME_MAGIC    0x4E444D52u     /* "RMDN" */
-#define RESUME_VERSION  1u
+#define RESUME_VERSION  2u              /* 2: log_entry gained pin, ic */
 #define RESUME_POOL     2048u
 #define RESUME_MAX_RESETS 3u            /* then a normal boot: no reset loop */
 #define BACKUP_PHYS     0x0C800000u
@@ -1239,6 +1283,69 @@ static u32 line_probe(u32 base, u32 len, u32 odd, u32 bit, u32 set)
     return wrong;
 }
 
+static void put_num(char *d, u32 *o, u32 v);
+static void put_str(char *d, u32 *o, const char *s);
+static void ser_pin(u32 pin);
+
+/* One cut data line, CPU RAM or VRAM: the serial detail and how the line
+ * reads, then a log entry naming the line, the chip, its DQ and the package
+ * pin to probe -- "Line D13 cut on IC9 DQ13, pin 50" -- shown on screen as
+ * "Line D13 DQ13 ... IC9 Pin 50 FAIL" and spoken as the line and the DQ. */
+static void cut_line_entry(u32 line, const char *ic, u32 clip, u32 dq, u32 pin,
+                           u32 f0, u32 f1)
+{
+    scif_puts(S_CUT_SERIAL);
+    scif_putdec(line);
+    scif_puts(" (");
+    scif_puts(ic);
+    scif_puts(", DQ");
+    scif_putdec(dq);
+    if (pin) {
+        scif_puts(S_SER_PIN);
+        scif_putdec(pin);
+    }
+    scif_puts(") : ");
+    scif_puts(f0 >= LINE_THRESHOLD && f1 >= LINE_THRESHOLD ? S_CUT_FLOAT :
+              f0 >= LINE_THRESHOLD ? S_CUT_HIGH : S_CUT_LOW);
+    scif_puts(" (");
+    scif_putdec(f0);
+    scif_puts("/64, ");
+    scif_putdec(f1);
+    scif_puts("/64)\n");
+
+    if (g_cut_n >= CUT_MAX)
+        return;
+    char *d = g_cut_name[g_cut_n++];
+    u32 o = 0;
+    put_str(d, &o, S_CUT_PRE);
+    put_num(d, &o, line);
+    put_str(d, &o, S_CUT_MID);
+    put_str(d, &o, ic);
+    put_str(d, &o, " DQ");
+    put_num(d, &o, dq);
+    d[o] = 0;
+
+    log_entry e;
+    e.name = d;
+    e.clip = clip;
+    e.status = T_FAIL;
+    e.detail = 0;
+    e.comps = 0;
+    e.quiet_ok = 0;
+    e.pre = CLIP_NONE;
+    e.kind = LK_DATA;
+    e.line = line;
+    e.dq = dq;
+    e.pin = pin;
+    e.ic = ic;
+    log_store(&e);
+    scif_puts(d);
+    ser_pin(e.pin);
+    scif_puts(S_SUF_FAIL);
+    screen_append(&e);
+    say_entry(&e);
+}
+
 static void report_cut_lines(u32 base, u32 len, u32 bits_even, u32 bits_odd)
 {
     if (len < LINE_SAMPLES * 64u)
@@ -1253,64 +1360,94 @@ static void report_cut_lines(u32 base, u32 len, u32 bits_even, u32 bits_odd)
             u32 f1 = line_probe(base, len, odd, bit, 1);
             if (f0 < LINE_THRESHOLD && f1 < LINE_THRESHOLD)
                 continue;                   /* cells, not the line */
-            u32 line = bit + (odd ? 32u : 0u);
             u32 comp = (odd ? 2u : 0u) + (bit >= 16 ? 1u : 0u);
-
-            /* serial: the detail, and how the line reads */
-            scif_puts(S_CUT_SERIAL);
-            scif_putdec(line);
-            scif_puts(" (");
-            scif_puts(work_comps[comp].name);
-            scif_puts(", DQ");
-            scif_putdec(bit & 15u);
-            scif_puts(") : ");
-            scif_puts(f0 >= LINE_THRESHOLD && f1 >= LINE_THRESHOLD ? S_CUT_FLOAT :
-                      f0 >= LINE_THRESHOLD ? S_CUT_HIGH : S_CUT_LOW);
-            scif_puts(" (");
-            scif_putdec(f0);
-            scif_puts("/64, ");
-            scif_putdec(f1);
-            scif_puts("/64)\n");
-
-            if (g_cut_n >= CUT_MAX)
-                continue;
-            /* "Line D37 cut on IC11S DQ5": the SH-4 bus line, then the
-             * chip and its own pin -- a name the log can keep */
-            char *d = g_cut_name[g_cut_n++];
             u32 dq = bit & 15u;
-            const char *parts[6] = { S_CUT_PRE, 0, S_CUT_MID,
-                                     g_ic_valid ? work_comps[comp].name : "?",
-                                     " DQ", 0 };
-            u32 o = 0;
-            for (u32 i = 0; i < 6; i++) {
-                if (!parts[i]) {
-                    u32 v = i == 1 ? line : dq;
-                    if (v >= 10)
-                        d[o++] = (char)('0' + v / 10);
-                    d[o++] = (char)('0' + v % 10);
-                    continue;
-                }
-                for (const char *s = parts[i]; *s && o < 31; s++)
-                    d[o++] = *s;
-            }
-            d[o] = 0;
+            cut_line_entry(bit + (odd ? 32u : 0u),
+                           g_ic_valid ? work_comps[comp].name : "?",
+                           g_ic_valid ? work_comps[comp].clip : CLIP_NUM_1 + comp,
+                           dq, pin54_dq[dq], f0, f1);
+        }
+    }
+}
 
-            log_entry e;
-            e.name = d;
-            e.clip = g_ic_valid ? work_comps[comp].clip : CLIP_NUM_1 + comp;
-            e.status = T_FAIL;
-            e.detail = 0;
-            e.comps = 0;
-            e.quiet_ok = 0;
-            e.pre = CLIP_NONE;
-            e.kind = LK_DATA;
-            e.line = line;
-            e.dq = dq;
-            log_store(&e);
-            scif_puts(d);
-            scif_puts(S_SUF_FAIL);
-            screen_append(&e);
-            say_entry(&e);
+/* VRAM: the same probe, one 4 MiB quarter at a time -- its chips change with
+ * address bit 22 (and 23 on the PVR-B's 16 MiB), so a line cut on one chip
+ * fails only the samples taken in that chip's quarters. The probed cells are
+ * saved and put back: the framebuffer lives in this memory. */
+static u32 line_probe_saved(u32 base, u32 len, u32 bit, u32 set)
+{
+    volatile u32 *p = (volatile u32 *)base;
+    u32 step = ((len >> 6) & ~7u) >> 2;
+    u32 keep[LINE_SAMPLES + 1];
+    for (u32 k = 0; k < LINE_SAMPLES; k++)
+        keep[k] = p[k * step];
+    keep[LINE_SAMPLES] = p[2];
+    u32 wrong = line_probe(base, len, 0, bit, set);
+    for (u32 k = 0; k < LINE_SAMPLES; k++)
+        p[k * step] = keep[k];
+    p[2] = keep[LINE_SAMPLES];
+    return wrong;
+}
+
+/* Elan RAM: 32-bit chips, picked by address bit 24 and the word parity:
+ * probed per 16 MiB half and per parity; the CPU bit is the chip's DQ. */
+static void report_cut_lines_elan(u32 base, u32 size, u32 bits_e, u32 bits_o,
+                                  const comp_map *comps)
+{
+    for (u32 h = 0; h < size; h += 0x01000000u) {
+        for (u32 odd = 0; odd < 2; odd++) {
+            u32 bits = odd ? bits_o : bits_e;
+            for (u32 bit = 0; bit < 32; bit++) {
+                if (!(bits & (1u << bit)))
+                    continue;
+                volatile u32 *p = (volatile u32 *)(base + h);
+                u32 step = ((0x01000000u >> 6) & ~7u) >> 2;
+                u32 keep[LINE_SAMPLES + 1];
+                for (u32 k = 0; k < LINE_SAMPLES; k++)
+                    keep[k] = p[k * step + odd];
+                keep[LINE_SAMPLES] = p[odd + 2];
+                u32 f0 = line_probe(base + h, 0x01000000u, odd, bit, 0);
+                u32 f1 = line_probe(base + h, 0x01000000u, odd, bit, 1);
+                for (u32 k = 0; k < LINE_SAMPLES; k++)
+                    p[k * step + odd] = keep[k];
+                p[odd + 2] = keep[LINE_SAMPLES];
+                if (f0 < LINE_THRESHOLD && f1 < LINE_THRESHOLD)
+                    continue;
+                u32 idx = (h ? 2u : 0u) + odd;
+                cut_line_entry(bit, comps ? comps[idx].name : "?",
+                               comps ? comps[idx].clip : CLIP_NUM_1 + idx,
+                               bit, pin86_dq[bit], f0, f1);
+            }
+        }
+    }
+}
+
+static void report_cut_lines_vram(u32 base, u32 size, u32 bits_e, u32 bits_o,
+                                  const comp_map *comps)
+{
+    if (elan_is_mapped(base)) {
+        report_cut_lines_elan(base, size, bits_e, bits_o, comps);
+        return;
+    }
+    u32 bits = bits_e | bits_o;
+    if (!bits || !vram_is_mapped(base))
+        return;
+    for (u32 q = 0; q < size; q += 0x00400000u) {
+        u32 qb = base + q;
+        for (u32 bit = 0; bit < 32; bit++) {
+            if (!(bits & (1u << bit)))
+                continue;
+            u32 f0 = line_probe_saved(qb, 0x00400000u, bit, 0);
+            u32 f1 = line_probe_saved(qb, 0x00400000u, bit, 1);
+            if (f0 < LINE_THRESHOLD && f1 < LINE_THRESHOLD)
+                continue;                   /* cells, not the line */
+            u32 m = vram_chip_mask(qb, 1u << bit), idx = 0;
+            while (idx < 7 && !(m & (1u << idx)))
+                idx++;
+            u32 dq = bit & 15u;
+            cut_line_entry(bit, comps ? comps[idx].name : "?",
+                           comps ? comps[idx].clip : CLIP_NUM_1 + (idx & 3u),
+                           dq, pin50_dq[dq], f0, f1);
         }
     }
 }
@@ -1392,8 +1529,18 @@ static void put_str(char *d, u32 *o, const char *s)
         d[(*o)++] = *s++;
 }
 
+/* ", pin 50" after a located line on serial: the pin travels in the entry
+ * (e.pin), not in the 32-byte name the OC-RAM can afford */
+static void ser_pin(u32 pin)
+{
+    if (pin) {
+        scif_puts(S_SER_PIN);
+        scif_putdec(pin);
+    }
+}
+
 static void addr_report(u32 kind, u32 num, u32 chips, const comp_map *comps,
-                        u32 ncomps, u32 clip)
+                        u32 ncomps, u32 clip, u32 pin)
 {
     if (g_cut_n >= CUT_MAX || !chips)
         return;
@@ -1412,12 +1559,25 @@ static void addr_report(u32 kind, u32 num, u32 chips, const comp_map *comps,
         for (u32 i = 0; i < ncomps; i++)
             if ((chips & (1u << i)) && comps && comps[i].name != last)
                 distinct++, last = comps[i].name;
+        /* the names, if they all fit in the 31 characters left of the
+         * name; otherwise how many chips ("IC11S/IC12S" does not fit after
+         * the French "Adresse BA1 coupee sur ") */
+        u32 need = o;
+        last = 0;
+        for (u32 i = 0; i < ncomps && comps; i++)
+            if ((chips & (1u << i)) && comps[i].name != last) {
+                const char *t = comps[i].name;
+                last = t;
+                while (*t++)
+                    need++;
+                need++;                 /* the '/' or the end */
+            }
         last = 0;
         for (u32 i = 0; i < ncomps && comps; i++) {
             if (!(chips & (1u << i)) || comps[i].name == last)
                 continue;
             last = comps[i].name;
-            if (distinct > 2) {         /* no room: say how many */
+            if (distinct > 2 || need > 32) {   /* no room: say how many */
                 put_num(d, &o, distinct);
                 put_str(d, &o, S_ADDR_CHIPS);
                 break;
@@ -1428,6 +1588,14 @@ static void addr_report(u32 kind, u32 num, u32 chips, const comp_map *comps,
         }
     }
     d[o] = 0;
+    /* the one chip it names, for the screen ("IC10 Pin 30") */
+    const char *one = 0;
+    u32 nch = 0;
+    for (u32 i = 0; i < ncomps && comps; i++)
+        if (chips & (1u << i)) {
+            if (!nch++)
+                one = comps[i].name;
+        }
 
     log_entry e;
     e.name = d;
@@ -1439,9 +1607,12 @@ static void addr_report(u32 kind, u32 num, u32 chips, const comp_map *comps,
     e.pre = CLIP_NONE;
     e.kind = kind;
     e.line = num;
-    e.dq = 0;
+    e.dq = nch;                     /* chips it touched, for the screen */
+    e.pin = pin;
+    e.ic = nch == 1 ? one : 0;
     log_store(&e);
     scif_puts(d);
+    ser_pin(e.pin);
     scif_puts(S_SUF_FAIL);
     screen_append(&e);
     say_entry(&e);
@@ -1496,7 +1667,8 @@ static void sdram_addr_report(const u32 byline[14], const u32 out[32])
         }
         scif_puts("\n");
         addr_report(pin < 12 ? LK_ADDR : LK_BANK, pin < 12 ? pin : pin - 12,
-                    byline[pin], IC(work_comps), 4, CLIP_CPU_RAM);
+                    byline[pin], IC(work_comps), 4, CLIP_CPU_RAM,
+                    pin54_addr[pin]);
     }
 }
 
@@ -1513,7 +1685,7 @@ static u32 addr_bits_report(u32 base, u32 size, u32 passes, u32 g2,
         if (!out[b])
             continue;
         any = 1;
-        addr_report(LK_ABIT, b, out[b], comps, ncomps, clip);
+        addr_report(LK_ABIT, b, out[b], comps, ncomps, clip, 0);
     }
     return any;
 }
@@ -1522,6 +1694,18 @@ static u32 test_sdram_cells(void)
 {
     u32 size = g_ram_size;
     scif_puts(S_SDRAM_HDR);
+#if SIM_LINE_REPORT
+    /* test build only (CFLAGS_EXTRA=-DSIM_LINE_REPORT=1): one of each line
+     * report, to check the serial text, the screen layout and the speech */
+    log_result(S_L_SDRAM_CELL, CLIP_CPU_RAM, T_FAIL, 1, IC(work_comps));
+    cut_line_entry(13, "IC9", CLIP_IC_9, 13, pin54_dq[13], 64, 0);
+    addr_report(LK_ADDR, 5, 0x2, IC(work_comps), 4, CLIP_CPU_RAM, pin54_addr[5]);
+    addr_report(LK_ADDR, 11, 0xF, IC(work_comps), 4, CLIP_CPU_RAM, pin54_addr[11]);
+    addr_report(LK_BANK, 1, 0xC, IC(work_comps), 4, CLIP_CPU_RAM, pin54_addr[13]);
+    cut_line_entry(37, "IC11S", CLIP_IC_11, 5, pin54_dq[5], 0, 64);
+    cut_line_entry(20, "IC18", CLIP_IC_18, 4, pin50_dq[4], 64, 64);
+    cut_line_entry(27, "IC108S", CLIP_IC_108S, 27, pin86_dq[27], 0, 64);
+#endif
 
     /* data bus test runs at an even word address (A2=0): comps 1/2 */
     u32 bad = ram_test_databus(SDRAM_P2_BASE);
@@ -1965,6 +2149,8 @@ static void test_vram_region_body(const char *name, const char *dbus, const char
     if (bad) {
         report_badbits(bad);
         report_comps(name, c, comps);
+        /* a data line cut on one chip: name it and its pin */
+        report_cut_lines_vram(base, size, bad, bad, comps);
         *ok_flag = 0;
         diagnose_vram(base, size);
         return;
@@ -2043,6 +2229,8 @@ static void test_vram_region_body(const char *name, const char *dbus, const char
         report_badbits(res.badbits);
         report_comps(name, chips, comps);
         report_fails(&res);
+        /* a cut data line rather than cells: name it and its pin */
+        report_cut_lines_vram(base, len, res.badbits_e, res.badbits_o, comps);
         *ok_flag = 0;
     }
 }
@@ -4275,6 +4463,8 @@ static void loop_say(const loop_part *lp, u32 chips)
     e.kind = LK_NONE;
     e.line = 0;
     e.dq = 0;
+    e.pin = 0;
+    e.ic = 0;
     say_entry(&e);
 }
 
@@ -5566,6 +5756,7 @@ void cmain(void)
         if (g_log[i].kind == LK_INFO || g_log[i].kind == LK_ICROW)
             continue;                   /* screen-only lines */
         scif_puts(g_log[i].name);
+        ser_pin(g_log[i].pin);
         scif_puts(g_log[i].status == T_OK ? S_SUM_OK :
                   g_log[i].status == T_SKIP ? S_SUM_SKIP : S_SUM_FAIL);
     }

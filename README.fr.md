@@ -321,18 +321,31 @@ fautives s'affichent en rouge sur la ligne même de l'échec, juste avant
 `ECHEC` (`SDRAM test cellules   IC9 IC12S ECHEC`) ; un libellé trop long pour
 leur laisser la place perd sa parenthèse.
 
-Une panne de RAM CPU est aussi examinée pour une **ligne de données
-coupée**. Chaque bit fautif est sondé sur 64 adresses réparties dans la zone
-testée, sur la parité de mot où il a échoué : toutes écrites, puis un leurre
-de polarité opposée pour qu'une ligne flottante ne se contente pas de
-garder la dernière valeur envoyée, puis toutes relues, avec le bit à 0 puis
-à 1. Faux sur 60 ou plus, c'est une ligne et non une cellule : elle a sa
-propre ligne à l'écran et à la voix — `Ligne D5 coupee sur IC9 DQ5`,
-« Ligne D, cinq, coupée sur, I C neuf, D Q, cinq » — et le port série précise
-comment elle se lit (toujours 0, toujours 1, ou flottante). La ligne est
-nommée deux fois : d'abord comme le bus 64 bits du SH-4 la porte (un mot
-pair est D0-D31, un mot impair D32-D63), puis comme la broche de données
-de la puce elle-même, DQ0-DQ15, celle à sonder sur le boîtier.
+Une panne de RAM est aussi examinée pour une **ligne de données coupée**,
+sur la RAM CPU, la VRAM et la RAM Elan de la Naomi 2. Chaque bit fautif est
+sondé sur 64 adresses réparties dans la zone que couvre une puce (la zone
+testée et la parité de mot sur la RAM CPU, un quart de 4 Mio sur la VRAM,
+une moitié de 16 Mio et une parité sur la RAM Elan ; les cellules VRAM et
+Elan sont sauvegardées puis remises, l'image affichée s'y trouve) : toutes
+écrites, puis un leurre de polarité opposée pour qu'une ligne flottante ne
+se contente pas de garder la dernière valeur envoyée, puis toutes relues,
+avec le bit à 0 puis à 1. Faux sur 60 ou plus, c'est une ligne et non une
+cellule. Elle est alors nommée de trois façons : comme le bus du processeur
+la porte (D0-D63 sur le bus 64 bits de la RAM CPU), comme la broche de
+données de la puce (DQ), et comme la **broche du boîtier** à sonder :
+
+- port série : `Ligne D13 coupee sur IC9 DQ13, broche 50`, et comment elle
+  se lit (toujours 0, toujours 1, ou flottante) ;
+- écran : `Ligne D13 DQ13 ....... IC9 Broche 50 ECHEC` ;
+- voix : « Ligne D, treize, coupée sur, I C neuf, D Q, treize ».
+
+La broche dépend de la puce : la RAM CPU est une Hitachi HM5264165
+(TSOP-II 54), la VRAM une Hynix HY57V161610D (TSOP-II 50), la RAM Elan une
+SDRAM 32 bits (TSOP-II 86, où le bit CPU est le numéro de DQ) -- tables dans
+`src/ram_pins.h`. Une ligne de données est partagée par toutes les puces de
+sa voie : la broche nommée est l'endroit où sonder, et la coupure peut être
+sur la piste ou un via vers une autre puce. Sur une vraie Naomi 2,
+`D27 (pin 50)` a mené directement à un via ouvert sur la ligne vers IC106.
 
 Les **lignes d'adresse** sont parcourues puce par puce sur chaque mémoire :
 une étape ne compte que si une voie entière de 16 bits d'une cellule relit
@@ -353,9 +366,10 @@ et un bit de ligne :
 | 23, 24 | BA0, BA1, banque | A15, A16 |
 
 Les lignes d'adresse sont communes aux quatre puces :
-`Adresse A5 coupee sur IC10` (« Ligne d'adresse A, cinq, coupée sur, I C
-dix ») désigne la broche de cette puce, `Adresse BA0 coupee, 4 puces` la
-piste commune ou le SH-4. Le port série ajoute la broche du SH-4 et les
+`Adresse A5 coupee sur IC10, broche 30` (écran `IC10 Broche 30 ECHEC`,
+voix « Ligne d'adresse A, cinq, coupée sur, I C dix ») désigne la broche
+de cette puce, `Adresse BA0 coupee, 4 puces, broche 20` la piste commune ou
+le SH-4. Le port série ajoute la broche du SH-4 et les
 bits CPU derrière la broche de SDRAM. La VRAM, la RAM Elan et la RAM son
 sont derrière des contrôleurs dont le multiplexage n'est pas documenté :
 pour elles, le rapport nomme le bit CPU et les puces touchées :

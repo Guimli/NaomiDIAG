@@ -293,16 +293,30 @@ the failing chips sit in red on the failure's own line, just before `FAIL`
 (`SDRAM cell test   IC9 IC12S FAIL`); a label too long to leave them room
 drops its parenthesis.
 
-A CPU RAM fault is also checked for a **cut data line**. Each failing bit is
-probed on 64 addresses spread over the tested region, on the word parity it
-failed on: all written, then a decoy of the opposite polarity so a floating
-line cannot simply hold the last value driven, then all read back, with the
-bit at 0 and at 1. Wrong on 60 or more is a line, not a cell, and it gets
-its own line on screen and in speech — `Line D5 cut on IC9 DQ5`, "Line D,
-five, cut on, I C nine, D Q, five" — with how it reads on serial (always 0,
-always 1, or floating). The line is named twice: first as the SH-4's 64-bit
-bus carries it (an even word is D0-D31, an odd word D32-D63), then as the
-chip's own data pin, DQ0-DQ15, the one to probe on the package.
+A RAM fault is also checked for a **cut data line**, on the CPU RAM, the
+VRAM and the Naomi 2 Elan RAM. Each failing bit is probed on 64 addresses
+spread over the area one chip covers (the tested region and word parity on
+the CPU RAM, a 4 MiB quarter on the VRAM, a 16 MiB half and a word parity
+on the Elan RAM; VRAM and Elan cells are saved and put back, the
+framebuffer lives there): all written, then a decoy of the opposite
+polarity so a floating line cannot simply hold the last value driven, then
+all read back, with the bit at 0 and at 1. Wrong on 60 or more is a line,
+not a cell. The line is then named three ways: as the CPU bus carries it
+(D0-D63 on the CPU RAM's 64-bit bus), as the chip's data pin (DQ), and as
+the **package pin** to probe:
+
+- serial: `Line D13 cut on IC9 DQ13, pin 50`, and how it reads (always 0,
+  always 1, or floating);
+- screen: `Line D13 DQ13 ......... IC9 Pin 50 FAIL`;
+- speech: "Line D, thirteen, cut on, I C nine, D Q, thirteen".
+
+The pin depends on the part: the CPU RAM is the Hitachi HM5264165
+(TSOP-II 54), the VRAM the Hynix HY57V161610D (TSOP-II 50), the Elan RAM a
+32-bit SDRAM (TSOP-II 86, where the CPU bit is the DQ number) -- tables in
+`src/ram_pins.h`. A data line is shared by every chip of its lane: the pin
+named is where to probe, and the break may be on the trace or a via to
+another chip. On a real Naomi 2, `D27 (pin 50)` led straight to an open via
+on the line to IC106.
 
 **Address lines** are walked chip by chip on every memory: a step counts
 only when a whole 16-bit lane of some cell reads back the value written at
@@ -320,9 +334,10 @@ for 16 MB). One pin carries a column bit and a row bit:
 | 21, 22 | A10, A11, row | A13, A14 |
 | 23, 24 | BA0, BA1, bank | A15, A16 |
 
-Address lines are common to the four chips: `Address A5 cut on IC10`
-("Address line A, five, cut on, I C ten") points at that chip's pin,
-`Address BA0 cut, all 4 chips` at the shared trace or the SH-4. The serial
+Address lines are common to the four chips: `Address A5 cut on IC10, pin
+30` (screen `IC10 Pin 30 FAIL`, speech "Address line A, five, cut on, I C
+ten") points at that chip's pin, `Address BA0 cut, all 4 chips, pin 20` at
+the shared trace or the SH-4. The serial
 console adds the SH-4 pin and the CPU bits behind the SDRAM pin. VRAM, Elan
 RAM and sound RAM sit behind controllers whose multiplexing is not
 documented, so for them the report names the CPU bit and the chips it
