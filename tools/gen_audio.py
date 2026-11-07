@@ -15,6 +15,8 @@ would change every clip) and only the new ones are synthesised. --all
 regenerates every clip.
 
 Engine: Piper neural TTS (tools/.venv), one voice model per language.
+The Japanese voice needs piper-tts 1.6 or later and pyopenjtalk in that
+venv (tools/.venv/bin/pip install "piper-tts>=1.6" pyopenjtalk).
 Some entries use phonetic spelling so the TTS pronounces acronyms right
 (e.g. FR 'rome bioss' -> 'ROM BIOS', 'enne ve ram' -> 'NVRAM')."""
 import subprocess, tempfile, os, sys, array

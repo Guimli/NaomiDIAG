@@ -155,6 +155,14 @@ void diag_input_check(u32 in_loop)
  * the screen says so in amber, the speech says why. */
 typedef enum { T_OK = 0, T_FAIL = 1, T_SKIP = 2 } t_status;
 
+/* Bytes in the UTF-8 character that starts with lead byte c: a copy into a
+ * fixed buffer stops before a character that does not fit whole, rather
+ * than leaving half of a kana or an accent at the end. */
+static inline u32 utf8_seq(u32 c)
+{
+    return c < 0xC0u ? 1u : c < 0xE0u ? 2u : c < 0xF0u ? 3u : 4u;
+}
+
 /* numbered position -> silkscreen IC (see analysis/ADDRESS_MAP.md).
  * Mapping extracted from the original BIOS RAM TEST tables; the WORK
  * lane ORDER is a hypothesis until confirmed by a forced fault on real
@@ -349,7 +357,7 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
      * short of the screen already. The label gives way to them. */
     char chips[24];
     u32 n = 0;
-    char lbuf[40];
+    char lbuf[64];                      /* a label is 3 bytes a column in CJK */
     const char *label = e->name;
     if ((e->kind == LK_DATA || e->kind == LK_ADDR || e->kind == LK_BANK) &&
         e->pin) {
@@ -402,16 +410,17 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
     /* FAIL ends where OK ends, one character in from the edge, whatever its
      * length in this language ("FAIL" 4, "ECHEC" 5) */
     u32 fail_x = FB_W - 16 * (fb_text_cols(S_SCR_FAIL) + 1);
-    u32 chips_x = n ? fail_x - 16 * (n + 1) : fail_x;
+    u32 chips_x = n ? fail_x - 16 * (fb_text_cols(chips) + 1) : fail_x;
     /* A label too long for the chips beside it drops its parenthesis --
      * on the memories it lists the region's chips, which the red names
      * now say better -- rather than being cut mid-word. */
     u32 llen = fb_text_cols(label);
     if (label == e->name && 16 + llen * 16 > chips_x - 16) {
         u32 i = 0;
-        while (label[i] && i < sizeof lbuf - 1 &&
+        while (label[i] && i + utf8_seq((u8)label[i]) < sizeof lbuf &&
                !(label[i] == ' ' && label[i + 1] == '('))
-            lbuf[i] = label[i], i++;
+            for (u32 k = utf8_seq((u8)label[i]); k-- && label[i];)
+                lbuf[i] = label[i], i++;
         lbuf[i] = 0;
         label = lbuf;
     }
@@ -1534,8 +1543,13 @@ static void put_num(char *d, u32 *o, u32 v)
 
 static void put_str(char *d, u32 *o, const char *s)
 {
-    while (*s && *o < 31)
-        d[(*o)++] = *s++;
+    while (*s) {
+        u32 k = utf8_seq((u8)*s);
+        if (*o + k > 31)
+            break;
+        while (k-- && *s)
+            d[(*o)++] = *s++;
+    }
 }
 
 /* ", pin 50" after a located line on serial: the pin travels in the entry
@@ -3073,8 +3087,13 @@ static const char *flash_maker(u32 mfr)
 
 static u32 str_cat(char *d, u32 n, const char *t)
 {
-    while (*t && n < 39)
-        d[n++] = *t++;
+    while (*t) {
+        u32 k = utf8_seq((u8)*t);
+        if (n + k > 39)
+            break;
+        while (k-- && *t)
+            d[n++] = *t++;
+    }
     d[n] = 0;
     return n;
 }

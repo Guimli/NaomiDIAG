@@ -5,6 +5,8 @@
 - on-screen strings fit: a result label (S_L_*) within 38 columns, the
   progress and menu labels within 40, FAIL/SKIP short enough to leave room;
 - S_SCR_OK is 2 columns: the OK column is fixed (FB_W - 3 cells);
+- the strings src/main.c copies into fixed buffers fit them in bytes (a kana
+  or hanzi is 3 bytes of UTF-8 for one column);
 - the number rule (NUM_UNIT_FIRST / NUM_JOIN) is valid.
 Columns are characters (one 16-px cell each, ASCII or not)."""
 import os, re, sys
@@ -48,6 +50,42 @@ def main():
     for k in ("S_SCR_FAIL", "S_SCR_SKIP"):
         if k in cur and cols(cur[k]) > 12:
             err.append(f"{k} too long ({cols(cur[k])} columns)")
+    # Strings that src/main.c copies into fixed byte buffers: in bytes, not
+    # columns (a kana or hanzi is 3 bytes of UTF-8 for one column). Past
+    # these, a copy overflows its buffer or is cut in the middle of a
+    # character. Each entry: the keys whose lengths add up, the limit, where.
+    b = lambda k: len(cur.get(k, "").encode("utf-8"))
+    budgets = [((k,), 40, "pass_label base") for k in cur if k.startswith("S_P_")]
+    budgets += [
+        (("S_P_PASS",), 12, "pass_label suffix"),
+        (("S_P_CART_IC",), 24, "cart_label"),
+        (("S_ADDR_CHIPS",), 18, "chips[24] on screen"),
+        (("S_SCR_PIN",), 8, "chips[24] on screen"),
+        (("S_SCR_NICS",), 8, "chips[24] on screen"),
+        (("S_L_DP_READ",), 31, "g_dimmbuf[40] + GDDIR=n"),
+        (("S_L_DP_WRITE",), 31, "g_dimmbuf[40] + GDDIR=n"),
+        (("S_DH_FW", "S_DH_MB"), 28, "g_dimmbuf[40] with version and size"),
+        (("S_DIMM_SIZE_UNK",), 39, "detail[40]"),
+        (("S_DH_MB", "S_SCR_DIMM_ETA"), 27, "detail[40] with size and h:mm:ss"),
+        (("S_SCR_FW_ID",), 17, "g_fwbuf[40] with AMD/Spansion and the ID"),
+        (("S_SCR_FW_S0", "S_SCR_FW_UNK"), 30, "g_fws0[40] with the word"),
+        (("S_SCR_FW_S1", "S_SCR_FW_UNK"), 30, "g_fws1[40] with the word"),
+        (("S_SCR_FW_S0",), 19, "fw menu label prefix"),
+        (("S_SCR_FW_S1",), 19, "fw menu label prefix"),
+        (("S_SCR_FW_ERRAT",), 25, "g_fwres[32] with the address"),
+        (("S_SCR_GAME",), 15, "g_gamebuf[48] with the title"),
+        (("S_LP_PASS",), 30, "loop screen buf[48]"),
+        (("S_LP_TIME",), 30, "loop screen buf[48]"),
+        (("S_LP_ERRS",), 30, "loop screen buf[48]"),
+        (("S_LP_FIRST",), 33, "loop screen buf[48] with two numbers"),
+        (("S_EXC_SCREEN",), 20, "exception line, cut at 20 bytes"),
+    ]
+    for keys, lim, where in budgets:
+        n = sum(b(k) for k in keys)
+        if n > lim:
+            err.append(f"{'+'.join(keys)}: {n} bytes > {lim} ({where})")
+    # (the report names, g_cut_name[32], are cut by put_str at 31 bytes on a
+    # character boundary: a long one loses its end, never overflows)
     if nums.get("NUM_JOIN", "0") not in ("0", "1", "2") or nums.get("NUM_UNIT_FIRST", "0") not in ("0", "1"):
         err.append(f"bad number rule {nums}")
     for e in err:

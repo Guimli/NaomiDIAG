@@ -653,9 +653,22 @@ Toolchain: Debian `gcc-sh-elf` / `binutils-sh-elf`.
 ```sh
 make LANG=EN            # -> NaomiDIAG_EN.bin (English text + voice)
 make LANG=FR            # -> NaomiDIAG_FR.bin (French text + voice)
+make LANG=DE            # German; ES Spanish, JA Japanese, ZH Chinese (simplified)
+make all-langs          # every language's ROM
 make LANG=EN QUICK=1    # 1 MB per RAM pass, for fast emulator bring-up
 make LANG=EN BAUD=115200  # serial console at 115200 instead of 57600
 ```
+
+Each language is one strings file, `src/lang/<lang>.h`, with the same keys
+as `en.h`. The screen draws its non-ASCII characters (accents, kana, kanji,
+hanzi) from GNU Unifont glyphs, `src/lang/glyphs_<lang>.h`, and the serial
+console prints UTF-8: set the terminal to UTF-8 for Japanese and Chinese. A
+new language needs its strings, its spoken clips (`tools/clips/<lang>.json`)
+and `make lang-assets LANG=XX`, which checks the strings
+(`tools/check_lang.py`: keys, screen columns, byte budgets of the fixed
+buffers), extracts the glyphs and synthesises the clips (Piper; the voice is
+downloaded on first use). Japanese needs piper-tts 1.6 or later with
+pyopenjtalk in the Piper venv.
 
 [`src/config.h`](src/config.h) holds the options that are a decision about
 the ROM rather than a per-build variation. The Makefile carries what changes

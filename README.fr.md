@@ -711,9 +711,23 @@ Chaîne d'outils : paquets Debian `gcc-sh-elf` / `binutils-sh-elf`.
 ```sh
 make LANG=EN            # -> NaomiDIAG_EN.bin (texte + voix anglais)
 make LANG=FR            # -> NaomiDIAG_FR.bin (texte + voix français)
+make LANG=DE            # allemand ; ES espagnol, JA japonais, ZH chinois (simplifié)
+make all-langs          # la ROM de chaque langue
 make LANG=FR QUICK=1    # 1 Mo par passe RAM, pour l'émulateur
 make LANG=FR BAUD=115200  # console série à 115200 au lieu de 57600
 ```
+
+Chaque langue est un fichier de chaînes, `src/lang/<langue>.h`, avec les
+mêmes clés que `en.h`. L'écran dessine les caractères non ASCII (accents,
+kana, kanji, hanzi) avec les glyphes GNU Unifont de
+`src/lang/glyphs_<langue>.h`, et la console série écrit de l'UTF-8 : régler
+le terminal en UTF-8 pour le japonais et le chinois. Une nouvelle langue
+demande ses chaînes, ses clips parlés (`tools/clips/<langue>.json`) et
+`make lang-assets LANG=XX`, qui vérifie les chaînes (`tools/check_lang.py` :
+clés, colonnes à l'écran, budgets en octets des tampons fixes), extrait les
+glyphes et synthétise les clips (Piper ; la voix est téléchargée au premier
+usage). Le japonais demande piper-tts 1.6 ou plus récent avec pyopenjtalk
+dans le venv Piper.
 
 [`src/config.h`](src/config.h) regroupe les options qui relèvent d'une
 décision sur la ROM plutôt que d'une variation d'une construction à l'autre.
