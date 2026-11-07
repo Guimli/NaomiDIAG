@@ -3114,6 +3114,28 @@ static void fw_choice_draw(u32 y0, const char *const *t, u32 n, u32 sel)
     fb_text(16, fb_hint_y(), S_MENU_HINT, COL_HINT, FB_W);
 }
 
+/* Version labels compared as versions: digit runs by value ("10.00" after
+ * "4.03"), the rest character by character, so "4.03 CD-R" > "4.03" > "4.01". */
+static int fw_label_cmp(const char *a, const char *b)
+{
+    while (*a || *b) {
+        if (*a >= '0' && *a <= '9' && *b >= '0' && *b <= '9') {
+            u32 x = 0, y = 0;
+            while (*a >= '0' && *a <= '9')
+                x = x * 10u + (u32)(*a++ - '0');
+            while (*b >= '0' && *b <= '9')
+                y = y * 10u + (u32)(*b++ - '0');
+            if (x != y)
+                return x < y ? -1 : 1;
+            continue;
+        }
+        if (*a != *b)
+            return (u8)*a < (u8)*b ? -1 : 1;
+        a++, b++;
+    }
+    return 0;
+}
+
 static int fw_choose(const char *const *t, u32 n, int key_yes)
 {
     u32 y0 = g_screen_y + 12, sel = 0;
@@ -3269,22 +3291,22 @@ static void test_dimm_flash(void)
         return;
     }
     u32 want_slot = sp == 0 ? 1 : 0;
+    /* newest first, and the newest kept when the slot has more versions
+     * than the menu has lines: the oldest falls off the end. The first line,
+     * the newest, is the one selected when the menu opens. */
     u32 idx[FW_MAXCH], n_ch = 0;
-    for (u32 i = 0; i < nimg && n_ch < FW_MAXCH - 1; i++) {
+    for (u32 i = 0; i < nimg; i++) {
         const dfw_entry *c = dfw_get(i);
         if (c->slot != want_slot)
             continue;
-        /* insertion by label, descending: "4.03 CD-R" before "4.01" ... */
-        u32 k = n_ch++;
-        while (k > 0) {
-            const char *x = dfw_get(idx[k - 1])->label, *y = c->label;
-            while (*x && *x == *y) { x++; y++; }
-            if ((u8)*x >= (u8)*y)
-                break;
-            idx[k] = idx[k - 1];
+        u32 k = n_ch < FW_MAXCH - 1 ? n_ch++ : FW_MAXCH - 1;
+        while (k > 0 && fw_label_cmp(dfw_get(idx[k - 1])->label, c->label) < 0) {
+            if (k < FW_MAXCH - 1)
+                idx[k] = idx[k - 1];
             k--;
         }
-        idx[k] = i;
+        if (k < FW_MAXCH - 1)
+            idx[k] = i;
     }
     scif_puts(S_FW_MENU);
     for (u32 j = 0; j < n_ch; j++) {
