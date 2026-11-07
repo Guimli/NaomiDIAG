@@ -85,3 +85,5 @@ tools/__pycache__/
 
 # local-only builds: SEGA NetDIMM firmware blob (tools/dimmfw_pack.py), never committed
 local/
+# GNU Unifont source (tools/gen_glyphs.py), downloaded on demand
+tools/fonts/

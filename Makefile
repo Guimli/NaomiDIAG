@@ -50,7 +50,8 @@ CFLAGS_EXTRA ?=
 
 CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
            -Wall -Wextra -std=c11 -DQUICK_TEST=$(QUICK) -DLANG_$(LANG) \
-           -DRELOC=$(RELOC) -DCFG_SCIF_BAUD=$(BAUD) $(CFLAGS_EXTRA)
+           -DRELOC=$(RELOC) -DCFG_SCIF_BAUD=$(BAUD) $(CFLAGS_EXTRA) \
+           -DLANG_STRINGS=\"lang/$(lang_lc).h\" -DLANG_GLYPHS=\"lang/glyphs_$(lang_lc).h\"
 # P2 (0xA0000000) is the default: it is the window the reset vector lands in
 # and the only one this ROM has been observed to run from on real hardware.
 # ROM_BASE=0x80000000 links for P1, the cached alias, which is much faster but
@@ -66,7 +67,8 @@ OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.
 HDRS := src/config.h src/version.inc src/hw.h src/scif.h src/sdram.h src/ramtest.h src/vram_mapping.h src/timer.h src/aica.h \
         src/pvr.h src/periph.h src/dimm.h src/maple.h src/board.h src/sha1.h \
         src/cart.h src/cartdb.h src/eta.h src/strings.h src/mie_prog.h src/arm_prog.h src/input.h src/dimm_host.h \
-        src/dimm_flash.h src/dimm_fw.h src/lzma_dec.h
+        src/dimm_flash.h src/dimm_fw.h src/lzma_dec.h \
+        $(wildcard src/lang/*.h)
 
 all: $(BIN)
 

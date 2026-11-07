@@ -336,7 +336,7 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
     }
     if (e->status == T_SKIP) {
         /* right-aligned with OK and FAIL, one character in from the edge */
-        u32 x = FB_W - 16 * (S_SCR_SKIP_LEN + 1);
+        u32 x = FB_W - 16 * (fb_text_cols(S_SCR_SKIP) + 1);
         fb_text(16, y, e->name, COL_WHITE, x - 16);
         fb_text(x, y, S_SCR_SKIP, COL_AMBER, FB_W);
         return y + 20;
@@ -405,14 +405,12 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
     chips[n] = 0;
     /* FAIL ends where OK ends, one character in from the edge, whatever its
      * length in this language ("FAIL" 4, "ECHEC" 5) */
-    u32 fail_x = FB_W - 16 * ((u32)sizeof(S_SCR_FAIL) - 1 + 1);
+    u32 fail_x = FB_W - 16 * (fb_text_cols(S_SCR_FAIL) + 1);
     u32 chips_x = n ? fail_x - 16 * (n + 1) : fail_x;
     /* A label too long for the chips beside it drops its parenthesis --
      * on the memories it lists the region's chips, which the red names
      * now say better -- rather than being cut mid-word. */
-    u32 llen = 0;
-    while (label[llen])
-        llen++;
+    u32 llen = fb_text_cols(label);
     if (label == e->name && 16 + llen * 16 > chips_x - 16) {
         u32 i = 0;
         while (label[i] && i < sizeof lbuf - 1 &&
@@ -4781,10 +4779,7 @@ static void jt_line_clear(u32 y)
 static u32 jt_tok(u32 x, u32 y, const char *s, u32 on)
 {
     fb_text(x, y, s, on ? COL_GREEN : COL_DIM, FB_W);
-    u32 n = 0;
-    while (s[n])
-        n++;
-    return x + (n + 1) * 16;
+    return x + (fb_text_cols(s) + 1) * 16;
 }
 
 static void jt_draw(const u8 *info, u32 full)

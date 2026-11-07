@@ -272,26 +272,104 @@ void fb_clear(u16 color)
         p[i] = v;
 }
 
-/* 8x8 public-domain font, rendered x2 -> 16x16 cells, 40 cols x 30 rows */
+/* The language's non-ASCII glyphs (tools/gen_glyphs.py, from GNU Unifont):
+ * the Makefile names the table of the language being built. */
+typedef struct { u16 cp; u16 off; u8 wide; } glyph_ent;
+#ifdef LANG_GLYPHS
+#include LANG_GLYPHS
+#else
+#include "lang/glyphs_en.h"
+#endif
+
+/* One UTF-8 character; a malformed sequence or one beyond the BMP gives '?'
+ * and is skipped whole. */
+static u32 utf8_next(const char **ps)
+{
+    const u8 *s = (const u8 *)*ps;
+    u32 c = *s++;
+    if (c >= 0xC0 && c < 0xE0 && (s[0] & 0xC0) == 0x80) {
+        c = ((c & 0x1Fu) << 6) | (s[0] & 0x3Fu);
+        s += 1;
+    } else if (c >= 0xE0 && c < 0xF0 && (s[0] & 0xC0) == 0x80 &&
+               (s[1] & 0xC0) == 0x80) {
+        c = ((c & 0x0Fu) << 12) | ((u32)(s[0] & 0x3Fu) << 6) | (s[1] & 0x3Fu);
+        s += 2;
+    } else if (c >= 0x80) {
+        c = '?';
+        while ((*s & 0xC0) == 0x80)
+            s++;
+    }
+    *ps = (const char *)s;
+    return c;
+}
+
+/* Characters, not bytes: what a line takes on screen, one 16-pixel cell
+ * each -- what every right-alignment must count. */
+u32 fb_text_cols(const char *s)
+{
+    u32 n = 0;
+    while (*s) {
+        utf8_next(&s);
+        n++;
+    }
+    return n;
+}
+
+static const glyph_ent *glyph_find(u32 cp)
+{
+    u32 lo = 0, hi = GLYPH_COUNT;
+    while (lo < hi) {
+        u32 mid = (lo + hi) >> 1;
+        if (glyph_tab[mid].cp == cp)
+            return &glyph_tab[mid];
+        if (glyph_tab[mid].cp < cp)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+    return 0;
+}
+
+/* 8x8 public-domain font for ASCII, rendered x2 -> 16x16 cells, 40 cols x
+ * 30 rows; any other character from the language's Unifont glyphs, in the
+ * same cell: half-width (8x16) two pixels wide, full-width (16x16) as is. */
 void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax)
 {
     volatile u16 *base = fb();
     while (*s) {
-        u8 c = (u8)*s++;
-        if (c > 127)
-            c = '?';
-        const char *glyph = font8x8_basic[c];
-        for (u32 gy = 0; gy < 8; gy++) {
-            u8 row = (u8)glyph[gy];
-            for (u32 gx = 0; gx < 8; gx++) {
-                if (!(row & (1u << gx)))
-                    continue;
-                u32 px = x + gx * 2, py = y + gy * 2;
-                volatile u16 *d = base + py * FB_W + px;
-                d[0] = color;
-                d[1] = color;
-                d[FB_W] = color;
-                d[FB_W + 1] = color;
+        u32 c = utf8_next(&s);
+        const glyph_ent *g = c > 127 ? glyph_find(c) : 0;
+        if (g) {
+            const u8 *b = glyph_bits + g->off;
+            for (u32 gy = 0; gy < 16; gy++) {
+                u32 row = g->wide ? ((u32)b[2 * gy] << 8) | b[2 * gy + 1]
+                                  : (u32)b[gy] << 8;
+                volatile u16 *d = base + (y + gy) * FB_W + x;
+                for (u32 gx = 0; gx < (g->wide ? 16u : 8u); gx++) {
+                    if (!(row & (0x8000u >> gx)))
+                        continue;
+                    if (g->wide) {
+                        d[gx] = color;
+                    } else {
+                        d[2 * gx] = color;
+                        d[2 * gx + 1] = color;
+                    }
+                }
+            }
+        } else {
+            const char *glyph = font8x8_basic[c > 127 ? '?' : c];
+            for (u32 gy = 0; gy < 8; gy++) {
+                u8 row = (u8)glyph[gy];
+                for (u32 gx = 0; gx < 8; gx++) {
+                    if (!(row & (1u << gx)))
+                        continue;
+                    u32 px = x + gx * 2, py = y + gy * 2;
+                    volatile u16 *d = base + py * FB_W + px;
+                    d[0] = color;
+                    d[1] = color;
+                    d[FB_W] = color;
+                    d[FB_W + 1] = color;
+                }
             }
         }
         x += 16;
@@ -465,9 +543,7 @@ void fb_banner(const char *text)
     if (!fb_progress_enabled())
         return;
     g_banner = 1;
-    u32 n = 0;
-    while (text[n])
-        n++;
+    u32 n = fb_text_cols(text);
     fb_rect(0, BAR_Y, FB_W, BAR_H, RGB565(0, 18, 28));
     u32 x = n * 16 < FB_W ? (FB_W - n * 16) >> 1 : 0;
     fb_text(x, BAR_Y + 2, text, COL_WHITE, FB_W);

@@ -91,6 +91,8 @@ void fb_pattern(u32 n);
 /* 8x8 font at x2 scale. Drawing stops before xmax so a long label can
  * never run into the status column on the right. */
 void fb_text(u32 x, u32 y, const char *s, u16 color, u32 xmax);
+/* characters (UTF-8 aware) a string takes on screen, one 16-px cell each */
+u32  fb_text_cols(const char *s);
 
 /* column where the OK/FAIL status is drawn; labels are clipped before it */
 #define FB_STATUS_X  (FB_W - 16 * 6)
