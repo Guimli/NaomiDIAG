@@ -1706,6 +1706,11 @@ static u32 arm_aram_run(u32 len, ram_result *res, u32 seed)
             }
             step = s;
             t_moved = timer_ms();
+            /* prog was read before the pass changed: it still holds the last
+             * address of the previous pass. Ticking with it would put the new
+             * bar at 99 % at once, and a bar never goes back. */
+            if (s >= 5 && s <= 7)
+                prog = ARM_WINDOW;
         }
         if (prog != last_prog) {
             last_prog = prog;
