@@ -49,11 +49,7 @@
  * bar from 0 to 100%, so the operator can see which of the three is running
  * and how far it has got. */
 #define N_PHASES    3
-#ifdef LANG_FR
-#define LANG_IS_FR 1
-#else
-#define LANG_IS_FR 0
-#endif
+
 /* what a line report names (log_entry.kind) */
 #define LK_NONE 0
 #define LK_DATA 1           /* cut data line: D number, chip, DQ     */
@@ -549,6 +545,10 @@ static void say(u32 clip, u32 gap_ms)
  * RAMs) are only spoken once. */
 /* 0..63, from the number clips: French composes 17-19 and 61 its own way,
  * but with 0-19 and the tens as clips only "et un" needs a rule. */
+/* 0..63 from the number clips (0-19 and the tens), in the language's order
+ * (src/lang/<lang>.h): tens then unit ("twenty one", "二十一"), with a joining
+ * word ("treinta y uno"), unit first ("ein und zwanzig"), or French's "et un"
+ * for one only. */
 static void say_number(u32 n)
 {
     if (n < 20) {
@@ -556,11 +556,26 @@ static void say_number(u32 n)
         return;
     }
     u32 t = n / 10, u = n - t * 10;     /* constant divide: no libgcc */
-    say(CLIP_W_20 + (t - 2), 0);
-    if (u == 1 && LANG_IS_FR)
+    u32 tens = CLIP_W_20 + (t - 2);
+    if (!u) {
+        say(tens, 0);
+        return;
+    }
+#if NUM_UNIT_FIRST
+    say(CLIP_W_0 + u, 0);
+    if (NUM_JOIN)
+        say(CLIP_W_AND, 0);
+    say(tens, 0);
+#else
+    say(tens, 0);
+    if (NUM_JOIN == NUM_JOIN_ONE && u == 1) {
         say(CLIP_W_AND_ONE, 0);
-    else if (u)
-        say(CLIP_W_0 + u, 0);
+        return;
+    }
+    if (NUM_JOIN == NUM_JOIN_ALL)
+        say(CLIP_W_AND, 0);
+    say(CLIP_W_0 + u, 0);
+#endif
 }
 
 static void say_entry(const log_entry *e)

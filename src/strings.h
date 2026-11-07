@@ -24,4 +24,18 @@
 #include "lang/en.h"
 #endif
 
+/* How a language reads 20..63 out of its number clips (say_number):
+ * NUM_UNIT_FIRST 1 says the unit before the tens ("ein und zwanzig");
+ * NUM_JOIN says the joining clip w_and between the two (NUM_JOIN_ALL), only
+ * French's "et un" for one (NUM_JOIN_ONE), or nothing (NUM_JOIN_NONE). */
+#define NUM_JOIN_NONE 0
+#define NUM_JOIN_ALL  1
+#define NUM_JOIN_ONE  2
+#ifndef NUM_UNIT_FIRST
+#define NUM_UNIT_FIRST 0
+#endif
+#ifndef NUM_JOIN
+#define NUM_JOIN NUM_JOIN_NONE
+#endif
+
 #endif /* STRINGS_H */

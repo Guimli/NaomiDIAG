@@ -131,10 +131,24 @@ $(BIN): $(ELF)
 	cat $(BIN) $(BIN) > $(BIN:.bin=_27C322.bin)
 	@echo "$(BIN:.bin=_27C322.bin): 4194304 bytes (2 MB image twice)"
 
+# Languages with a strings file (src/lang/<lang>.h), clip texts and a voice.
+LANGS := EN FR $(sort $(filter-out EN FR,$(shell ls src/lang | sed -n 's/^\([a-z][a-z]\)\.h$$/\1/p' | tr a-z A-Z)))
+
 # regenerate both spoken-clip headers (needs Piper venv + sox)
 audio:
 	python3 tools/gen_audio.py fr src/audio_clips_fr.h
 	python3 tools/gen_audio.py en src/audio_clips_en.h
+
+# one language's generated files: its glyphs (needs tools/fonts/unifont.hex.gz)
+# and its spoken clips (Piper; the voice is downloaded if missing), checked
+lang-assets:
+	python3 -I tools/check_lang.py $(lang_lc)
+	python3 -I tools/gen_glyphs.py $(lang_lc)
+	python3 tools/gen_audio.py $(lang_lc) src/audio_clips_$(lang_lc).h
+
+# every language's ROM
+all-langs:
+	@for l in $(LANGS); do $(MAKE) -s LANG=$$l || exit 1; done
 
 # regenerate the AICA ARM7 program header (needs arm-none-eabi binutils)
 armprog:
@@ -174,4 +188,4 @@ clean:
 	rm -f src/*.o naomi_diag_*.elf naomi_diag_*.map naomi_diag_*.dis \
 	      NaomiDIAG_*.bin src/audio_clips.h .build_* linker.gen.ld
 
-.PHONY: all audio cartdb mieprog dis mame-rom run-mame clean
+.PHONY: all audio lang-assets all-langs cartdb mieprog dis mame-rom run-mame clean

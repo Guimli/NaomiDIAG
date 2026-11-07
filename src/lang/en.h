@@ -133,7 +133,6 @@
 #define S_SCR_OK            "OK"
 #define S_SCR_FAIL          "FAIL"
 #define S_SCR_SKIP          "NOT TESTED"
-#define S_SCR_SKIP_LEN      10
 #define S_SCR_IC_BAD        "BAD"
 #define S_SCR_IC_ABS        "ABS"
 #define S_SCR_IC_NOHASH     "--"

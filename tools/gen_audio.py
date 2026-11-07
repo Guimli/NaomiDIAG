@@ -6,7 +6,8 @@ The AICA decodes ADPCM in hardware, so this is a straight 4:1 saving on the
 EPROM with no decompressor and no scratch RAM -- the bytes go to sound RAM
 untouched. See tools/adpcm.py for the codec and what it measures.
 
-Usage: gen_audio.py <fr|en> [out.h] [--all]
+Usage: gen_audio.py <lang> [out.h] [--all]   (en fr de es it pt nl pl sv cs hu
+                                              da fi no ro sk sl ja zh)
 
 Incremental by default: the clips already in out.h are kept byte for byte
 (Piper never says a sentence twice the same way, so regenerating everything
@@ -25,10 +26,39 @@ HERE   = os.path.dirname(os.path.abspath(__file__))
 PIPER  = os.path.join(HERE, ".venv", "bin", "piper")
 VOICES = os.path.join(HERE, "voices")
 
-MODEL = {
-    "fr": os.path.join(VOICES, "fr_FR-siwis-medium.onnx"),
-    "en": os.path.join(VOICES, "en_US-lessac-medium.onnx"),
+# One Piper voice per language (rhasspy/piper-voices, openly licensed
+# models). A missing one is downloaded into tools/voices/ (git-ignored).
+VOICE = {
+    "en": "en_US-lessac-medium",      "fr": "fr_FR-siwis-medium",
+    "de": "de_DE-thorsten-medium",    "es": "es_ES-davefx-medium",
+    "it": "it_IT-paola-medium",       "pt": "pt_PT-tugão-medium",
+    "nl": "nl_NL-pim-medium",         "pl": "pl_PL-gosia-medium",
+    "sv": "sv_SE-nst-medium",         "cs": "cs_CZ-jirka-medium",
+    "hu": "hu_HU-anna-medium",        "da": "da_DK-talesyntese-medium",
+    "fi": "fi_FI-harri-medium",       "no": "no_NO-talesyntese-medium",
+    "ro": "ro_RO-mihai-medium",       "sk": "sk_SK-lili-medium",
+    "sl": "sl_SI-artur-medium",       "ja": "ja_JP-hi_fi_captain-medium",
+    "zh": "zh_CN-huayan-medium",
 }
+MODEL = {l: os.path.join(VOICES, v + ".onnx") for l, v in VOICE.items()}
+HF = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
+
+
+def ensure_voice(lang):
+    """Download the language's Piper voice (model + config) if missing."""
+    import json, urllib.request, urllib.parse
+    if os.path.exists(MODEL[lang]) and os.path.exists(MODEL[lang] + ".json"):
+        return
+    os.makedirs(VOICES, exist_ok=True)
+    index = os.path.join(VOICES, "voices.json")
+    if not os.path.exists(index):
+        urllib.request.urlretrieve(HF + "voices.json", index)
+    files = json.load(open(index, encoding="utf-8"))[VOICE[lang]]["files"]
+    for path in files:
+        if path.endswith((".onnx", ".onnx.json")):
+            dst = os.path.join(VOICES, os.path.basename(path))
+            print(f"downloading {os.path.basename(path)}")
+            urllib.request.urlretrieve(HF + urllib.parse.quote(path), dst)
 
 # clip key -> spoken text per language. Keys and order MUST match between
 # languages (they drive the shared CLIP_* enum consumed by the C code).
@@ -138,13 +168,29 @@ CLIPS = {
     "cart_unchk": {"fr": "contenu non vérifié,",              "en": "content not checked,"},
     "arm7":       {"fr": "Processeur son.",                   "en": "Sound processor."},
     "mie_self":   {"fr": "Auto-test du contrôleur émi.",     "en": "M I E self test."},
+    # the joining word of 20..63 where the language has one (NUM_JOIN_ALL)
+    "w_and":      {"fr": "et,",                               "en": "and,"},
 }
+
+
+def clip_texts(lang):
+    """key -> text: English and French above, the others in tools/clips/."""
+    import json
+    if lang in ("en", "fr"):
+        return {k: v[lang] for k, v in CLIPS.items()}
+    path = os.path.join(HERE, "clips", lang + ".json")
+    texts = json.load(open(path, encoding="utf-8"))
+    missing = [k for k in CLIPS if k not in texts]
+    extra = [k for k in texts if k not in CLIPS]
+    if missing or extra:
+        sys.exit(f"{path}: missing {missing} extra {extra}")
+    return texts
 
 RATE = 22050
 MAX_SAMPLES = 0xFFF0            # AICA LEA is 16-bit -> 2.97 s per clip
 
 def usage():
-    print("usage: gen_audio.py <fr|en> [out.h] [--all]")
+    print("usage: gen_audio.py <" + "|".join(MODEL) + "> [out.h] [--all]")
     sys.exit(1)
 
 args = [a for a in sys.argv[1:] if a != "--all"]
@@ -152,6 +198,7 @@ regen_all = "--all" in sys.argv[1:]
 if not args or args[0] not in MODEL:
     usage()
 lang = args[0]
+TEXTS = clip_texts(lang)
 out_path = args[1] if len(args) > 1 else f"src/audio_clips_{lang}.h"
 model = MODEL[lang]
 
@@ -171,6 +218,7 @@ def load_existing(path):
 existing = {} if regen_all else load_existing(out_path)
 
 def tts(text, wav):
+    ensure_voice(lang)
     if os.path.exists(PIPER) and os.path.exists(model):
         subprocess.run([PIPER, "-m", model, "-f", wav],
                        input=text.encode(), check=True,
@@ -197,7 +245,7 @@ for name, texts in CLIPS.items():
                    f"clip_{name}[] = {{ {arr} }};")
         names.append((name, nsamples))
         continue
-    text = texts[lang]
+    text = TEXTS[name]
     with tempfile.TemporaryDirectory() as td:
         wav = os.path.join(td, "c.wav")
         raw = os.path.join(td, "c.raw")

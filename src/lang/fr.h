@@ -3,6 +3,7 @@
 #ifndef LANG_FR_STRINGS_H
 #define LANG_FR_STRINGS_H
 /* ------------------------------- French -------------------------------- */
+#define NUM_JOIN            2   /* NUM_JOIN_ONE: "soixante et un" */
 
 /* boot (crt0.S) */
 #define S_BANNER_A          "\r\n\r\n==== NAOMI DIAG ROM v"
@@ -105,7 +106,7 @@
 #define S_L_DIMM_ABSENT     "Carte DIMM : absente"
 #define S_L_DIMM_PRESENT    "Carte DIMM : presente, mailbox"
 #define S_L_MIE             "Bus Maple / MIE (JVS)"
-#define S_L_MIE_NORESP      "Bus Maple / MIE : communication en echec"
+#define S_L_MIE_NORESP      "Bus Maple / MIE : pas de reponse"
 #define S_L_MIE_SELFTEST    "Auto-test MIE (Z80 ROM+RAM)"
 #define S_L_EEPROM_MIE      "EEPROM reglages (93C46 via MIE)"
 #define S_L_EEPROM_GPIO     "EEPROM serie (IC31, 93C46)"
@@ -136,7 +137,6 @@
 #define S_SCR_OK            "OK"
 #define S_SCR_FAIL          "ECHEC"
 #define S_SCR_SKIP          "NON TESTE"
-#define S_SCR_SKIP_LEN      9
 #define S_SCR_IC_BAD        "HS"
 #define S_SCR_IC_ABS        "ABS"
 #define S_SCR_IC_NOHASH     "--"
@@ -288,7 +288,7 @@
 #define S_SCR_FW_S1         "Slot 1 : "
 #define S_SCR_FW_UNK        "? (mot "
 #define S_SCR_FW_CANCEL     "Mise a jour DIMM annulee"
-#define S_SCR_FW_WARN1      "Ne pas couper la Naomi pendant l'ecriture"
+#define S_SCR_FW_WARN1      "Ne pas couper la Naomi (ecriture)"
 #define S_SCR_FW_WARN0      "DANGER : slot 0 = amorceur du DIMM"
 #define S_SCR_FW_WARN0B     "Confirmer une seconde fois"
 #define S_SCR_FW_POWER      "Eteindre puis rallumer la Naomi"
