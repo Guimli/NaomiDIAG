@@ -171,7 +171,7 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
     [plus bas](#accès-au-pvr-b-et-ram-elan).
 13. **ARM7 son et RAM son** (AICA IC33, RAM IC35, 8 Mo). Le SH-4 n'atteint
     cette RAM qu'à travers le bus G2, un accès à la fois cadencé par sa
-    FIFO : huit minutes pour les 8 Mo. L'ARM7 de l'AICA est sur le bus de
+    FIFO : huit minutes pour les 8 Mo ; l'ARM7 le fait en 26 s. L'ARM7 de l'AICA est sur le bus de
     la RAM elle-même ; il est donc utilisé comme les boucles relogées de la
     RAM CPU : le SH-4 teste une fenêtre de 16 Ko, y charge
     `arm/aica_arm_test.S` et sort l'ARM7 du reset. L'ARM se teste sur cette
@@ -385,28 +385,32 @@ oui ou par non — et les lignes qu'elle occupait reviennent au rapport.
 
 Le coin supérieur droit de l'écran décompte le temps jusqu'à la fin de la
 suite de démarrage, et le port série imprime l'estimation dès que le plan
-est connu. Chaque étape a une durée tirée du log série d'une vraie Naomi 2 en v0.16
-dont tous les tests fonctionnent (le log « après » de la PR #3), résultats
-parlés compris ; seul le cas sans RAM CPU pour les boucles est extrapolé :
+est connu. Chaque étape a une durée tirée du log série d'une vraie Naomi 2 en v0.19
+(résultats parlés compris) ; le contrôle rapide de la VRAM et le cas sans
+RAM CPU pour les boucles gardent les valeurs de la mesure v0.16 :
 
-| Étape | Boucles relogées | Pas de RAM CPU pour les boucles |
+|---|---|---|
 |---|---|---|
 | Amorçage écran + haut-parleur | 0:29 | 0:29 |
 | Identification de la carte | 0:04 | 0:04 |
-| Relocalisation des boucles | 0:37 | 0:31 (jusqu'à 128 blocs balayés depuis la ROM) |
+| Relocalisation des boucles | 0:08 | 0:31 (jusqu'à 128 blocs balayés depuis la ROM) |
 | CRC du BIOS | 0:01 (mesuré : 1,06 s) | 0:04 |
 | MIE, EEPROM des réglages, JVS | 0:19 | sautée |
-| RAM CPU | 0:52 | 12:39 |
-| VRAM TEX0 + TEX1 | 0:53 | 6:25 |
-| Naomi 2 : PVR-B + RAM Elan | 1:31 | 19:00 |
-| RAM son | 8:22 | 8:22 (jamais relogée) |
-| NVRAM, RTC, EEPROM série, fin | 0:29 | 0:29 |
-| **Total Naomi 1** | **12:06** | **29:04** |
-| **Total Naomi 2** | **13:37** | **48:04** |
+| RAM CPU | 0:24 | 12:39 |
+| VRAM TEX0 + TEX1 | 0:30 | 6:25 |
+| Naomi 2 : PVR-B + RAM Elan | 0:55 | 19:00 |
+| RAM son (par l'ARM7) | 0:34 | 0:34 (jamais relogée) |
+| NVRAM, RTC, EEPROM série, fin | 0:21 | 0:29 |
+| **Total Naomi 1** | **2:50** | **21:15** |
+| **Total Naomi 2** | **3:45** | **40:15** |
 
-- Cette exécution a duré 13:42. Le total Naomi 1 est la même exécution
-  sans le PVR-B ni la RAM Elan. TEX1 y est mesurée plus lente que TEX0,
-  8,9 s contre 4,1 s par passe.
+- L'exécution v0.19 a duré 3:07 jusqu'à DIAG COMPLETE. Sur cette carte, le
+  bus d'adresses du PVR-B est en échec et son test de cellules est sauté :
+  l'étape Naomi 2 est donc la RAM Elan mesurée plus le PVR-B au rythme des
+  TEX, une estimation. La RAM son est testée par l'ARM7 de l'AICA en 26 s,
+  là où le SH-4 à travers G2 mettait 8:22 ; la relocalisation des boucles ne
+  prend plus que quelques dixièmes de seconde. Le total Naomi 1 est le même
+  sans le PVR-B ni la RAM Elan.
 - Sans bloc de RAM CPU, les boucles tournent depuis l'EPROM de démarrage.
   Le contrôle rapide de la VRAM le fait toujours : 3 passes sur 600 Ko en
   14,5 s, soit 7,9 s par mégaoctet-passe, environ 14 fois le rythme en

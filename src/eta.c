@@ -38,6 +38,27 @@
  *   relocated-code check 821.85 ->  821.93      0.1     0.5
  *   Naomi 2 total                             13:42   (this table: 13:37)
  *
+ * Recalibrated on a real Naomi 2 running v0.19 (capture/
+ * naomidiag_v019_full_EN.log, 57600 baud, audio on, loops relocated, MIE
+ * answering, no JVS board), 3:07 to DIAG COMPLETE:
+ *
+ *   step                 from -> to (s)        total   base + results
+ *   board+reloc+BIOS CRC  15.53 ->   25.46      9.9    the relocation now
+ *                                                      takes tenths of a s
+ *   MIE, EEPROM, JVS      25.46 ->   40.61     15.1     4.5 + 4  (unchanged)
+ *   CPU RAM               40.61 ->   64.53     23.9    20.2 + 1
+ *   VRAM TEX0 + TEX1      64.53 ->   94.23     29.7    22.3 + 2
+ *   sound RAM, by ARM7   132.27 ->  165.88     33.6    26.2 + 2
+ *                        (ARM7 self-test, then 3 passes over 8 MB in 26.7 s:
+ *                        the SH-4's own G2 test took 498.8 s)
+ *   serial EEPROM        ~180.0 ->  186.57      6.6     2.9 + 1
+ * The PVR-B address bus fails on that board, so its cell test was skipped:
+ * the Naomi 2 step is the Elan RAM measured (25.6 s) plus the PVR-B's 16 MB
+ * at the TEX rate (22 s) -- 48 s, an estimate. NVRAM/RTC is kept: the RTC
+ * date failed on that run and lengthened the step. The quick VRAM check and
+ * the from-ROM figures stay as measured below: they are the yardstick of
+ * the EPROM execution speed (g_romk).
+ *
  * The Naomi 1 has the same steps but the PVR-B and Elan RAM. The first
  * version of this table came from the PR #2 log, which had a fault on
  * TEX1, a MIE that did not answer and no Naomi 2 memories tested; it was
@@ -78,19 +99,18 @@ static const step_est est[ETA_STEPS] = {
     [ETA_VIDEO]   = { 14500, 14500, 0, 3, 0 },
     [ETA_AUDIO]   = {  7400,  7400, 2, 3, 0 },
     [ETA_BOARD]   = {   300,   300, 1, 1, 0 },
-    [ETA_RELOC]   = { 29400, 24000, 2, 0, 0 },
+    [ETA_RELOC]   = {   500, 24000, 2, 0, 0 },
     [ETA_BIOS]    = {  1100,  3600, 0, 0, 0 },
     [ETA_MIE]     = {  4500,     0, 4, 0, 0 },
-    [ETA_SDRAM]   = { Q(48100, 32), Q(755000, 32), 1, 3, 1 },
-    [ETA_VRAM]    = { Q(45300, 8),  Q(378000, 8),  2, 6, 1 },
-    /* v0.18: tested by the AICA's ARM7 from its own side of the bus (see
-     * arm_aram_test); 40 s is an estimate until a real log gives the
-     * figure -- the SH-4 fallback, if the ARM7 fails, is the 498.8 s
-     * measured above, and the progress tracking corrects either way */
-    [ETA_ARAM]    = { Q(40000, 8),  Q(40000, 8),   2, 3, 0 },
-    [ETA_N2]      = { Q(83900, 24), Q(1133000, 24), 2, 6, 1 },
+    [ETA_SDRAM]   = { Q(20200, 32), Q(755000, 32), 1, 3, 1 },
+    [ETA_VRAM]    = { Q(22300, 8),  Q(378000, 8),  2, 6, 1 },
+    /* tested by the AICA's ARM7 from its own side of the bus: 26.2 s on a
+     * real Naomi 2 (v0.19). The SH-4 fallback, if the ARM7 fails, is the
+     * 498.8 s measured on v0.16; the progress tracking corrects then. */
+    [ETA_ARAM]    = { Q(26200, 8),  Q(26200, 8),   2, 3, 0 },
+    [ETA_N2]      = { Q(48000, 24), Q(1133000, 24), 2, 6, 1 },
     [ETA_PERIPH]  = {  6200,  6200, 2, 0, 0 },
-    [ETA_SEEPROM] = { 10900, 10900, 1, 0, 0 },
+    [ETA_SEEPROM] = {  2900, 10900, 1, 0, 0 },
     [ETA_END]     = {   500,   500, 0, 0, 0 },
 };
 

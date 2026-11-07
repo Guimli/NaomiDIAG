@@ -5691,7 +5691,8 @@ void cmain(void)
     suite_check_abort();
     /* Naomi 2 extra memories (no-op on other boards), before the sound
      * RAM: theirs are fast relocated loops, the sound RAM is the long one
-     * (eight minutes across G2), so the graphics verdicts come first. */
+     * (26 s by the ARM7, eight minutes across G2 without it), so the
+     * graphics verdicts come first. */
     eta_step(ETA_N2);
     test_naomi2_ram();
     suite_check_abort();
