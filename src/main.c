@@ -298,8 +298,26 @@ static void scr_num(char *d, u32 *o, u32 v)
     d[(*o)++] = (char)('0' + v % 10);
 }
 
+/* A label too long for the room left of its status drops its parenthesis
+ * -- on the memories it lists the region's chips, which a failure names in
+ * red anyway -- rather than being cut mid-word. buf holds the shortened
+ * copy; the label itself is returned when it fits or has no parenthesis. */
+static const char *fit_label(const char *label, u32 room_px, char *buf, u32 bufsz)
+{
+    if (16 + fb_text_cols(label) * 16 <= room_px)
+        return label;
+    u32 i = 0;
+    while (label[i] && i + utf8_seq((u8)label[i]) < bufsz &&
+           !(label[i] == ' ' && label[i + 1] == '('))
+        for (u32 k = utf8_seq((u8)label[i]); k-- && label[i];)
+            buf[i] = label[i], i++;
+    buf[i] = 0;
+    return buf;
+}
+
 static u32 screen_draw_entry(const log_entry *e, u32 y)
 {
+    char lbuf[64];                      /* a label is 3 bytes a column in CJK */
     /* The screen holds fewer lines than the suite produces results, so the
      * bus tests give up their line while they pass. They still run and still
      * print on serial; a failure takes the line back, because that is when
@@ -341,13 +359,14 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
     if (e->status == T_SKIP) {
         /* right-aligned with OK and FAIL, one character in from the edge */
         u32 x = FB_W - 16 * (fb_text_cols(S_SCR_SKIP) + 1);
-        fb_text(16, y, e->name, COL_WHITE, x - 16);
+        fb_text(16, y, fit_label(e->name, x - 16, lbuf, sizeof lbuf), COL_WHITE, x - 16);
         fb_text(x, y, S_SCR_SKIP, COL_AMBER, FB_W);
         return y + 20;
     }
 
     if (e->status == T_OK) {
-        fb_text(16, y, e->name, COL_WHITE, FB_STATUS_X);
+        fb_text(16, y, fit_label(e->name, FB_STATUS_X, lbuf, sizeof lbuf),
+                COL_WHITE, FB_STATUS_X);
         fb_text(FB_W - 16 * 3, y, S_SCR_OK, COL_GREEN, FB_W);
         return y + 20;
     }
@@ -357,7 +376,6 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
      * short of the screen already. The label gives way to them. */
     char chips[24];
     u32 n = 0;
-    char lbuf[64];                      /* a label is 3 bytes a column in CJK */
     const char *label = e->name;
     if ((e->kind == LK_DATA || e->kind == LK_ADDR || e->kind == LK_BANK) &&
         e->pin) {
@@ -411,19 +429,9 @@ static u32 screen_draw_entry(const log_entry *e, u32 y)
      * length in this language ("FAIL" 4, "ECHEC" 5) */
     u32 fail_x = FB_W - 16 * (fb_text_cols(S_SCR_FAIL) + 1);
     u32 chips_x = n ? fail_x - 16 * (fb_text_cols(chips) + 1) : fail_x;
-    /* A label too long for the chips beside it drops its parenthesis --
-     * on the memories it lists the region's chips, which the red names
-     * now say better -- rather than being cut mid-word. */
-    u32 llen = fb_text_cols(label);
-    if (label == e->name && 16 + llen * 16 > chips_x - 16) {
-        u32 i = 0;
-        while (label[i] && i + utf8_seq((u8)label[i]) < sizeof lbuf &&
-               !(label[i] == ' ' && label[i + 1] == '('))
-            for (u32 k = utf8_seq((u8)label[i]); k-- && label[i];)
-                lbuf[i] = label[i], i++;
-        lbuf[i] = 0;
-        label = lbuf;
-    }
+    /* too long for the chips beside it: the parenthesis goes (fit_label) */
+    if (label == e->name)
+        label = fit_label(label, chips_x - 16, lbuf, sizeof lbuf);
     fb_text(16, y, label, COL_WHITE, chips_x - 16);
     if (n)
         fb_text(chips_x, y, chips, COL_RED, fail_x);

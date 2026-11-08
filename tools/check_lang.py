@@ -45,6 +45,15 @@ def main():
         lim = 38 if k.startswith("S_L_") else 40 if k.startswith(("S_P_", "S_M_", "S_SCR_")) else None
         if lim and cols(v) > lim:
             err.append(f"{k}: {cols(v)} columns > {lim}: {v!r}")
+    # A result label shares its line with OK (FB_STATUS_X: 33 columns) or
+    # FAIL (38 - len(FAIL) columns, chips aside). One too long drops its
+    # " (...)" part first (fit_label in src/main.c): what is left must fit.
+    room = min(33, 38 - cols(cur.get("S_SCR_FAIL", "FAIL")))
+    for k, v in cur.items():
+        if k.startswith("S_L_"):
+            core = v.split(" (")[0] if " (" in v else v
+            if cols(core) > room:
+                err.append(f"{k}: {cols(core)} columns without its parenthesis > {room}: {v!r}")
     if cols(cur.get("S_SCR_OK", "OK")) != 2:
         err.append(f"S_SCR_OK must be 2 columns: {cur.get('S_SCR_OK')!r}")
     for k in ("S_SCR_FAIL", "S_SCR_SKIP"):
@@ -80,6 +89,12 @@ def main():
         (("S_LP_FIRST",), 33, "loop screen buf[48] with two numbers"),
         (("S_EXC_SCREEN",), 20, "exception line, cut at 20 bytes"),
     ]
+    pl = cur.get("S_JT_PLAYER", "P")
+    if len(pl) != 1 or ord(pl) > 0x7F:
+        err.append(f"S_JT_PLAYER must be one ASCII letter (only its first byte is drawn): {pl!r}")
+    dirs = [cur.get(f"S_JT_DIR_{d}") for d in "UDLR"]
+    if len(set(dirs)) != 4:
+        err.append(f"S_JT_DIR_U/D/L/R must differ: {dirs}")
     for keys, lim, where in budgets:
         n = sum(b(k) for k in keys)
         if n > lim:

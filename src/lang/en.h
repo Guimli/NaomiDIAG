@@ -103,7 +103,7 @@
 #define S_L_DIMM_ABSENT     "DIMM board: not present"
 #define S_L_DIMM_PRESENT    "DIMM board: present, mailbox"
 #define S_L_MIE             "Maple bus / MIE (JVS)"
-#define S_L_MIE_NORESP      "Maple bus / MIE: communication failed"
+#define S_L_MIE_NORESP      "Maple bus / MIE: no communication"
 #define S_L_MIE_SELFTEST    "MIE self-test (Z80 ROM+RAM)"
 #define S_L_EEPROM_MIE      "Settings EEPROM (93C46 via MIE)"
 #define S_L_EEPROM_GPIO     "Serial EEPROM (IC31, 93C46)"

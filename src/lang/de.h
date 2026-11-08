@@ -32,7 +32,7 @@
 #define S_INTERMITTENT      "  Sporadischer Fehler: beim Prüfen gesehen, beim erneuten Suchen verschwunden.\n  Der Chip wird trotzdem genannt: die Wortparität wurde gespeichert.\n"
 #define S_L_BOARD_N1        "Platine: Naomi 1 (837-13544)"
 #define S_L_BOARD_N2        "Platine: Naomi 2 (837-14009)"
-#define S_L_BOARD_UNK       "Platine: UNBEKANNT - ohne IC-Namen"
+#define S_L_BOARD_UNK       "Platine: UNBEKANNT (keine IC-Namen)"
 #define S_L_BIOS            "BIOS-ROM (IC27) CRC32"
 #define S_L_SDRAM_DBUS      "SDRAM Datenbus"
 #define S_L_SDRAM_ABUS      "SDRAM Adressbus"
@@ -83,7 +83,7 @@
 #define S_L_VRAM_B          "VRAM PVR-B (IC111 bis IC118S)"
 /* short labels for the progress bar: they get a " NN/10" pass suffix, so
  * they must stay well inside the screen width */
-#define S_L_RELOC           "Testschleifen ins CPU-RAM verlegt"
+#define S_L_RELOC           "Testschleifen im CPU-RAM"
 #define S_L_RELOC_SCAN      "Defekte Blöcke oben im CPU-RAM"
 #define S_L_RELOC_CHK       "Integrität des verlegten Codes"
 #define S_RELOC_SUSPECT     "  Das RAM mit dem Testcode hat sich während des Laufs verändert: alle\nErgebnisse oben sind zweifelhaft. Mit einer RELOC=0-ROM wiederholen.\n"
@@ -354,7 +354,7 @@
 #define S_PAT_9             "Schachbrett, ein Pixel (Bandbreite)"
 #define S_L_JVS_READY       "JVS-E/A-Platine: vorhanden"
 #define S_L_JVS_ABSENT      "JVS-E/A-Platine: nicht vorhanden"
-#define S_L_JVS_ERROR       "JVS-E/A-Platine: Austausch gestört"
+#define S_L_JVS_ERROR       "JVS-E/A-Platine: Fehler"
 #define S_L_JVS_STUCK       "MIE-JVS-Master antwortet nicht"
 #define S_JVS_HDR           "\nJVS: suche eine E/A-Platine...\n"
 #define S_JVS_SKIP          "\nJVS-Test übersprungen: kein MIE-Programm.\n"
