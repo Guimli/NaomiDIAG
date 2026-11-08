@@ -258,7 +258,7 @@ RAM CPU la parité du mot, validée par la réparation d'IC10.
 Reproduction, avec le BIOS utilisateur conservé dans un dossier ignoré :
 
 ```sh
-python3 tools/inspect_bios_mapping.py roms/epr-23608c.ic27
+python3 tools/inspect_bios_mapping.py ../SEGA_Naomi_ROMs/naomi2/epr-23608c.ic27
 sh tools/test_pvr2.sh
 ```
 

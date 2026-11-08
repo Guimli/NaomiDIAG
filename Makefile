@@ -19,13 +19,14 @@ AUDIO   ?= 1
 # lowercase language tag for the generated audio header / clip source
 lang_lc := $(shell echo $(LANG) | tr A-Z a-z)
 # DIMMFW=1 -- LOCAL TEST BUILD ONLY: embeds SEGA NetDIMM firmware images,
-# packed from your own dumps (SEGADIMM = MAME segadimm.zip, FW403 = the
+# packed from your own dumps (SEGADIMM = MAME segadimm set, a .zip or a
+# folder, FW403 = the
 # CD-R's FW_Netdimm_403.bin) by tools/dimmfw_pack.py into local/dimmfw.bin
 # (git-ignored): seven slot images in one LZMA stream, ~475 KB, so the
 # speech stays in. The image gets its own name,
 # NaomiDIAG_<LANG>_DIMMFW_LOCAL.bin, and must NEVER be published.
 DIMMFW   ?= 0
-SEGADIMM ?= ../roms_gd/segadimm.zip
+SEGADIMM ?= ../SEGA_Naomi_ROMs/segadimm
 FW403    ?= ../analysis/sega_dimm_cdr/Updater/FW_Netdimm_403.bin
 ifeq ($(DIMMFW),1)
 BIN     := NaomiDIAG_$(LANG)_DIMMFW_LOCAL.bin
@@ -166,16 +167,18 @@ dis: $(ELF)
 	$(OBJDUMP) -d $< > $(ELF:.elf=.dis)
 
 # ---------------------------------------------------------------------------
-# MAME test set: copy of the stock naomi.zip (which includes the real
-# MIE/JVS device ROMs) with our ROM replacing the default BIOS
+# MAME test set: a naomi.zip made from the local SEGA dumps (the board's
+# BIOSes and the real MIE/JVS device ROMs, ROMS = a MAME rompath laid out in
+# folders, one per set) with our ROM replacing the default BIOS
 # (epr-21576h). The wrong-checksum warning on the BIOS is expected.
 # ---------------------------------------------------------------------------
-ROMSRC := ../roms/naomi.zip
+ROMS   ?= ../SEGA_Naomi_ROMs
 ROMDIR := ../roms_diag
 
 mame-rom: $(BIN)
 	mkdir -p $(ROMDIR)/stage
-	cp -f $(ROMSRC) $(ROMDIR)/naomi.zip
+	rm -f $(ROMDIR)/naomi.zip
+	zip -j -q $(ROMDIR)/naomi.zip $(ROMS)/naomi/* $(ROMS)/mie/* $(ROMS)/jvs13551/*
 	cp -f $(BIN) $(ROMDIR)/stage/epr-21576h.ic27
 	cd $(ROMDIR)/stage && zip -j ../naomi.zip epr-21576h.ic27
 

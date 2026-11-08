@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""dimmfw_pack.py SEGADIMM_ZIP FW403_BIN OUT.bin -- LOCAL USE ONLY.
+"""dimmfw_pack.py SEGADIMM_ZIP_OR_DIR FW403_BIN OUT.bin -- LOCAL USE ONLY.
 
 Packs SEGA NetDIMM firmware slots, taken from the owner's own dumps, into the
 blob that a local NaomiDIAG build embeds (make LANG=.. DIMMFW=1 ...). The blob
@@ -48,7 +48,7 @@ Format (little-endian):
     u32 check word
   then the patch words, u32 (offset << 8 | byte), then the LZMA stream.
 """
-import lzma, struct, sys, zipfile, zlib
+import lzma, os, struct, sys, zipfile, zlib
 
 SLOT = 0x100000
 LC, LP, PB = 1, 1, 1          # SH-4 code: 16-bit instructions
@@ -61,8 +61,12 @@ def boot_crc(b):
 
 def main():
     zpath, f403, out = sys.argv[1:4]
-    z = zipfile.ZipFile(zpath)
-    rd = {n: z.read(n) for n in ('401_203.bin', '317_312.bin', '217_203.bin',
+    # the MAME segadimm set, zipped or as a folder of its files
+    if os.path.isdir(zpath):
+        read = lambda n: open(os.path.join(zpath, n), 'rb').read()
+    else:
+        read = zipfile.ZipFile(zpath).read
+    rd = {n: read(n) for n in ('401_203.bin', '317_312.bin', '217_203.bin',
                                  '213_203.bin', '203_203.bin', 'fpr23718.ic36',
                                  'fpr23905.ic36', 'fpr23905c.ic36')}
     rd['FW_Netdimm_403.bin'] = open(f403, 'rb').read()
