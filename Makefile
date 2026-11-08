@@ -1,7 +1,7 @@
 # NaomiDiag -- diagnostic BIOS ROM for SEGA Naomi / Naomi 2
 # Toolchain: Debian gcc-sh-elf / binutils-sh-elf
 #
-# Language:  LANG=EN (default), FR, DE, ES, JA, ZH -> NaomiDIAG_<LANG>.bin
+# Language:  LANG=EN (default), FR, DE, ES, IT, PT, DA, JA, ZH -> NaomiDIAG_<LANG>.bin
 # Quick:     QUICK=1 tests only 1MB per RAM pass (fast emulator bring-up)
 
 CROSS   ?= sh-elf-

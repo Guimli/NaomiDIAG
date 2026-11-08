@@ -711,7 +711,8 @@ Chaîne d'outils : paquets Debian `gcc-sh-elf` / `binutils-sh-elf`.
 ```sh
 make LANG=EN            # -> NaomiDIAG_EN.bin (texte + voix anglais)
 make LANG=FR            # -> NaomiDIAG_FR.bin (texte + voix français)
-make LANG=DE            # allemand ; ES espagnol, JA japonais, ZH chinois (simplifié)
+make LANG=DE            # allemand ; ES espagnol, IT italien, PT portugais, DA danois,
+                        # JA japonais, ZH chinois (simplifié)
 make all-langs          # la ROM de chaque langue
 make LANG=FR QUICK=1    # 1 Mo par passe RAM, pour l'émulateur
 make LANG=FR BAUD=115200  # console série à 115200 au lieu de 57600

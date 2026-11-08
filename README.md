@@ -653,7 +653,8 @@ Toolchain: Debian `gcc-sh-elf` / `binutils-sh-elf`.
 ```sh
 make LANG=EN            # -> NaomiDIAG_EN.bin (English text + voice)
 make LANG=FR            # -> NaomiDIAG_FR.bin (French text + voice)
-make LANG=DE            # German; ES Spanish, JA Japanese, ZH Chinese (simplified)
+make LANG=DE            # German; ES Spanish, IT Italian, PT Portuguese, DA Danish,
+                        # JA Japanese, ZH Chinese (simplified)
 make all-langs          # every language's ROM
 make LANG=EN QUICK=1    # 1 MB per RAM pass, for fast emulator bring-up
 make LANG=EN BAUD=115200  # serial console at 115200 instead of 57600
