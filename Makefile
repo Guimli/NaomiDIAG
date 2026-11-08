@@ -19,15 +19,20 @@ AUDIO   ?= 1
 # lowercase language tag for the generated audio header / clip source
 lang_lc := $(shell echo $(LANG) | tr A-Z a-z)
 # DIMMFW=1 -- LOCAL TEST BUILD ONLY: embeds SEGA NetDIMM firmware images,
-# packed from your own dumps (SEGADIMM = MAME segadimm set, a .zip or a
-# folder, FW403 = the
-# CD-R's FW_Netdimm_403.bin) by tools/dimmfw_pack.py into local/dimmfw.bin
-# (git-ignored): seven slot images in one LZMA stream, ~475 KB, so the
-# speech stays in. The image gets its own name,
-# NaomiDIAG_<LANG>_DIMMFW_LOCAL.bin, and must NEVER be published.
+# packed by tools/dimmfw_pack.py into local/dimmfw.bin (git-ignored): seven
+# slot images in one LZMA stream, ~545 KB, so the speech stays in. Sources:
+#  - SEGADIMM: MAME's segadimm.zip (a recent set: 0.218's lacks
+#    fpr23905c.ic36), used as it is, spaces in its path allowed;
+#  - FW403: the "4.03 CD-R" image, FW_Netdimm_403.bin from the SEGA DIMM
+#    update CD-R, downloaded on first use from the GitHub repository that
+#    keeps it (pinned commit, SHA-256 checked) into local/.
+# The image gets its own name, NaomiDIAG_<LANG>_DIMMFW_LOCAL.bin, and must
+# NEVER be published.
 DIMMFW   ?= 0
-SEGADIMM ?= ../SEGA_Naomi_ROMs/segadimm
-FW403    ?= ../analysis/sega_dimm_cdr/Updater/FW_Netdimm_403.bin
+SEGADIMM ?= ../SEGA_Naomi_ROMs/segadimm.zip
+FW403    ?= local/FW_Netdimm_403.bin
+FW403_URL    := https://raw.githubusercontent.com/mathieulh/SEGA_DIMM_CD-R/df16ea0b47fa35fd8910e32360cb9e5aaf455507/Updater/FW_Netdimm_403.bin
+FW403_SHA256 := af0f261ee659bbafc49230dc9ab95ffce64090f6677cd9370d1a084c9e6a335e
 ifeq ($(DIMMFW),1)
 BIN     := NaomiDIAG_$(LANG)_DIMMFW_LOCAL.bin
 else
@@ -101,9 +106,18 @@ src/%.o: src/%.c $(HDRS) src/audio_clips.h $(STAMP)
 
 ifeq ($(DIMMFW),1)
 CFLAGS += -DDIMMFW=1
-local/dimmfw.bin: tools/dimmfw_pack.py $(SEGADIMM) $(FW403)
-	mkdir -p local
+# segadimm.zip is followed through a signature file (path, size, date):
+# a path with spaces cannot be a make prerequisite.
+dimmfw_sig := $(shell stat -c '%n %s %Y' "$(SEGADIMM)" 2>/dev/null || echo "$(SEGADIMM) missing")
+$(shell mkdir -p local; [ "$$(cat local/segadimm.sig 2>/dev/null)" = "$(dimmfw_sig)" ] || echo "$(dimmfw_sig)" > local/segadimm.sig)
+local/dimmfw.bin: tools/dimmfw_pack.py local/segadimm.sig $(FW403)
 	python3 -I tools/dimmfw_pack.py "$(SEGADIMM)" "$(FW403)" $@
+local/FW_Netdimm_403.bin:
+	mkdir -p local
+	curl -fsSL -o $@.part "$(FW403_URL)"
+	echo "$(FW403_SHA256)  $@.part" | sha256sum -c --quiet - || \
+	    { echo "FW_Netdimm_403.bin: unexpected SHA-256, not used"; rm -f $@.part; exit 1; }
+	mv $@.part $@
 src/dimmfw_blob.o: local/dimmfw.bin
 endif
 

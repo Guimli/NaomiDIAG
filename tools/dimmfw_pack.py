@@ -62,13 +62,21 @@ def boot_crc(b):
 def main():
     zpath, f403, out = sys.argv[1:4]
     # the MAME segadimm set, zipped or as a folder of its files
+    if not os.path.exists(zpath):
+        sys.exit(f'{zpath} : introuvable (SEGADIMM=chemin/vers/segadimm.zip)')
     if os.path.isdir(zpath):
+        names = set(os.listdir(zpath))
         read = lambda n: open(os.path.join(zpath, n), 'rb').read()
     else:
-        read = zipfile.ZipFile(zpath).read
-    rd = {n: read(n) for n in ('401_203.bin', '317_312.bin', '217_203.bin',
-                                 '213_203.bin', '203_203.bin', 'fpr23718.ic36',
-                                 'fpr23905.ic36', 'fpr23905c.ic36')}
+        z = zipfile.ZipFile(zpath)
+        names, read = set(z.namelist()), z.read
+    need = ('401_203.bin', '317_312.bin', '217_203.bin', '213_203.bin',
+            '203_203.bin', 'fpr23718.ic36', 'fpr23905.ic36', 'fpr23905c.ic36')
+    missing = [n for n in need if n not in names]
+    if missing:
+        sys.exit(f'{zpath} : il manque {" ".join(missing)} '
+                 '(segadimm d\'un set MAME recent, 0.280 par exemple)')
+    rd = {n: read(n) for n in need}
     rd['FW_Netdimm_403.bin'] = open(f403, 'rb').read()
     for n, d in rd.items():
         if len(d) != 2 * SLOT:
