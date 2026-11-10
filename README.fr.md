@@ -75,7 +75,7 @@ processeur — les octets sont copiés en RAM son exactement tels qu'ils sont
 en ROM. Le build français complet est passé de 98 % de l'EPROM à 29 % ;
 avec les clips ajoutés depuis (puces Naomi 2, carte JVS, lignes de données),
 un build complet
-occupe environ 50 %.
+occupe 54 à 58 % dans les langues en alphabet latin, 70 % en japonais.
 
 ## Ce qui est testé
 
@@ -663,6 +663,7 @@ Touches sur la console série :
 | `f` | flash du firmware DIMM — identification, et choix d'une version |
 | `j` | test des entrées JVS — chaque contact, monnayeur et voie analogique, en direct |
 | `m` | mire vidéo |
+| `!` | moniteur série — lecture/écriture mémoire, statut G1 (console seulement, absent du menu à l'écran) |
 
 À l'écran, le menu opérateur liste les mêmes actions : **TEST** (ou le TEST
 de la borne) les parcourt en bouclant ; **SERVICE** (ou le **START** du
@@ -701,8 +702,8 @@ seul le **SERVICE** de la carte, ou une touche série, en fait sortir.
 Deux d'entre elles sont à l'initiative de l'opérateur précisément parce
 qu'elles ne sont pas sûres sans surveillance : le test SDRAM du DIMM écrase
 le jeu qui y est chargé (pas le firmware, qui tourne depuis sa propre RAM),
-et l'action flash touche à la flash du firmware du DIMM — en lecture seule
-pour l'instant, voir plus bas.
+et l'action flash touche à la flash du firmware du DIMM — identification
+seulement, sauf dans un build local `DIMMFW=1`, voir plus bas.
 
 ## Compilation
 
@@ -763,13 +764,31 @@ la machine ne se stabilise pas. À activer quand vous avez une sonde en main.
 **`AUDIO=0`** produit une ROM muette : la table des clips vocaux est
 remplacée par un stub et l'image tombe à 6 % de l'EPROM. Cette option est née
 quand les clips étaient du PCM 16 bits et ne laissaient de place à rien
-d'autre ; depuis leur passage en ADPCM, un build complet occupe environ
-50 %, ce n'est donc plus un moyen de faire de la place — c'est pour un
+d'autre ; depuis leur passage en ADPCM, un build complet occupe de 54 à
+70 %, ce n'est donc plus un moyen de faire de la place — c'est pour un
 établi où la parole gêne, et ça démarre un peu plus vite. `AUDIO=1` est la
 valeur par défaut.
 
 ```sh
 make LANG=FR AUDIO=0
+```
+
+**`DIMMFW=1`** — build de test local uniquement — embarque les images de
+firmware NetDIMM qu'écrit l'action `f` : les versions du jeu de ROM MAME
+`segadimm` et le « 4.03 CD-R », pour les deux slots, rassemblées dans un
+seul flux LZMA (~546 Ko) décompressé à l'exécution. Elles sont à SEGA :
+l'image porte son propre nom, `NaomiDIAG_<LANG>_DIMMFW_LOCAL.bin`, et ne
+doit jamais être publiée. Le build lit le `segadimm.zip` de MAME tel quel —
+`SEGADIMM=chemin/vers/segadimm.zip`, d'un jeu de ROM récent (celui de la
+0.218 n'a pas `fpr23905c.ic36`) — et télécharge l'image 4.03 CD-R,
+`FW_Netdimm_403.bin`, au premier usage depuis
+[mathieulh/SEGA_DIMM_CD-R](https://github.com/mathieulh/SEGA_DIMM_CD-R)
+dans `local/` (commit figé, refusée si son SHA-256 ne correspond pas ;
+`FW403=fichier` utilise une copie locale). Toutes les langues tiennent avec
+les images et la parole : 81 à 85 % de l'EPROM, 97 % en japonais.
+
+```sh
+make LANG=FR DIMMFW=1 SEGADIMM="/chemin/vers/MAME 0.280 ROMs/segadimm.zip"
 ```
 
 Attention : le shell exporte souvent `LANG=fr_FR.UTF-8`, qui écrase le
@@ -842,7 +861,9 @@ une carte I/O 837-13551 émulée.
   bordure passe au rouge fixe : la machine est arrêtée. Seule une exception
   dans les toutes premières instructions, avant l'installation de la table
   des vecteurs, redémarre la ROM.
-- Le ventilateur de la carte DIMM n'est surveillé que par le firmware DIMM.
+- Ni les ventilateurs ni les températures ne sont lus. Aucun BIOS SEGA ne
+  lit un ventilateur ou une température, aucun firmware DIMM désassemblé
+  jusqu'ici non plus, et aucun registre n'est connu pour l'un ou l'autre.
 
 ## État et limites
 
@@ -863,8 +884,9 @@ une carte I/O 837-13551 émulée.
   l'écran et le port série font foi.
 - Les chemins Naomi 2 — identification par l'identifiant Elan,
   initialisation de l'Elan, contrôle d'accès au PVR-B, tests de la VRAM du
-  PVR-B et de la RAM Elan — sont couverts par des tests côté PC mais n'ont
-  encore tourné sur aucune vraie Naomi 2, et MAME ne peut pas les exécuter.
+  PVR-B et de la RAM Elan — sont couverts par des tests côté PC et ont
+  tourné sur une vraie Naomi 2 (ID Elan E1AD0000, RAM Elan testée) ; MAME
+  ne peut pas les exécuter.
   La lecture de l'identifiant Elan sur une Naomi 1 n'a pas non plus été
   essayée sur une vraie carte ; `CFG_BOARD_MODEL=1` la supprime.
 - Le maître JVS a été vérifié face à la carte I/O 837-13551 émulée par
@@ -935,26 +957,38 @@ Ce qui marche passe à côté, par le bus G1 :
   registres OFFSETL/PARAMETERL de la mailbox et en les relisant : après
   un reset, la mailbox d'un DIMM lit 0xFFFF partout, exactement comme un
   bus vide. *Pas encore validé sur vrai matériel* ; sous MAME (un jeu
-  GD-ROM avec NaomiDIAG à la place de l'epr-21576h de `naomigd.zip`,
+  GD-ROM avec NaomiDIAG à la place de l'epr-21576h de `naomigd`, placé devant les
+  dumps SEGA dans le rompath,
   `-bios bios2`) la carte est détectée et la sonde lit, mais MAME ignore
   le bit de sens et ne peut pas montrer d'écriture. L'émulation complète
   du DIMM de MAME (réglage « Full emulation », réservé au débogage) ne
   dialogue avec aucun BIOS : la session PEEK/POKE n'y est pas testable non
   plus ; la reprise après reset l'est, avec `mame/dimm_resume.lua`, qui
   remplace le reset du DIMM par un reset logiciel.
-- **`f` — flash du firmware DIMM.** La flash s'atteint par le PIO ROM-board
-  du G1 avec des commandes AMD. La ROM fait un read-ID, non destructeur, et
-  propose un choix entre 3.17, 4.01 et 4.03. L'écran affiche le fabricant
-  et l'identifiant de la flash (ou « Carte DIMM : absente » / « Flash DIMM
-  (ne repond pas) »), puis les versions et « Annuler » : TEST déplace,
-  SERVICE ou START choisit, comme dans le menu opérateur ; les touches
-  1/2/3 marchent toujours sur la console. Le choix se termine par
-  « Gravure (pas encore armee) » en orange. **La gravure n'est
-  volontairement pas armée.** L'updater de SEGA a été décompilé : il procède
-  par un unique effacement de puce suivi de la reprogrammation de l'image
-  entière — le filet de secours à deux slots de la carte survit donc à un
-  flash réussi, mais pas à un flash interrompu. Cela attend une validation
-  sur matériel, pas davantage de lecture.
+- **`f` — flash du firmware DIMM.** La flash s'atteint par le PIO
+  ROM-board du G1 avec des commandes AMD. Tout build l'identifie (read-ID,
+  non destructeur) et nomme la version que contient chaque slot d'après son
+  mot de contrôle : l'écran affiche le fabricant et l'identifiant (ou
+  « Carte DIMM : absente » / « Flash DIMM (ne repond pas) ») et les deux
+  slots. L'écriture demande les images de firmware, qui sont à SEGA : elles
+  ne sont que dans un **build local `DIMMFW=1`** (voir
+  [Compilation](#compilation)), jamais dans une ROM publiée, qui s'arrête là
+  sur « Images firmware (absentes ici) ». Un build `DIMMFW=1` exige
+  aussi une Am29LV160 top-boot (ID 0x22C4) et une RAM CPU validée par la
+  suite, puis demande quel slot écrire — le slot 1, firmware principal, ou
+  le slot 0, chargeur de démarrage (risqué) — et quelle version, de la plus
+  récente à la plus ancienne, la plus récente présélectionnée (TEST déplace,
+  SERVICE ou START choisit, touches 1 à 9 sur la console). Le slot 1 se
+  confirme une fois, le slot 0 deux fois. L'image est décompressée et
+  contrôlée (CRC-32 du slot = 0, mot de contrôle) avant de toucher la
+  flash ; seuls les secteurs de ce slot sont ensuite effacés — effacement
+  par secteur, comme le fait la routine flash du firmware DIMM lui-même,
+  alors que l'updater de SEGA efface toute la puce, donc les deux slots —,
+  vérifiés vierges, programmés, puis vérifiés mot à mot et par le CRC du
+  slot relu depuis la flash. Si l'écriture du slot 1 échoue, le DIMM
+  démarre encore sur son slot 0 de secours. *Pas encore validé sur vrai
+  matériel* ; le pilote tourne sur PC contre une flash simulée
+  (`tools/test_dimm_flash.c`).
 
 L'analyse des images de firmware SEGA reste hors de ce dépôt, délibérément.
 

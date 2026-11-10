@@ -71,7 +71,7 @@ on the EPROM with no decompressor, no scratch buffer and no CPU cost — the
 bytes are copied into sound RAM exactly as they sit in the ROM. The full
 French build went from 98 % of the EPROM to 29 %; with the clips added since
 (Naomi 2 chips, JVS board, data-line reports) a full build sits at
-about 50 %.
+54 to 58 % in the Latin-script languages, 70 % in Japanese.
 
 ## What it tests
 
@@ -608,6 +608,7 @@ Keys on the serial console:
 | `f` | DIMM firmware flash — identify, and choose a version |
 | `j` | JVS input test — every switch, coin count and analog channel, live |
 | `m` | video test pattern |
+| `!` | serial monitor — memory read/write, G1 status (console only, not in the on-screen menu) |
 
 On screen, the operator menu lists the same actions: **TEST** (or the
 cabinet's TEST) steps through them and wraps; **SERVICE** (or player 1
@@ -644,7 +645,8 @@ leaves.
 Two of these are operator-initiated precisely because they are not safe to
 run unattended: the DIMM SDRAM test overwrites whatever game is loaded in the
 DIMM (not the firmware, which runs from its own RAM), and the flash action
-touches the DIMM's firmware flash — read-only for now, see below.
+touches the DIMM's firmware flash — identification only, except in a
+local `DIMMFW=1` build, see below.
 
 ## Building
 
@@ -703,12 +705,29 @@ have a probe in hand.
 **`AUDIO=0`** builds a silent ROM: the spoken-clip table is replaced by a
 stub and the image drops to 6 % of the EPROM. It was introduced when the
 clips were 16-bit PCM and left no room for anything else; since they became
-ADPCM a full build sits at about 50 %, so this is no longer a way of
+ADPCM a full build sits at 54 to 70 %, so this is no longer a way of
 making room — it is for a bench where the speech is in the way, and it boots
 a little faster. `AUDIO=1` is the default.
 
 ```sh
 make LANG=EN AUDIO=0
+```
+
+**`DIMMFW=1`** — a local test build only — embeds the NetDIMM firmware
+images the `f` action writes: the versions of MAME's `segadimm` set and the
+"4.03 CD-R", for both slots, packed into one LZMA stream (~546 KB) unpacked
+at run time. They are SEGA's: the image gets its own name,
+`NaomiDIAG_<LANG>_DIMMFW_LOCAL.bin`, and must never be published. The build
+reads MAME's `segadimm.zip` as it is — `SEGADIMM=path/to/segadimm.zip`,
+from a recent set (0.218's lacks `fpr23905c.ic36`) — and downloads the
+4.03 CD-R image, `FW_Netdimm_403.bin`, on first use from
+[mathieulh/SEGA_DIMM_CD-R](https://github.com/mathieulh/SEGA_DIMM_CD-R)
+into `local/` (pinned commit, refused unless its SHA-256 matches;
+`FW403=file` uses a local copy). Every language fits with the images and
+the speech: 81 to 85 % of the EPROM, 97 % in Japanese.
+
+```sh
+make LANG=EN DIMMFW=1 SEGADIMM="/path/to/MAME 0.280 ROMs/segadimm.zip"
 ```
 
 Note that the shell often exports `LANG=fr_FR.UTF-8`, which overrides the
@@ -779,7 +798,9 @@ can be tested: MAME's `naomi` carries an emulated 837-13551 I/O board.
   exception"* on the **speaker**. The border turns solid red: the machine
   has stopped. Only an exception in the very first instructions, before the
   vector table is installed, restarts the ROM instead.
-- The DIMM-board fan is monitored only by the DIMM firmware.
+- Fans and temperatures are not read. No SEGA BIOS reads a fan or a
+  temperature, nor does any DIMM firmware disassembled so far, and no
+  register for either is known.
 
 ## Status and limitations
 
@@ -800,8 +821,8 @@ can be tested: MAME's `naomi` carries an emulated 837-13551 I/O board.
   the screen and the serial console remain authoritative.
 - The Naomi 2 paths — board identification by the Elan ID, the Elan's
   initialisation, the PVR-B access check, the PVR-B and Elan RAM tests —
-  are covered by host-side tests but have run on no real Naomi 2 yet, and
-  MAME cannot run them. The Elan ID read on a Naomi 1 has not been tried on
+  are covered by host-side tests and have run on a real Naomi 2 (Elan ID
+  E1AD0000, Elan RAM tested); MAME cannot run them. The Elan ID read on a Naomi 1 has not been tried on
   a real board either; `CFG_BOARD_MODEL=1` removes it.
 - The JVS master has been checked against MAME's emulated 837-13551 I/O
   board. MAME does not model the UART's timing or the RS-485 direction, so
@@ -867,24 +888,34 @@ What does work goes around it, on the G1 bus:
   OFFSETL/PARAMETERL latches and reading them back: a DIMM's mailbox reads
   0xFFFF in every register after reset, exactly like an empty bus.
   *Not validated on real hardware yet*; under MAME (a GD-ROM game with
-  NaomiDIAG staged as `naomigd.zip`'s epr-21576h, `-bios bios2`) the board
+  NaomiDIAG staged as `naomigd`'s epr-21576h ahead of the SEGA dumps in the
+  rompath, `-bios bios2`) the board
   is found and the probe reads, but MAME ignores the direction bit and
   cannot show a write. MAME's full DIMM emulation (its debug-only "Full
   emulation" setting) does not talk to any BIOS, so the PEEK/POKE session is
   not testable there either; the resume after a reset is, with
   `mame/dimm_resume.lua`, which stands a soft reset in for the DIMM's.
-- **`f` — DIMM firmware flash.** The flash is reachable through the G1
-  ROM-board PIO with AMD commands. The ROM performs a read-ID, which is
-  non-destructive, and offers a 3.17 / 4.01 / 4.03 selection. The screen
-  shows the flash's maker and ID (or "DIMM board: not present" / "DIMM
-  flash (no answer)"), then the versions and "Cancel": TEST moves,
-  SERVICE or START picks, as in the operator menu; keys 1/2/3 still work on
-  the console. The choice ends on an amber "Flash write (not armed yet)".
-  **Writing is
-  deliberately not armed.** Sega's own updater was decompiled and it does a
-  single chip-erase followed by a full-image reprogram — so the board's
-  two-slot recovery net survives a successful flash but not an interrupted
-  one. That waits on hardware validation, not on more reading.
+- **`f` — DIMM firmware flash.** The flash is reached through the G1
+  ROM-board PIO with AMD commands. Every build identifies it (a read-ID,
+  non-destructive) and names the version each slot holds from its check
+  word: the screen shows the maker and ID (or "DIMM board: not present" /
+  "DIMM flash (no answer)") and both slots. Writing needs the firmware
+  images, which are SEGA's: they are only in a **local `DIMMFW=1` build**
+  (see [Building](#building)), never in a published ROM, which stops there
+  with "Firmware images (not in this build)". A `DIMMFW=1` build also
+  requires a top-boot Am29LV160 (ID 0x22C4) and a CPU RAM the suite has
+  validated, then asks which slot to write — slot 1, the main firmware, or
+  slot 0, the boot loader (risky) — and which version, newest first with the
+  newest selected (TEST moves, SERVICE or START picks, keys 1–9 on the
+  console). Slot 1 is confirmed once, slot 0 twice. The image is unpacked and
+  checked (slot CRC-32 = 0, check word) before the flash is touched; then
+  only that slot's sectors are erased — sector erase, as the DIMM firmware's
+  own flash routine does it, where SEGA's updater uses a chip erase that
+  wipes both slots — blank-checked, programmed, and verified word by word and
+  by the slot CRC read back from the flash. If slot 1 fails, the DIMM still
+  starts on its recovery slot 0. *Not validated on real hardware yet*; the
+  driver runs on the PC against a simulated flash
+  (`tools/test_dimm_flash.c`).
 
 The supporting analysis of SEGA's firmware images stays out of this
 repository on purpose.
