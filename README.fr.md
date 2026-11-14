@@ -866,7 +866,13 @@ une carte I/O 837-13551 émulée.
   même bus G1, était mal lue pendant un DMA cartouche lancé depuis elle (une
   erreur d'adresse avec le PC dans `.rodata`) ; le code ne revient donc
   jamais à l'EPROM avec un transfert en cours. Le SHA-1 de la cartouche
-  tourne dans cette routine, pendant le transfert du bloc suivant.
+  tourne dans cette routine, pendant le transfert du bloc suivant. Chaque
+  transfert terminé est clos côté carte par 0xC000 en 0x5F700C, comme le fait
+  le BIOS ; laissé ouvert, la carte répond 0xFFFF sur son port PIO. Validé
+  sur une vraie Naomi 2 avec une cartouche VIRTUA STRIKER 3 : identifiée
+  (World, Rev B) en moins d'une seconde, 12 puces sur 12 conformes à leur
+  SHA-1 MAME, 172 Mo hachés en 37 s environ (8 Ko en 1 ms par DMA contre
+  16 ms par le port PIO).
 - Ni les ventilateurs ni les températures ne sont lus. Aucun BIOS SEGA ne
   lit un ventilateur ou une température, aucun firmware DIMM désassemblé
   jusqu'ici non plus, et aucun registre n'est connu pour l'un ou l'autre.

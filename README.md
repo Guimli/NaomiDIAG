@@ -803,7 +803,12 @@ can be tested: MAME's `naomi` carries an emulated 837-13551 I/O board.
   bus, was misread while a cartridge DMA ran from it (an address error with
   the PC in `.rodata`), so the code never returns to the EPROM with a
   transfer in flight. The cartridge's SHA-1 rounds run inside that routine,
-  during the transfer of the next chunk.
+  during the transfer of the next chunk. Each finished transfer is closed on
+  the board with 0xC000 in 0x5F700C, as the BIOS does; left open, the board
+  answers 0xFFFF on its PIO port. Validated on a real Naomi 2 with a
+  VIRTUA STRIKER 3 cartridge: identified (World, Rev B) in under a second,
+  12/12 chips matching their MAME SHA-1, 172 MB hashed in about 37 s
+  (8 KB by DMA in 1 ms against 16 ms by the PIO port).
 - Fans and temperatures are not read. No SEGA BIOS reads a fan or a
   temperature, nor does any DIMM firmware disassembled so far, and no
   register for either is known.
