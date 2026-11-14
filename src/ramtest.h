@@ -67,6 +67,27 @@ void g1_unlock(void);
 void g1_unlock_v(u32 flags);   /* parts of it, for the serial monitor */
 void sha1_mem_blocks(u32 h[5], u32 nblocks, u32 w[80], const u32 *src);
 
+/* One G1 DMA (ROM board <-> system RAM), started and awaited from CPU RAM so
+ * that the EPROM, on the same G1 bus, is never fetched from while it runs
+ * (ramtest_fast.S, which documents why). Offsets MUST match the assembly. */
+typedef struct {
+    u32 pio_hi, pio_lo;          /* 0xA05F7000 / 7004                      */
+    u32 dma_hi, dma_lo;          /* 0xA05F700C / 7010                      */
+    u32 count;                   /* 0xA05F7014                             */
+    u32 phys, len, dir;          /* SB_GDSTAR, SB_GDLEN, SB_GDDIR          */
+    u32 timeout;                 /* TMU1 ticks (TIMER_HZ) before giving up */
+    u32 flags;                   /* G1DMA_PIO16                            */
+    u32 *h;                      /* SHA-1 state to update meanwhile, or 0  */
+    u32 nblocks;                 /* 64-byte blocks of src to hash          */
+    u32 *w;                      /* 80-word schedule scratch               */
+    const u32 *src;              /* buffer hashed during the transfer      */
+} g1_dma_job;
+#define G1DMA_PIO16     1u       /* PIO offset written 16 bits wide        */
+#define G1DMA_OK        0u
+#define G1DMA_BUSY      1u       /* a transfer was running: nothing done   */
+#define G1DMA_TIMEOUT   2u       /* never finished: stopped (SB_GDEN = 0)  */
+u32  g1_dma_run(const g1_dma_job *j);
+
 #define RAM_MAX_FAILS 8
 
 typedef struct {

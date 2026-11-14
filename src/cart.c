@@ -94,36 +94,46 @@ void g1_bus_init(void)
  * linear M2 addressing), its count is in 32-byte units, and SB_GDDIR = 1
  * brings the data into system RAM. MAME's M2 board reads the linear flag
  * from the PIO offset, so that one is set too. */
-u32 cart_dma_busy(void)
+/* The transfer is started and awaited by g1_dma_run, from CPU RAM: on a real
+ * board an instruction fetch from the EPROM while a G1 DMA is running comes
+ * back wrong (see ramtest_fast.S). Nothing here returns to the EPROM with a
+ * transfer in flight. */
+static void cart_dma_job(g1_dma_job *j, u32 offset, u32 phys, u32 len)
 {
-    return SB_GDST & 1;
+    u32 hi = ((offset >> 16) & 0x1FFF) | 0xA000;
+    j->pio_hi  = hi;
+    j->pio_lo  = offset & 0xFFFF;
+    j->dma_hi  = hi;
+    j->dma_lo  = offset & 0xFFFF;
+    j->count   = len >> 5;
+    j->phys    = phys;
+    j->len     = len;
+    j->dir     = 1;
+    j->timeout = TIMER_HZ / 10;         /* 100 ms for 8 KB: it is not coming */
+    j->flags   = G1DMA_PIO16;
+    j->h       = 0;
+    j->nblocks = 0;
+    j->w       = 0;
+    j->src     = 0;
 }
 
-u32 cart_dma_wait(void)
+u32 cart_dma_xfer(u32 offset, u32 phys, u32 len)
 {
-    u32 t0 = timer_ticks();
-    while (SB_GDST & 1)
-        if (timer_ticks() - t0 > TIMER_HZ / 10)
-            return 1;                   /* 100 ms for 8 KB: it is not coming */
-    return 0;
+    g1_dma_job j;
+    cart_dma_job(&j, offset, phys, len);
+    return p_g1_dma_run(&j) != G1DMA_OK;
 }
 
-u32 cart_dma_start(u32 offset, u32 phys, u32 len)
+u32 cart_dma_xfer_hash(u32 offset, u32 phys, u32 len,
+                       u32 h[5], u32 nblocks, u32 w[80], const void *src)
 {
-    if (cart_dma_wait())
-        return 1;
-    u16 hi = (u16)(((offset >> 16) & 0x1FFF) | 0xA000);
-    CART_ROM_OFFSETH = hi;
-    CART_ROM_OFFSETL = (u16)offset;
-    REG32(0xA05F7010) = offset & 0xFFFF;
-    REG32(0xA05F700C) = hi;
-    REG32(0xA05F7014) = len >> 5;
-    SB_GDSTAR = phys;
-    SB_GDLEN  = len;
-    SB_GDDIR  = 1;
-    SB_GDEN   = 1;
-    SB_GDST   = 1;
-    return 0;
+    g1_dma_job j;
+    cart_dma_job(&j, offset, phys, len);
+    j.h = h;
+    j.nblocks = nblocks;
+    j.w = w;
+    j.src = (const u32 *)src;
+    return p_g1_dma_run(&j) != G1DMA_OK;
 }
 
 void cart_seek(u32 offset)

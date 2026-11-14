@@ -19,5 +19,8 @@ void sha1_final(sha1_ctx *c, u8 out[20]);
 void sha1_update_cart(sha1_ctx *c, u32 len);
 /* Same, from bytes already in memory (a G1 DMA buffer); len as above. */
 void sha1_update_buf(sha1_ctx *c, const void *src, u32 len);
+/* Account for len bytes whose blocks were hashed elsewhere (the rounds run
+ * by g1_dma_run during a cartridge transfer). */
+void sha1_count(sha1_ctx *c, u32 len);
 
 #endif

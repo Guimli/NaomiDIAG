@@ -52,6 +52,10 @@ extern void (*p_dimm_fill_seq_fast)(u32 *dst, u32 nblocks8, u32 first,
                                    u32 step);
 extern void (*p_dimm_check_seq_fast)(const u32 *src, u32 nblocks8,
                                     dimm_chk_ctx *c);
+/* Every G1 DMA goes through this one: run from the EPROM it is the ROM copy,
+ * which a real board does not survive (see ramtest_fast.S) -- the cartridge
+ * content check already refuses to run unrelocated. */
+extern u32  (*p_g1_dma_run)(const g1_dma_job *j);
 
 void reloc_init(void);              /* point everything at the ROM copies */
 

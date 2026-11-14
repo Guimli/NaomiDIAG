@@ -55,17 +55,6 @@ void dimm_probe(dimm_info *di)
 #define SCRATCH_PHYS_R  (SCRATCH_PHYS_W + DIMM_DMA_BLK)
 #define P2(phys)        ((volatile u32 *)(0xA0000000u | (phys)))
 
-/* Wait for the GD-DMA to go idle. 0 = idle, 1 = timed out (~1 s): nothing on
- * the bus completed the transfer, i.e. no DIMM or its firmware is not up. */
-static u32 gdst_wait(void)
-{
-    u32 t0 = timer_ticks();
-    while (SB_GDST & 1)
-        if (timer_ticks() - t0 > TIMER_HZ)
-            return 1;
-    return 0;
-}
-
 /* The board's transfer count (0x5F7014): 8-byte units as first reversed
  * for the DIMM, 32-byte units in the BIOS cartridge loader. dimm_g1_probe
  * settles it on the real board; until then the DIMM figure stands. */
@@ -78,19 +67,26 @@ static u32 g_count32;            /* 0: 8-byte units (no .data here) */
 static u32 dimm_dma_n(u32 dimm_addr, u32 sysram_phys, u32 len, u32 dir,
                       u32 count)
 {
-    if (gdst_wait())
-        return 1;
-    REG32(0xA05F7000) = 0;
-    REG32(0xA05F7004) = 0;
-    REG32(0xA05F7010) = dimm_addr & 0xFFFF;
-    REG32(0xA05F700C) = (dimm_addr >> 16) | 0x8000;
-    REG32(0xA05F7014) = count;
-    SB_GDSTAR = sysram_phys;
-    SB_GDLEN  = len;
-    SB_GDDIR  = dir;
-    SB_GDEN   = 1;
-    SB_GDST   = 1;
-    return gdst_wait();
+    /* started and awaited from CPU RAM by g1_dma_run: on a real board the
+     * EPROM, on the same G1 bus, must not be fetched from during a transfer
+     * (ramtest_fast.S). A transfer that does not end within ~1 s means no
+     * DIMM, or its firmware is not up; it is stopped, and 1 returned. */
+    g1_dma_job j;
+    j.pio_hi  = 0;
+    j.pio_lo  = 0;
+    j.dma_hi  = (dimm_addr >> 16) | 0x8000;
+    j.dma_lo  = dimm_addr & 0xFFFF;
+    j.count   = count;
+    j.phys    = sysram_phys;
+    j.len     = len;
+    j.dir     = dir;
+    j.timeout = TIMER_HZ;
+    j.flags   = 0;                      /* PIO offset 32 bits wide, as before */
+    j.h       = 0;
+    j.nblocks = 0;
+    j.w       = 0;
+    j.src     = 0;
+    return p_g1_dma_run(&j) != G1DMA_OK;
 }
 
 static u32 dimm_dma(u32 dimm_addr, u32 sysram_phys, u32 len, u32 dir)

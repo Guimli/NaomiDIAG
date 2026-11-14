@@ -1025,5 +1025,115 @@ _dimm_check_seq_fast:
     rts
     mov.l   @r15+, r8
 
+! =============================================================================
+! u32 g1_dma_run(const g1_dma_job *j)
+!
+! One G1 DMA between the ROM board (cartridge or DIMM) and system RAM, run
+! from CPU RAM from start to finish. On a real Naomi 2 the boot EPROM, on the
+! same G1 bus, does not survive being fetched from while such a transfer is
+! in flight: the first cartridge DMA, started and awaited from the EPROM,
+! ended in an address error with the PC inside .rodata (EXPEVT 0xE0,
+! 2026-11-14). So the board and Holly are programmed here, another buffer is
+! optionally hashed while the transfer runs (sha1_mem_blocks, same block),
+! and the routine returns only once SB_GDST reads idle -- or after stopping
+! the transfer on a timeout. Interrupts stay masked throughout the ROM, so
+! nothing else fetches from the EPROM meanwhile.
+!
+! Job (offsets MUST match g1_dma_job in ramtest.h):
+!     0  pio_hi    0xA05F7000 (ROM-board PIO offset, high)
+!     4  pio_lo    0xA05F7004 (low)
+!     8  dma_hi    0xA05F700C (ROM-board DMA offset, high)
+!    12  dma_lo    0xA05F7010 (low)
+!    16  count     0xA05F7014 (transfer count, board units)
+!    20  phys      SB_GDSTAR (system RAM, physical)
+!    24  len       SB_GDLEN (bytes)
+!    28  dir       SB_GDDIR
+!    32  timeout   TMU1 ticks (12.5 MHz) from the start to give up
+!    36  flags     bit 0: PIO offset written 16 bits wide (cartridge),
+!                  otherwise 32 bits (DIMM), as the C code did before
+!    40  h         SHA-1 state to update meanwhile, 0 = no hashing
+!    44  nblocks   64-byte blocks to hash
+!    48  w         80-word schedule scratch
+!    52  src       buffer to hash (not the one being transferred into)
+! Returns 0 done, 1 a transfer was already running (nothing started),
+! 2 timed out (the transfer was stopped with SB_GDEN = 0).
+! =============================================================================
+    .global _g1_dma_run
+_g1_dma_run:
+    sts.l   pr, @-r15
+    mov.l   r8, @-r15
+    mov.l   r9, @-r15
+    mov     r4, r8
+    mov.l   .Lgd_sb, r2             ! 0xA05F7400
+    mov.l   @(24, r2), r0           ! SB_GDST
+    tst     #1, r0
+    bt      1f
+    bra     .Lgd_out
+    mov     #1, r0                  ! busy already: start nothing
+1:  mov.l   .Lgd_board, r2          ! 0xA05F7000
+    mov     r2, r6
+    add     #4, r6                  ! 0xA05F7004
+    mov.l   @(0, r8), r3            ! pio_hi
+    mov.l   @(4, r8), r5            ! pio_lo
+    mov.l   @(36, r8), r0
+    tst     #1, r0
+    bt      2f
+    mov.w   r3, @r2                 ! cartridge: 16-bit PIO offset
+    bra     3f
+    mov.w   r5, @r6
+2:  mov.l   r3, @r2                 ! DIMM: 32-bit
+    mov.l   r5, @r6
+3:  mov.l   @(12, r8), r0
+    mov.l   r0, @(16, r2)           ! 0xA05F7010 dma_lo
+    mov.l   @(8, r8), r0
+    mov.l   r0, @(12, r2)           ! 0xA05F700C dma_hi
+    mov.l   @(16, r8), r0
+    mov.l   r0, @(20, r2)           ! 0xA05F7014 count
+    mov.l   .Lgd_sb, r2
+    mov.l   @(20, r8), r0
+    mov.l   r0, @(4, r2)            ! SB_GDSTAR
+    mov.l   @(24, r8), r0
+    mov.l   r0, @(8, r2)            ! SB_GDLEN
+    mov.l   @(28, r8), r0
+    mov.l   r0, @(12, r2)           ! SB_GDDIR
+    mov     #1, r0
+    mov.l   r0, @(20, r2)           ! SB_GDEN
+    mov.l   .Lgd_tcnt1, r1
+    mov.l   @r1, r9                 ! start time (TMU1 counts down)
+    mov.l   r0, @(24, r2)           ! SB_GDST: go
+    mov.l   @(40, r8), r4           ! hash another buffer meanwhile?
+    tst     r4, r4
+    bt      4f
+    mov.l   @(44, r8), r5
+    mov.l   @(48, r8), r6
+    bsr     _sha1_mem_blocks
+    mov.l   @(52, r8), r7
+4:  mov.l   .Lgd_sb, r2
+    mov.l   .Lgd_tcnt1, r1
+    mov.l   @(32, r8), r3           ! timeout in ticks
+5:  mov.l   @(24, r2), r0           ! SB_GDST
+    tst     #1, r0
+    bt      6f                      ! idle: done
+    mov.l   @r1, r0
+    mov     r9, r4
+    sub     r0, r4                  ! ticks elapsed = start - now
+    cmp/hi  r3, r4
+    bf      5b
+    mov     #0, r0                  ! timed out: stop the transfer
+    mov.l   r0, @(20, r2)           ! SB_GDEN = 0
+    bra     .Lgd_out
+    mov     #2, r0
+6:  mov     #0, r0
+.Lgd_out:
+    mov.l   @r15+, r9
+    mov.l   @r15+, r8
+    lds.l   @r15+, pr
+    rts
+    nop
+    .align  2
+.Lgd_board: .long 0xA05F7000
+.Lgd_sb:    .long 0xA05F7400
+.Lgd_tcnt1: .long 0xFFD80018
+
     .global _reloc_blk_end
 _reloc_blk_end:

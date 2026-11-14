@@ -16,6 +16,7 @@ void (*p_g1_unlock_v)(u32);
 void (*p_sha1_mem_blocks)(u32 *, u32, u32 *, const u32 *);
 void (*p_dimm_fill_seq_fast)(u32 *, u32, u32, u32);
 void (*p_dimm_check_seq_fast)(const u32 *, u32, dimm_chk_ctx *);
+u32  (*p_g1_dma_run)(const g1_dma_job *);
 
 static u32 g_active;
 static u32 g_p2_dest;        /* uncached address of the relocated block */
@@ -63,6 +64,7 @@ void reloc_init(void)
     p_sha1_mem_blocks      = sha1_mem_blocks;
     p_dimm_fill_seq_fast   = dimm_fill_seq_fast;
     p_dimm_check_seq_fast  = dimm_check_seq_fast;
+    p_g1_dma_run           = g1_dma_run;
     g_active = 0;
 }
 
@@ -140,6 +142,8 @@ u32 reloc_install(u32 p2_dest)
         (cached + ((u32)(char *)dimm_fill_seq_fast - (u32)reloc_blk_start));
     p_dimm_check_seq_fast  = (void (*)(const u32 *, u32, dimm_chk_ctx *))
         (cached + ((u32)(char *)dimm_check_seq_fast - (u32)reloc_blk_start));
+    p_g1_dma_run           = (u32 (*)(const g1_dma_job *))
+        (cached + ((u32)(char *)g1_dma_run - (u32)reloc_blk_start));
     g_p2_dest = p2_dest;
     g_active = 1;
     return 1;

@@ -3676,20 +3676,30 @@ static void cart_hash_range(sha1_ctx *c, u32 off, u32 len, u32 pbase)
         cart_hash_pio(c, off, len, pbase);
         return;
     }
+    /* Chunk n+1 is fetched while chunk n is hashed, both inside one call to
+     * the relocated g1_dma_run, which only comes back once the transfer is
+     * over: the EPROM this loop runs from is never read during a G1 DMA. */
     u32 cur = 0, done = 0;
-    if (cart_dma_start(off, CART_DMA_PHYS, CART_HASH_CHUNK))
+    u32 w[80];
+    if (cart_dma_xfer(off, CART_DMA_PHYS, CART_HASH_CHUNK))
         goto lost;
     for (; done < len; done += CART_HASH_CHUNK) {
         progress_tick(pbase + done);
         if (((pbase + done) & 0x3FFFFF) == 0)
             scif_putc('.');
-        if (cart_dma_wait())
+        if (done + CART_HASH_CHUNK >= len) {
+            sha1_update_buf(c, (const void *)CART_DMA_BUF(cur), CART_HASH_CHUNK);
+            break;
+        }
+        u32 bad = cart_dma_xfer_hash(off + done + CART_HASH_CHUNK,
+                                     CART_DMA_PHYS + (cur ^ 1) * CART_HASH_CHUNK,
+                                     CART_HASH_CHUNK, c->h, CART_HASH_CHUNK >> 6,
+                                     w, (const void *)CART_DMA_BUF(cur));
+        sha1_count(c, CART_HASH_CHUNK);     /* chunk n is hashed either way */
+        if (bad) {
+            done += CART_HASH_CHUNK;        /* n + 1 never arrived */
             goto lost;
-        if (done + CART_HASH_CHUNK < len)
-            cart_dma_start(off + done + CART_HASH_CHUNK,
-                           CART_DMA_PHYS + (cur ^ 1) * CART_HASH_CHUNK,
-                           CART_HASH_CHUNK);
-        sha1_update_buf(c, (const void *)CART_DMA_BUF(cur), CART_HASH_CHUNK);
+        }
         cur ^= 1;
     }
     return;
@@ -3720,8 +3730,7 @@ static u32 cart_dma_probe(u32 base)
     for (u32 i = 0; i < CART_HASH_CHUNK / 4; i++)
         b[i] = 0x5A5A5A5Au;
     u32 t0 = timer_ticks();
-    if (cart_dma_start(base, CART_DMA_PHYS, CART_HASH_CHUNK) ||
-        cart_dma_wait())
+    if (cart_dma_xfer(base, CART_DMA_PHYS, CART_HASH_CHUNK))
         return 0;
     g_cart_t_dma = timer_ticks() - t0;
     /* the port read is timed on its own, compared afterwards: the two

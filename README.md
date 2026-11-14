@@ -798,6 +798,12 @@ can be tested: MAME's `naomi` carries an emulated 837-13551 I/O board.
   exception"* on the **speaker**. The border turns solid red: the machine
   has stopped. Only an exception in the very first instructions, before the
   vector table is installed, restarts the ROM instead.
+- Every G1 DMA (cartridge, DIMM) is started and awaited by a routine in the
+  relocated CPU RAM block: on a real Naomi 2 the boot EPROM, on the same G1
+  bus, was misread while a cartridge DMA ran from it (an address error with
+  the PC in `.rodata`), so the code never returns to the EPROM with a
+  transfer in flight. The cartridge's SHA-1 rounds run inside that routine,
+  during the transfer of the next chunk.
 - Fans and temperatures are not read. No SEGA BIOS reads a fan or a
   temperature, nor does any DIMM firmware disassembled so far, and no
   register for either is known.

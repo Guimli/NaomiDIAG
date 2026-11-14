@@ -26,11 +26,13 @@ void g1_set_board_timing(u32 v);       /* G1GDRC/G1GDWC */
 void cart_seek(u32 offset);
 
 /* G1 DMA of len bytes (multiple of 32) from the cartridge into system RAM
- * at physical address phys. start returns 1 if the previous transfer never
- * finished; wait returns 1 on a timeout (100 ms). */
-u32  cart_dma_start(u32 offset, u32 phys, u32 len);
-u32  cart_dma_wait(void);
-u32  cart_dma_busy(void);
+ * at physical address phys, started and awaited from CPU RAM (g1_dma_run);
+ * 1 if it never finished (100 ms) or another one was running. The _hash
+ * form also runs the SHA-1 rounds over nblocks x 64 bytes of src, another
+ * buffer, while the transfer goes on. */
+u32  cart_dma_xfer(u32 offset, u32 phys, u32 len);
+u32  cart_dma_xfer_hash(u32 offset, u32 phys, u32 len,
+                        u32 h[5], u32 nblocks, u32 w[80], const void *src);
 void cart_read(u32 offset, u8 *buf, u32 len);
 
 /* 1 if something answers with plausible data (not stuck all-0/all-1) */

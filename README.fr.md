@@ -861,6 +861,12 @@ une carte I/O 837-13551 émulée.
   bordure passe au rouge fixe : la machine est arrêtée. Seule une exception
   dans les toutes premières instructions, avant l'installation de la table
   des vecteurs, redémarre la ROM.
+- Tout DMA G1 (cartouche, DIMM) est lancé et attendu par une routine du bloc
+  déplacé en RAM CPU : sur une vraie Naomi 2, l'EPROM de démarrage, sur le
+  même bus G1, était mal lue pendant un DMA cartouche lancé depuis elle (une
+  erreur d'adresse avec le PC dans `.rodata`) ; le code ne revient donc
+  jamais à l'EPROM avec un transfert en cours. Le SHA-1 de la cartouche
+  tourne dans cette routine, pendant le transfert du bloc suivant.
 - Ni les ventilateurs ni les températures ne sont lus. Aucun BIOS SEGA ne
   lit un ventilateur ou une température, aucun firmware DIMM désassemblé
   jusqu'ici non plus, et aucun registre n'est connu pour l'un ou l'autre.
