@@ -1036,7 +1036,10 @@ _dimm_check_seq_fast:
 ! 2026-11-14). So the board and Holly are programmed here, another buffer is
 ! optionally hashed while the transfer runs (sha1_mem_blocks, same block),
 ! and the routine returns only once SB_GDST reads idle -- or after stopping
-! the transfer on a timeout. Interrupts stay masked throughout the ROM, so
+! the transfer on a timeout. A finished transfer is then closed on the board
+! with 0xC000 in 0x5F700C, as the BIOS's own DMA wait does: left open, the
+! board answers 0xFFFF on its PIO port from then on (seen on the real board,
+! 2026-11-14: header fine, every read after the first DMA all ones). Interrupts stay masked throughout the ROM, so
 ! nothing else fetches from the EPROM meanwhile.
 !
 ! Job (offsets MUST match g1_dma_job in ramtest.h):
@@ -1123,7 +1126,10 @@ _g1_dma_run:
     mov.l   r0, @(20, r2)           ! SB_GDEN = 0
     bra     .Lgd_out
     mov     #2, r0
-6:  mov     #0, r0
+6:  mov.l   .Lgd_board, r1          ! done: close the transfer on the board
+    mov.l   .Lgd_end, r0            ! side, as the BIOS's DMA wait does
+    mov.l   r0, @(12, r1)           ! (epr-21576h 0xA0033550): 700C = C000,
+    mov     #0, r0                  ! without which the PIO port reads FFFF
 .Lgd_out:
     mov.l   @r15+, r9
     mov.l   @r15+, r8
@@ -1134,6 +1140,7 @@ _g1_dma_run:
 .Lgd_board: .long 0xA05F7000
 .Lgd_sb:    .long 0xA05F7400
 .Lgd_tcnt1: .long 0xFFD80018
+.Lgd_end:   .long 0x0000C000
 
     .global _reloc_blk_end
 _reloc_blk_end:
