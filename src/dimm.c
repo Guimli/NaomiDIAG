@@ -132,12 +132,15 @@ static u32 is_pattern(volatile u32 *b)
     return 1;
 }
 
+/* 1 = varied data (a game image); 2 = one word everywhere but not all ones
+ * (a DIMM with no game: its SDRAM as the firmware left it); 0 = all ones,
+ * which is also what an empty bus reads. */
 static u32 plausible(volatile u32 *b)
 {
     for (u32 i = 1; i < PROBE_NW; i++)
         if (b[i] != b[0])
             return 1;
-    return b[0] != 0 && b[0] != 0xFFFFFFFFu;
+    return b[0] != 0xFFFFFFFFu ? 2 : 0;
 }
 
 void dimm_g1_probe(dimm_g1_probe_result *r)
@@ -150,6 +153,7 @@ void dimm_g1_probe(dimm_g1_probe_result *r)
     r->restored = r->restore_failed = 0;
     r->cnt_ok[0] = r->cnt_ok[1] = 0;
     r->ticks_32k = 0;
+    r->const_ref = r->const_val = 0;
     if (!dimm_scratch_ok())
         return;
 
@@ -159,18 +163,28 @@ void dimm_g1_probe(dimm_g1_probe_result *r)
     /* The block is the first that holds real data: 1 MB in by preference,
      * clear of the header, but a game can leave zeros there (MAME's
      * Ikaruga does), so a few places are tried, the header last. */
+    /* With no game loaded (the real NetDIMM, 2026-11-15) the memory reads one
+     * word everywhere: a second pass then takes that, unless it is all ones,
+     * which an empty bus reads too. A constant reference still tells the two
+     * directions apart -- the buffer holds a varied pattern, never that word
+     * -- and restoring it is writing the word back. */
     static const u16 flags[2] = { 0x8000, 0xA000 };
     static const u32 where[6] = { 0x00100000, 0x00200000, 0x00400000,
                                   0x00040000, 0x00010000, 0x00000000 };
-    for (u32 w = 0; w < 6 && !r->pio_flags; w++) {
-        r->addr = where[w];
-        for (u32 f = 0; f < 2 && !r->pio_flags; f++) {
-            dimm_pio_read(r->addr, a, PROBE_NW, flags[f]);
-            dimm_pio_read(r->addr, d, PROBE_NW, flags[f]);
-            if (same(a, d) && plausible(a))
-                r->pio_flags = flags[f];
+    for (u32 want = 1; want <= 2 && !r->pio_flags; want++)
+        for (u32 w = 0; w < 6 && !r->pio_flags; w++) {
+            r->addr = where[w];
+            for (u32 f = 0; f < 2 && !r->pio_flags; f++) {
+                dimm_pio_read(r->addr, a, PROBE_NW, flags[f]);
+                dimm_pio_read(r->addr, d, PROBE_NW, flags[f]);
+                u32 q = same(a, d) ? plausible(a) : 0;
+                if (q && q <= want) {
+                    r->pio_flags = flags[f];
+                    r->const_ref = q == 2;
+                    r->const_val = a[0];
+                }
+            }
         }
-    }
     if (!r->pio_flags)
         return;                         /* nothing to compare against */
 

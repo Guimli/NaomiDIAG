@@ -108,6 +108,8 @@ typedef struct {
     u32 restore_failed;     /* ... or could not be                     */
     u32 cnt_ok[2];          /* count in 32-byte / 8-byte units worked  */
     u32 ticks_32k;          /* one 32 KB read, timer ticks             */
+    u32 const_ref;          /* the reference was one word everywhere   */
+    u32 const_val;          /* ... this one (no game loaded)           */
 } dimm_g1_probe_result;
 void dimm_g1_probe(dimm_g1_probe_result *r);
 

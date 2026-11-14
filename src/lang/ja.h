@@ -177,6 +177,7 @@
 #define S_DP_HDR            "\n  G1 DMAの確認 (ゲームイメージ1 KB、DIMMの内容は元のまま):\n"
 #define S_DP_NOPIO          "  DIMMのPIO読み出しが不安定、または全域で一定 (ゲーム未ロード?): 確認なし\n"
 #define S_DP_PIO            "  PIO基準読み出し、フラグ "
+#define S_DP_CONST          "  DIMMは全域で同じワード (ゲーム未ロード)、これを基準とする: 0x"
 #define S_DP_AT             " DIMMオフセット "
 #define S_DP_DIR            "  GDDIR="
 #define S_DP_NOTRUN         "未実行"

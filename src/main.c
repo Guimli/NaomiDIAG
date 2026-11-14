@@ -2503,6 +2503,11 @@ static void dimm_probe_report(const dimm_g1_probe_result *r)
     scif_puts(S_DP_AT);
     scif_puthex(r->addr);
     scif_puts("\n");
+    if (r->const_ref) {
+        scif_puts(S_DP_CONST);
+        scif_puthex(r->const_val);
+        scif_puts("\n");
+    }
     for (u32 dir = 0; dir < 2; dir++) {
         scif_puts(S_DP_DIR);
         scif_putdec(dir);
@@ -2809,12 +2814,13 @@ static void test_dimm(u32 resumed)
     RB->dimm_size = size;
     resume_save(RS_SESSION);
 
-    /* Read-twice-and-compare over as much of the board as the operator is
-     * willing to wait for; TEST or a key stops it at the next block. */
+    /* Read twice and compare: a sample of the bus, not a memory test (the
+     * cell test below covers every word). 16 MB took 33 minutes through the
+     * PIO port on a real NetDIMM; 1 MB says as much about the lines. */
 #if QUICK_TEST
     const u32 span = 0x00040000;
 #else
-    const u32 span = 0x01000000;        /* 16 MB, abortable */
+    const u32 span = 0x00100000;        /* 1 MB, about 2 minutes */
 #endif
     cart_pin_stats st;
     progress_begin(S_P_DIMM, span);
@@ -4716,6 +4722,21 @@ static void menu_run(void)
  * d appended five or six entries to the boot suite's two dozen, and a few
  * presses filled the log. The looping tests write nothing to the log and
  * leave the boot report where it is. */
+/* The DIMM, cartridge and flash actions have percentages to show: the bar,
+ * retired with the boot suite, comes back for them, its label naming the
+ * step (copy, pass, IC...), and goes again after -- the way the RAM loops
+ * bring it back. bar_show returns what bar_hide needs. */
+static u32 bar_show(void)
+{
+    return fb_progress_set_retired(0);
+}
+
+static void bar_hide(u32 was)
+{
+    if (was)
+        fb_progress_retire();
+}
+
 static void report_restart(void)
 {
     resume_clear();                     /* a new report: nothing to resume */
@@ -5200,19 +5221,28 @@ static void run_action(u32 act)
         aica_arm_park();
         break;
     }
-    case ACT_DIMM:
+    case ACT_DIMM: {
+        u32 was = bar_show();
         report_restart();
         test_dimm(0);
+        bar_hide(was);
         break;
-    case ACT_GAME:
+    }
+    case ACT_GAME: {
+        u32 was = bar_show();
         report_restart();
         test_x76();
         test_cartridge();
+        bar_hide(was);
         break;
-    case ACT_FLASH:
+    }
+    case ACT_FLASH: {
+        u32 was = bar_show();
         report_restart();
         test_dimm_flash();
+        bar_hide(was);
         break;
+    }
     case ACT_JVS:
         jvs_input_test();
         break;
@@ -5604,9 +5634,12 @@ static void resume_run(void)
     log_screen_line(LK_INFO, S_L_RESUMED, 0, 0, 0);
     switch (RB->step) {
     case RS_HELLO:
-    case RS_SESSION:
+    case RS_SESSION: {
+        u32 was = bar_show();
         test_dimm(1);
+        bar_hide(was);
         break;
+    }
     case RS_TEST:
         dimm_resume_interrupted();
         break;

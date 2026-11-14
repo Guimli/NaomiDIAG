@@ -174,6 +174,7 @@
 #define S_DP_HDR            "\n  sondeo DMA G1 (1 KB de la imagen del juego, el DIMM queda como estaba):\n"
 #define S_DP_NOPIO          "  lectura PIO del DIMM inestable o constante en todas partes (sin juego cargado?): sin sondeo\n"
 #define S_DP_PIO            "  lectura PIO de referencia con flags "
+#define S_DP_CONST          "  el DIMM contiene una sola palabra en todas partes (ningún juego cargado), tomada como referencia: 0x"
 #define S_DP_AT             " en el desplazamiento DIMM "
 #define S_DP_DIR            "  GDDIR="
 #define S_DP_NOTRUN         "no probado"

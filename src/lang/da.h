@@ -175,6 +175,7 @@
 #define S_DP_HDR            "\n  G1-DMA-prøve (1 KB af spillets image, DIMM'en efterlades som den var):\n"
 #define S_DP_NOPIO          "  PIO-læsning af DIMM ustabil eller konstant overalt (intet spil indlæst?): ingen prøve\n"
 #define S_DP_PIO            "  PIO-referencelæsning med flag "
+#define S_DP_CONST          "  DIMM'en indeholder det samme ord overalt (intet spil indlæst), brugt som reference: 0x"
 #define S_DP_AT             " ved DIMM-offset "
 #define S_DP_DIR            "  GDDIR="
 #define S_DP_NOTRUN         "ikke prøvet"

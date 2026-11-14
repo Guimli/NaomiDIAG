@@ -177,6 +177,7 @@
 #define S_DP_HDR            "\n  G1 DMA探测 (游戏映像1 KB, DIMM内容保持原样):\n"
 #define S_DP_NOPIO          "  DIMM的PIO读取不稳定或处处恒定 (未载入游戏?): 不探测\n"
 #define S_DP_PIO            "  PIO参考读取, 标志 "
+#define S_DP_CONST          "  DIMM各处为同一个字 (未载入游戏), 以此作为参考: 0x"
 #define S_DP_AT             " DIMM偏移 "
 #define S_DP_DIR            "  GDDIR="
 #define S_DP_NOTRUN         "未尝试"

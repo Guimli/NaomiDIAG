@@ -173,6 +173,7 @@
 #define S_DP_HDR            "\n  G1 DMA probe (1 KB of the game image, the DIMM is left as it was):\n"
 #define S_DP_NOPIO          "  PIO read of the DIMM unstable or constant everywhere (no game loaded?): no probe\n"
 #define S_DP_PIO            "  PIO reference read with flags "
+#define S_DP_CONST          "  DIMM holds one word everywhere (no game loaded), taken as the reference: 0x"
 #define S_DP_AT             " at DIMM offset "
 #define S_DP_DIR            "  GDDIR="
 #define S_DP_NOTRUN         "not tried"
