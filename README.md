@@ -363,27 +363,29 @@ no — and the rows it occupied go to the report instead.
 The top right corner of the screen counts down to the end of the boot
 suite, and the serial console prints the estimate once the plan is known.
 Each step has a duration taken from the serial logs of a real Naomi 2
-running v0.19, spoken results included: once as built, once built with
-`RELOC=0` so that every memory loop runs from the boot EPROM:
+running v0.19, spoken results included: once as built (the program in CPU
+RAM), once built with `RELOC=0` so that everything runs from the boot
+EPROM:
 
-| Step | Loops relocated | No CPU RAM for the loops |
+| Step | Program in CPU RAM | No CPU RAM for it |
 |---|---|---|
 | Screen + speaker bring-up | 0:16 | 0:16 |
 | Board identification | 0:04 | 0:04 |
 | Loop relocation | 0:04 | 0:28 (up to 128 blocks scanned from ROM, extrapolated) |
 | BIOS CRC | 0:05 | 0:16 |
 | MIE, settings EEPROM, JVS | 0:19 | 0:19, run after the RTC |
-| CPU RAM | 0:24 | 4:57 |
-| VRAM TEX0 + TEX1 | 0:30 | 2:44 |
-| Naomi 2: PVR-B + Elan RAM | 0:55 | 7:42 |
+| CPU RAM | 0:08 | 4:57 |
+| VRAM TEX0 + TEX1 | 0:17 | 2:44 |
+| Naomi 2: PVR-B + Elan RAM | 0:23 | 7:42 |
 | Sound RAM (by the ARM7) | 0:34 | 0:34 (never relocated) |
 | NVRAM, RTC, serial EEPROM, end | 0:21 | 0:21 |
-| **Naomi 1 total** | **2:36** | **9:59** |
-| **Naomi 2 total** | **3:31** | **17:42** |
+| **Naomi 1 total** | **2:08** | **9:59** |
+| **Naomi 2 total** | **2:31** | **17:42** |
 
-- The two runs took 3:07 and 14:36 to DIAG COMPLETE. On that board the
-  PVR-B address bus fails and its cell test is skipped, so the Naomi 2 step
-  is the Elan RAM as measured plus the PVR-B at the TEX rate, an estimate.
+- The two runs took 2:02 and 14:36 to DIAG COMPLETE (3:07 before the
+  program itself moved to CPU RAM). On that board the PVR-B fails and its
+  cell test is skipped, so the Naomi 2 step is the Elan RAM as measured
+  plus the PVR-B at the TEX rate, an estimate.
   The sound RAM is tested by the AICA's ARM7 in 26 s either way, where the
   SH-4 across G2 took 8:22; the loop relocation now takes tenths of a
   second. The Naomi 1 total is the same without the PVR-B and Elan RAM.

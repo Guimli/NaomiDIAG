@@ -59,6 +59,19 @@
  * the from-ROM figures stay as measured below: they are the yardstick of
  * the EPROM execution speed (g_romk).
  *
+ * Recalibrated again once the whole program runs from CPU RAM (v0.19,
+ * 2026-11-15, same board, audio on, no JVS board), 2:02 to DIAG COMPLETE:
+ *
+ *   step                 from -> to (s)        total   base + results
+ *   CPU RAM               35.1  ->   43.1       8.0     4.3 + 1
+ *   VRAM TEX0 + TEX1      43.1  ->   59.8      16.7     9.3 + 2
+ *   Elan RAM              62.9  ->   73.1      10.2     6.5 + 1
+ * The PVR-B failed its access check there and was not tested: the Naomi 2
+ * step is the Elan RAM plus the PVR-B's 16 MB at the TEX rate, 15.2 s, an
+ * estimate. The steps before the switch (screen, audio, board) and the
+ * ARM7's sound RAM test are unchanged; the BIOS CRC reads 2 MB of EPROM
+ * data and stays as it was.
+ *
  * Loops from ROM, measured too (v0.19 built with RELOC=0 on the same board,
  * capture/naomidiag_v019_reloc0_EN.log, 14:36 to DIAG COMPLETE):
  *
@@ -118,13 +131,13 @@ static const step_est est[ETA_STEPS] = {
     [ETA_RELOC]   = {   500, 24000, 1, 0, 0 },
     [ETA_BIOS]    = {  1100, 12600, 1, 0, 0 },
     [ETA_MIE]     = {  4500,     0, 4, 0, 0 },
-    [ETA_SDRAM]   = { Q(20200, 32), Q(293400, 32), 1, 3, 1 },
-    [ETA_VRAM]    = { Q(22300, 8),  Q(156900, 8),  2, 6, 1 },
+    [ETA_SDRAM]   = { Q(4300, 32),  Q(293400, 32), 1, 3, 1 },
+    [ETA_VRAM]    = { Q(9300, 8),   Q(156900, 8),  2, 6, 1 },
     /* tested by the AICA's ARM7 from its own side of the bus: 26.2 s on a
      * real Naomi 2 (v0.19). The SH-4 fallback, if the ARM7 fails, is the
      * 498.8 s measured on v0.16; the progress tracking corrects then. */
     [ETA_ARAM]    = { Q(26200, 8),  Q(26200, 8),   2, 3, 0 },
-    [ETA_N2]      = { Q(48000, 24), Q(455000, 24),  2, 6, 1 },
+    [ETA_N2]      = { Q(15200, 24), Q(455000, 24),  2, 6, 1 },
     [ETA_PERIPH]  = {  6200,  6200, 2, 0, 0 },
     [ETA_SEEPROM] = {  2900,  3500, 1, 0, 0 },
     [ETA_END]     = {   500,   500, 0, 0, 0 },

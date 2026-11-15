@@ -1,6 +1,23 @@
 #include "reloc.h"
 #include "progress.h"
 
+/* The instruction cache invalidated (CCR.ICI). The SH-4 allows a CCR write
+ * only from P2: the store runs through the P2 alias of wherever this code
+ * is -- the EPROM (already P2) or the program's RAM copy (P1, then 0xA...).
+ * The operand cache is kept (OCI clear): it is configured as RAM and holds
+ * the stack and .bss. */
+static void __attribute__((noinline)) ici_from_p2(void)
+{
+    CCR = 0x000009A1;
+    for (volatile int i = 0; i < 8; i++)
+        ;
+}
+
+static void icache_invalidate(void)
+{
+    ((void (*)(void))((u32)ici_from_p2 | 0x20000000u))();
+}
+
 extern char reloc_blk_start[], reloc_blk_end[];
 
 void (*p_ram_fill_fast)(u32 *, u32, u32);
@@ -84,10 +101,8 @@ u32 reloc_install(u32 p2_dest)
      * through the uncached alias. ICI only: the value keeps OCI clear on
      * purpose, because the operand cache is configured as RAM and holds this
      * program's stack and .bss -- invalidating it here would destroy both.
-     * Written from P2, as the architecture requires. */
-    CCR = 0x000009A1;
-    for (volatile int i = 0; i < 8; i++)
-        ;
+     * Written from P2, as the architecture requires (icache_invalidate). */
+    icache_invalidate();
 
     u32 cached = 0x80000000u | (p2_dest & 0x1FFFFFFFu);
     u32 off_fill    = (u32)(char *)ram_fill_fast        - (u32)reloc_blk_start;
@@ -152,7 +167,7 @@ u32 reloc_install(u32 p2_dest)
 /* .ramtext: linked at 0x8C700000 (P1, cached; linker.ld), stored in the EPROM
  * at __ramtext_load. Written through the P1 alias: write-through, so memory
  * and any operand-cache line of the area agree -- the code's literal pools
- * are read through the operand cache. Then ICI, from P2 like reloc_install. */
+ * are read through the operand cache. Then ICI, from P2 (icache_invalidate). */
 extern char _ramtext_start[], _ramtext_end[], _ramtext_load[];   /* __ramtext_* in linker.ld */
 
 u32 ramtext_install(void)
@@ -168,9 +183,7 @@ u32 ramtext_install(void)
     for (u32 i = 0; i < n; i++)
         if (dst[i] != src[i])
             return 0;
-    CCR = 0x000009A1;               /* ICI, OC kept (stack and .bss are there) */
-    for (volatile int i = 0; i < 8; i++)
-        ;
+    icache_invalidate();
     return 1;
 }
 
@@ -225,9 +238,7 @@ u32 text_install(u32 p2_dest)
         if (dst[i] != w + delta)
             return 0;
     }
-    CCR = 0x000009A1;                   /* ICI, from P2; OC kept (stack, .bss) */
-    for (volatile int i = 0; i < 8; i++)
-        ;
+    icache_invalidate();
     g_text_p1 = p1;
     g_text_delta = delta;
     g_text_rom = ts;
@@ -259,4 +270,12 @@ u32 text_verify(u32 *addr, u32 *expect, u32 *got)
         return 0;
     }
     return 1;
+}
+
+u32 text_rom_addr(u32 pc)
+{
+    u32 off = (pc & 0x1FFFFFFFu) - (g_text_p1 & 0x1FFFFFFFu);
+    if (!g_text_p1 || off >= g_text_words * 4)
+        return 0;
+    return g_text_rom + off;
 }

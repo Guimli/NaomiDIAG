@@ -1124,6 +1124,9 @@ _g1_dma_run:
     bf      5b
     mov     #0, r0                  ! timed out: stop the transfer
     mov.l   r0, @(20, r2)           ! SB_GDEN = 0
+    mov.l   .Lgd_board, r1          ! and close it on the board side too, or
+    mov.l   .Lgd_end, r0            ! the PIO fallback reads FFFF
+    mov.l   r0, @(12, r1)
     bra     .Lgd_out
     mov     #2, r0
 6:  mov.l   .Lgd_board, r1          ! done: close the transfer on the board

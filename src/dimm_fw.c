@@ -92,9 +92,15 @@ int dfw_unpack(u32 i, u8 *out, u8 *dec, void *work)
     if (le != LZMA_OK)
         return DFW_ERR_DECODE;
     copy_slot(out, dec + d->out_off);
+    /* patch words: inside the blob, aligned, each offset inside the slot */
+    if ((e->poff & 3) || e->poff + 4 * e->npatch > (u32)(dimmfw_blob_end - dimmfw_blob))
+        return DFW_ERR_INDEX;
     const u32 *pw = (const u32 *)(dimmfw_blob + e->poff);
-    for (u32 k = 0; k < e->npatch; k++)
+    for (u32 k = 0; k < e->npatch; k++) {
+        if ((pw[k] >> 8) >= DIMM_SLOT_SIZE)
+            return DFW_ERR_INDEX;
         out[pw[k] >> 8] = (u8)pw[k];
+    }
     u32 crc = 0xFFFFFFFFu;
     for (u32 k = 0; k < DIMM_SLOT_SIZE; k += 0x10000) {
         crc = dimm_crc32_update(crc, out + k, 0x10000);

@@ -396,28 +396,28 @@ oui ou par non — et les lignes qu'elle occupait reviennent au rapport.
 Le coin supérieur droit de l'écran décompte le temps jusqu'à la fin de la
 suite de démarrage, et le port série imprime l'estimation dès que le plan
 est connu. Chaque étape a une durée tirée des logs série d'une vraie Naomi 2
-en v0.19, résultats parlés compris : une fois telle que compilée, une fois
-compilée avec `RELOC=0` pour que toutes les boucles mémoire tournent depuis
-l'EPROM de démarrage :
+en v0.19, résultats parlés compris : une fois telle que compilée (le
+programme en RAM CPU), une fois compilée avec `RELOC=0` pour que tout
+tourne depuis l'EPROM de démarrage :
 
-| Étape | Boucles relogées | Pas de RAM CPU pour les boucles |
+| Étape | Programme en RAM CPU | Pas de RAM CPU pour lui |
 |---|---|---|
 | Amorçage écran + haut-parleur | 0:16 | 0:16 |
 | Identification de la carte | 0:04 | 0:04 |
 | Relocalisation des boucles | 0:04 | 0:28 (jusqu'à 128 blocs balayés depuis la ROM, extrapolé) |
 | CRC du BIOS | 0:05 | 0:16 |
 | MIE, EEPROM des réglages, JVS | 0:19 | 0:19, passe après la RTC |
-| RAM CPU | 0:24 | 4:57 |
-| VRAM TEX0 + TEX1 | 0:30 | 2:44 |
-| Naomi 2 : PVR-B + RAM Elan | 0:55 | 7:42 |
+| RAM CPU | 0:08 | 4:57 |
+| VRAM TEX0 + TEX1 | 0:17 | 2:44 |
+| Naomi 2 : PVR-B + RAM Elan | 0:23 | 7:42 |
 | RAM son (par l'ARM7) | 0:34 | 0:34 (jamais relogée) |
 | NVRAM, RTC, EEPROM série, fin | 0:21 | 0:21 |
-| **Total Naomi 1** | **2:36** | **9:59** |
-| **Total Naomi 2** | **3:31** | **17:42** |
+| **Total Naomi 1** | **2:08** | **9:59** |
+| **Total Naomi 2** | **2:31** | **17:42** |
 
-- Les deux exécutions ont duré 3:07 et 14:36 jusqu'à DIAG COMPLETE. Sur
-  cette carte, le bus d'adresses du PVR-B est en échec et son test de
-  cellules est sauté : l'étape Naomi 2 est donc la RAM Elan mesurée plus le
+- Les deux exécutions ont duré 2:02 et 14:36 jusqu'à DIAG COMPLETE (3:07
+  avant que le programme lui-même passe en RAM CPU). Sur cette carte, le
+  PVR-B est en échec et son test de cellules est sauté : l'étape Naomi 2 est donc la RAM Elan mesurée plus le
   PVR-B au rythme des TEX, une estimation. La RAM son est testée par l'ARM7
   de l'AICA en 26 s dans les deux cas, là où le SH-4 à travers G2 mettait
   8:22 ; la relocalisation des boucles ne prend plus que quelques dixièmes

@@ -86,6 +86,9 @@ u32  text_install(u32 p2_dest);
 /* Re-read the copy (uncached) against the EPROM and the table: 1 = intact;
  * 0 = the first word that changed (its P2 address, expected, read). */
 u32  text_verify(u32 *addr, u32 *expect, u32 *got);
+/* The EPROM address of the same instruction when pc lies in the copy (any
+ * alias), else 0: what the .map and the disassembly know it by. */
+u32  text_rom_addr(u32 pc);
 
 /* Re-read the relocated block and compare it byte for byte against the master
  * copy in ROM. A cell that passes an 8 KB test and then decays under load

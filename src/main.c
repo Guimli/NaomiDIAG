@@ -290,11 +290,13 @@ static void scr_cat(char *d, u32 *o, const char *s, u32 max)
         d[(*o)++] = *s++;
 }
 
+/* the chips buffer is 24 bytes: digits stop at 23 like scr_cat */
 static void scr_num(char *d, u32 *o, u32 v)
 {
-    if (v >= 10)
+    if (v >= 10 && *o < 23)
         d[(*o)++] = (char)('0' + v / 10);
-    d[(*o)++] = (char)('0' + v % 10);
+    if (*o < 23)
+        d[(*o)++] = (char)('0' + v % 10);
 }
 
 /* A label too long for the room left of its status drops its parenthesis
@@ -880,7 +882,15 @@ static u32 resume_gap(void)
     u32 then = RESUME_HB[1], now = rtc_now();
     if (now < then)
         return 0xFFFFFFFFu;
-    return now - then <= RESUME_GAP_S ? 0 : now - then;
+    if (now - then > RESUME_GAP_S)
+        return now - then;
+    /* A clock that does not count dates nothing: a stopped RTC reads the
+     * heartbeat's second after any time off. It must tick within 1.2 s. */
+    u32 t0 = timer_ms();
+    while (rtc_now() == now)
+        if (timer_ms() - t0 > 1200)
+            return 0xFFFFFFFFu;
+    return 0;
 }
 
 static void resume_clear(void)
@@ -1364,6 +1374,7 @@ static u32 text_to_ram(void)
     if (progress_aborted())             /* not tested to the end: not used */
         return 0;
     if (res.errors) {                   /* the CPU RAM test will report it */
+        scif_puts("\n");               /* end the rescan's progress line */
         scif_puts(S_TEXT_ROM);
         scif_puts(S_TEXT_BADWIN);
         return 0;
@@ -3586,10 +3597,15 @@ static void test_dimm_flash(u32 resumed)
     scif_puts("  ");                    /* how long, for the record */
     scif_putdec(t_unpack);
     scif_puts(" ms\n");
-    if (ue != DFW_OK) {
+    if (ue == DFW_ERR_RAM) {            /* not the image: the decoder's copy */
+        scif_puts("  ");
+        scif_puts(S_TEXT_FAIL);
+    } else if (ue != DFW_OK) {
         scif_puts(S_FW_UNPACK_BAD);
         scif_putdec((u32)ue);
         scif_puts("\n");
+    }
+    if (ue != DFW_OK) {
         log_result(S_L_FW_IMAGE, CLIP_NONE, T_FAIL, 0, 0);
         resume_clear();
         return;
@@ -3623,6 +3639,11 @@ static void test_dimm_flash(u32 resumed)
         resume_clear();
         return;
     }
+
+    /* From here a DIMM reset must not resume into this action: it would
+     * reopen the session and offer the versions again while (or after) the
+     * DIMM writes its flash. The resume block goes before the request. */
+    resume_clear();
 
     /* The request. Its status is cleared to the version alone, as the
      * updater does; then the DIMM, polling the request word, takes it. */
@@ -5795,6 +5816,7 @@ static void hex_into(char *d, u32 v, u32 ndigits)
  * snapshot is crt0's (exc_common), in OC-RAM. */
 #define EXC_SNAP        ((const volatile u32 *)0x7C000010u)
 #define EXC_TEA         (EXC_SNAP[19])
+#define EXC_PR          (EXC_SNAP[18])  /* r0-r7, r8-r15, SPC, SSR, PR, TEA */
 
 static u32 exc_rom_misread(u32 expevt, u32 spc)
 {
@@ -5820,6 +5842,17 @@ void exc_report(u32 expevt, u32 spc)
     u32 misread = exc_rom_misread(expevt, spc);
     if (misread)
         scif_puts(S_EXC_MISREAD);
+    /* In the program's RAM copy, SPC and PR above are copy addresses: give
+     * the EPROM ones too, which the .map and the disassembly know. The
+     * screen shows the EPROM one, marked with a trailing '*'. */
+    u32 rom_pc = text_rom_addr(spc), rom_pr = text_rom_addr(EXC_PR);
+    if (rom_pc || rom_pr) {
+        scif_puts("  (running from the RAM copy) EPROM addresses: PC=");
+        scif_puthex(rom_pc ? rom_pc : spc);
+        scif_puts(" PR=");
+        scif_puthex(rom_pr ? rom_pr : EXC_PR);
+        scif_puts("\n");
+    }
     if (g_screen_ready) {
         char line[40];
         u32 n = 0;
@@ -5831,8 +5864,10 @@ void exc_report(u32 expevt, u32 spc)
         line[n++] = 'P';
         line[n++] = 'C';
         line[n++] = ' ';
-        hex_into(&line[n], spc, 8);
+        hex_into(&line[n], rom_pc ? rom_pc : spc, 8);
         n += 8;
+        if (rom_pc)
+            line[n++] = '*';
         line[n] = 0;
         u32 ymax = fb_report_ymax();
         u32 y = g_screen_y + 20 <= ymax ? g_screen_y : ymax - 20;
@@ -6191,7 +6226,9 @@ static void __attribute__((noinline)) cmain_rest(void)
      * is what we just spent the whole suite testing. A cell that passed the
      * 8 KB qualification and then decayed would have corrupted the code
      * producing every result since, so the block is re-read and compared
-     * against the master copy in ROM before anything is summarised. */
+     * against its master copy before anything is summarised (the EPROM's,
+     * or the program's RAM copy's once the program runs from there: that
+     * copy is checked against the EPROM right after). */
     /* The same for the program's own copy (text_to_ram). A changed word
      * names the chip it sits in, as a cell test would. */
     if (reloc_active() || g_text_win) {
