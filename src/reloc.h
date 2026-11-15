@@ -73,6 +73,17 @@ u32  reloc_active(void);
 #define RAMTEXT_PHYS    0x0C700000u
 u32  ramtext_install(void);
 
+/* The whole program (.text) run from CPU RAM. text_install copies it to
+ * p2_dest (a window the caller has tested), shifts the code addresses its
+ * literal pools hold (table filled by tools/textreloc.py) and checks the
+ * result; it returns the offset to add to a function's EPROM address to get
+ * its RAM copy (P1, cached), or 0 if anything is off -- the program then
+ * simply goes on from the EPROM. Data (.rodata) is still read from the
+ * EPROM. text_size() is what the window must hold. */
+#define TEXTRELOC_MAX   3072u
+u32  text_size(void);
+u32  text_install(u32 p2_dest);
+
 /* Re-read the relocated block and compare it byte for byte against the master
  * copy in ROM. A cell that passes an 8 KB test and then decays under load
  * would otherwise corrupt the very code producing the results, and the

@@ -99,6 +99,15 @@ are reported as they land.
 4. **Test-loop relocation** — the memory-test loops are copied into an 8 KB
    block of CPU RAM, tested first, and run from there cached (see
    [Where the test loops execute](#where-the-test-loops-execute)).
+   Right after, the **whole program** follows: its code (about 80 KB) is
+   copied into a CPU RAM window just below that block, tested first with the
+   same three patterns, and the rest of the suite, the menus and the DIMM
+   sessions run from there, cached. Until then, and whenever that window, its
+   test or the copy is in doubt, the program simply goes on from the EPROM
+   (much slower, never wrong). The data (texts, glyphs, sounds, DIMM
+   firmware) are still read from the EPROM. The copy's code addresses are
+   shifted from a table `tools/textreloc.py` builds from the link's
+   relocations.
 5. **G1 bus unlock** — Holly keeps the bus to the cartridge or DIMM closed
    after reset (every read 0xFFFF, writes dropped) until the CPU writes a
    key, the size of a ROM range, to `0x5F74E4` and Holly has checked the
@@ -194,8 +203,8 @@ take long enough that they have no business delaying the report.
   START stops the loop (key `a` on the console when the MIE program is not
   running). The sound RAM loop runs through the AICA's ARM7 as the boot
   suite does, the SH-4 taking over for any pass where the ARM path is not
-  usable. The CPU RAM loop stops below the 8 KB block the relocated code
-  runs from.
+  usable. The CPU RAM loop stops below the windows the relocated code and
+  the program's copy run from.
 - **Console keys** — the serial log shows a framed reminder that `a`
   cancels the running tests and `h` prints the help: as soon as the
   board's buttons answer (with the blue hint on screen), and in any case

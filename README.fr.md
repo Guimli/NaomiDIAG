@@ -105,6 +105,15 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
    recopiées dans un bloc de 8 Ko de RAM CPU, testé d'abord, et exécutées
    de là en cache (voir
    [Où s'exécutent les boucles de test](#où-sexécutent-les-boucles-de-test)).
+   Juste après, **tout le programme** suit : son code (environ 80 Ko) est
+   recopié dans une fenêtre de RAM CPU juste sous ce bloc, testée d'abord avec
+   les mêmes trois motifs, et la suite, les menus et les sessions DIMM
+   tournent de là, en cache. Jusque-là, et dès que cette fenêtre, son test ou
+   la copie posent le moindre doute, le programme continue simplement depuis
+   l'EPROM (bien plus lent, jamais faux). Les données (textes, glyphes, sons,
+   firmwares DIMM) sont toujours lues dans l'EPROM. Les adresses de code de la
+   copie sont décalées d'après une table que `tools/textreloc.py` construit à
+   partir des relocations de l'édition de liens.
 5. **Déverrouillage du bus G1** — Holly garde fermé le bus vers la
    cartouche ou le DIMM après un reset (toute lecture rend 0xFFFF, les
    écritures sont perdues) jusqu'à ce que le CPU écrive une clé, la taille
@@ -215,7 +224,8 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
   boucle RAM son passe par l'ARM7 de l'AICA comme la suite de démarrage ;
   le SH-4 reprend la main pour toute passe où le chemin ARM n'est pas
   utilisable. La
-  boucle RAM CPU s'arrête sous le bloc de 8 Ko où tourne le code relogé.
+  boucle RAM CPU s'arrête sous les fenêtres où tournent le code relogé et la
+  copie du programme.
 - **Touches de la console** — le log série affiche un rappel encadré : `a`
   annule les tests en cours, `h` affiche l'aide. Il apparaît dès que les
   boutons de la carte répondent (avec l'indication bleue à l'écran), et

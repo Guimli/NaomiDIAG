@@ -173,3 +173,55 @@ u32 ramtext_install(void)
         ;
     return 1;
 }
+
+/* Filled after the link by tools/textreloc.py: 'TRL1', count, .text size,
+ * then the word offsets (from the start of .text) of every literal holding
+ * a .text address. The placeholder ('PTRL', capacity) is what the tool
+ * looks for; left as it is, text_install refuses. */
+typedef struct {
+    u32 magic, count, size;
+    u16 off[TEXTRELOC_MAX];
+} textreloc_t;
+const textreloc_t textreloc_tab = { 0x4C525450u, TEXTRELOC_MAX, 0, { 0 } };
+
+/* the first and past-the-last byte of .text (crt0.S, linker.ld) */
+extern char text_lo[] __asm__("_start"), text_hi[] __asm__("__text_end");
+
+u32 text_size(void)
+{
+    return (u32)(text_hi - text_lo);
+}
+
+u32 text_install(u32 p2_dest)
+{
+    const volatile textreloc_t *tr = &textreloc_tab;
+    u32 ts = (u32)text_lo, n = text_size() / 4;
+    if (tr->magic != 0x314C5254u || tr->size != text_size() ||
+        tr->count > TEXTRELOC_MAX || (p2_dest & 0x1Fu))
+        return 0;
+    /* Through the P1 alias: write-through, so memory and any operand-cache
+     * line of the window agree (the copy's literal pools are read through
+     * the operand cache). */
+    u32 p1 = 0x80000000u | (p2_dest & 0x1FFFFFFFu);
+    const volatile u32 *src = (const volatile u32 *)ts;
+    volatile u32 *dst = (volatile u32 *)p1;
+    for (u32 i = 0; i < n; i++)
+        dst[i] = src[i];
+    for (u32 i = 0; i < n; i++)
+        if (dst[i] != src[i])
+            return 0;
+    u32 delta = p1 - ts, te = ts + text_size();
+    for (u32 k = 0; k < tr->count; k++) {
+        u32 i = tr->off[k];
+        u32 w = src[i];
+        if (i >= n || w < ts || w >= te)
+            return 0;                   /* the table does not fit this image */
+        dst[i] = w + delta;
+        if (dst[i] != w + delta)
+            return 0;
+    }
+    CCR = 0x000009A1;                   /* ICI, from P2; OC kept (stack, .bss) */
+    for (volatile int i = 0; i < 8; i++)
+        ;
+    return delta;
+}

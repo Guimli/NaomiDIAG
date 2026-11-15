@@ -63,7 +63,8 @@ CFLAGS  := -ml -m4-nofpu -O2 -ffreestanding -fno-builtin -fomit-frame-pointer \
 # ROM_BASE=0x80000000 links for P1, the cached alias, which is much faster but
 # has not yet been confirmed to boot on a real board -- keep it opt-in.
 ROM_BASE ?= 0xA0000000
-LDFLAGS := -nostdlib -Wl,-T,linker.gen.ld -Wl,--build-id=none -Wl,-Map,$(ELF).map
+# --emit-relocs: tools/textreloc.py reads them to let .text run from CPU RAM
+LDFLAGS := -nostdlib -Wl,-T,linker.gen.ld -Wl,--build-id=none -Wl,--emit-relocs -Wl,-Map,$(ELF).map
 
 OBJS := src/crt0.o src/main.o src/progress.o src/scif.o src/sdram.o src/ramtest.o src/ramtest_fast.o src/reloc.o \
         src/timer.o src/aica.o src/pvr.o src/pvr2.o src/vram_diag.o src/vram_scan.o src/periph.o src/dimm.o src/maple.o \
@@ -137,6 +138,7 @@ $(BIN): $(ELF)
 	    rm -f $@; exit 1; fi; \
 	    echo "$(BIN): $$sz / 2097152 bytes ($$((sz*100/2097152))%)"
 	truncate -s 2M $@
+	CROSS=$(CROSS) python3 tools/textreloc.py $< $@
 	python3 tools/patch_crc.py $@
 	python3 tools/check_g1min.py $@
 

@@ -1190,6 +1190,9 @@ static void sdram_setup(void)
  * whose CPU RAM is unusable still gets a full, slow diagnostic, which is
  * exactly the board that needs one. */
 static u32 g_reloc_win;             /* P2 address of the block in use, 0 = none */
+static u32 g_text_win;              /* P2 address of the program's copy, 0 = none */
+/* the CPU RAM tests stop below the windows code runs from */
+#define RAM_TEST_TOP    (g_text_win ? g_text_win : g_reloc_win)
 static u32 g_maple_safe;            /* Maple DMA buffers sit in a qualified block */
 
 /* "pass n/3 <what>" on serial, and the same on the progress bar. */
@@ -1306,6 +1309,72 @@ static void relocate_fast_loops(void)
     scif_puts("  loops execute at ");
     scif_puthex(at);
     scif_puts((at & 0x1FFFFFFFu) >= 0x0C000000u ? S_RELOC_IN_RAM : S_RELOC_IN_ROM);
+}
+
+/* The whole program into CPU RAM, under the same rule as the loops: only
+ * into a window that has just passed the full pattern suite, right below
+ * the loops' window (so above everything the later tests write: the fixed
+ * buffers end at 0x0D800000, the DIMM test's 16 MB copy). Any doubt -- no
+ * loops' window, a window too low, a cell that fails, a copy that does not
+ * check out, a stop -- and the program simply goes on from the EPROM.
+ * Returns the offset from a function's EPROM address to its RAM copy, or 0.
+ * The window is then left out of the CPU RAM tests (RAM_TEST_TOP): it was
+ * tested before the copy, testing it again would overwrite the program. */
+#define TEXT_RAM_MIN_PHYS   0x0D800000u
+static u32 text_to_ram(void)
+{
+#if RELOC
+    if (!reloc_active()) {
+        scif_puts(S_TEXT_ROM);
+        scif_puts(S_TEXT_NOWIN);
+        return 0;
+    }
+    u32 len = (text_size() + 0x1FFFu) & ~0x1FFFu;
+    u32 base = g_reloc_win - len;
+    if ((base & 0x1FFFFFFFu) < TEXT_RAM_MIN_PHYS) {
+        scif_puts(S_TEXT_ROM);
+        scif_puts(S_TEXT_NOWIN);
+        return 0;
+    }
+    ram_result res;
+    ram_result_clear(&res);
+    ram_test_pattern(base, len, 0x55555555, &res);
+    ram_test_pattern(base, len, 0xAAAAAAAA, &res);
+    ram_test_prng(base, len, 0x5EED7E57, &res);
+    if (progress_aborted())             /* not tested to the end: not used */
+        return 0;
+    if (res.errors) {                   /* the CPU RAM test will report it */
+        scif_puts(S_TEXT_ROM);
+        scif_puts(S_TEXT_BADWIN);
+        return 0;
+    }
+    u32 d = text_install(base);
+    if (!d) {
+        scif_puts(S_TEXT_ROM);
+        scif_puts(S_TEXT_FAIL);
+        return 0;
+    }
+    g_text_win = base;
+    scif_puts(S_TEXT_RAM);
+    scif_puthex(0x80000000u | (base & 0x1FFFFFFFu));
+    scif_puts("\n");
+    return d;
+#else
+    return 0;
+#endif
+}
+
+/* Go on with fn from the RAM copy if there is one, else from the EPROM.
+ * Everything fn calls then runs from the same copy (the copy's code
+ * addresses were shifted); fn never returns. */
+static void __attribute__((noreturn)) continue_in(void (*fn)(void))
+{
+    u32 d = text_to_ram();
+    if (d)
+        ((void (*)(void))((u32)fn + d))();
+    fn();
+    for (;;)
+        ;
 }
 
 
@@ -1811,7 +1880,7 @@ static u32 test_sdram_cells(void)
     /* the top window holds the relocated test loops and was already tested
      * in full before they were copied there; testing it again would mean
      * overwriting the code we are executing */
-    u32 len = g_reloc_win ? g_reloc_win - SDRAM_P2_BASE : size;
+    u32 len = RAM_TEST_TOP ? RAM_TEST_TOP - SDRAM_P2_BASE : size;
 #endif
 
     ram_result res;
@@ -5313,7 +5382,7 @@ static void run_action(u32 act)
     switch (act) {
     case ACT_CPU: {
         loop_part p = { SDRAM_P2_BASE,
-                        g_reloc_win ? g_reloc_win - SDRAM_P2_BASE : g_ram_size,
+                        RAM_TEST_TOP ? RAM_TEST_TOP - SDRAM_P2_BASE : g_ram_size,
                         { S_CG_CPU, IC(work_comps), 0 }, CLIP_CPU_RAM };
         loop_regions(&p, 1, S_M_CPU);
         break;
@@ -5809,6 +5878,7 @@ static void g1_report(void)
  * the MIE are brought back -- what the report and the buttons need -- the
  * report is put back as it was, and the DIMM test goes on. Audio stays off:
  * its bring-up would replay and speak the whole report again. */
+static void resume_rest(void);
 static void resume_run(void)
 {
     scif_puts(S_RESUME);
@@ -5816,6 +5886,11 @@ static void resume_run(void)
     test_board();
     progress_phase(PH_BOARD_ID);
     relocate_fast_loops();
+    continue_in(resume_rest);
+}
+
+static void __attribute__((noinline)) resume_rest(void)
+{
     g1_open();
     g_ram_usable = RB->ram_usable;
     mie_quiet_bringup(RB->mie_port1);
@@ -5849,6 +5924,7 @@ static void resume_run(void)
     console_idle();                     /* never returns */
 }
 
+static void cmain_rest(void);
 void cmain(void)
 {
     timer_init();
@@ -5950,7 +6026,12 @@ void cmain(void)
     eta_set_reloc(reloc_active());
     eta_set_mie_early(g_maple_safe);
     suite_check_abort();
+    continue_in(cmain_rest);
+}
 
+/* The suite past the relocation: from CPU RAM when it could be arranged. */
+static void __attribute__((noinline)) cmain_rest(void)
+{
     /* The G1 bus to the cartridge or DIMM was unlocked at reset (crt0.S,
      * key 0x15): Holly's verdict is read back and reported here. Without
      * it every ROM-board access reads 0xFFFF. */

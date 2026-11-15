@@ -25,6 +25,8 @@ SECTIONS
         KEEP(*(.text.start))
         *(.text.reloc)
         *(.text*)
+        . = ALIGN(32);
+        __text_end = .;                 /* text_install copies up to here */
     } > ROM
 
     .rodata : {
