@@ -58,14 +58,21 @@ u32 dfw_need(u32 i)
     return d ? d->out_off + DIMM_SLOT_SIZE : 0;
 }
 
+static void (*g_dfw_cb)(u32 done);
+void dfw_set_progress(void (*cb)(u32 done)) { g_dfw_cb = cb; }
+u32 dfw_unpack_total(u32 i) { return dfw_need(i) + DIMM_SLOT_SIZE; }
+
 int dfw_unpack(u32 i, u8 *out, u8 *dec, void *work)
 {
     const dfw_hdr *h = hdr();
     const dfw_entry *e = dfw_get(i), *d = data_entry(i);
     if (!h || !e || !d || dfw_need(i) > h->total_out)
         return DFW_ERR_INDEX;
-    if (lzma_decode(dimmfw_blob + h->stream_off, h->stream_len, h->lc, h->lp,
-                    h->pb, dec, dfw_need(i), work) != LZMA_OK)
+    lzma_set_progress(g_dfw_cb);
+    int le = lzma_decode(dimmfw_blob + h->stream_off, h->stream_len, h->lc,
+                         h->lp, h->pb, dec, dfw_need(i), work);
+    lzma_set_progress(0);
+    if (le != LZMA_OK)
         return DFW_ERR_DECODE;
     const u8 *src = dec + d->out_off;
     for (u32 k = 0; k < DIMM_SLOT_SIZE; k++)
@@ -73,7 +80,13 @@ int dfw_unpack(u32 i, u8 *out, u8 *dec, void *work)
     const u32 *pw = (const u32 *)(dimmfw_blob + e->poff);
     for (u32 k = 0; k < e->npatch; k++)
         out[pw[k] >> 8] = (u8)pw[k];
-    if (dimm_crc32_update(0xFFFFFFFFu, out, DIMM_SLOT_SIZE) != 0)
+    u32 crc = 0xFFFFFFFFu;
+    for (u32 k = 0; k < DIMM_SLOT_SIZE; k += 0x10000) {
+        crc = dimm_crc32_update(crc, out + k, 0x10000);
+        if (g_dfw_cb)
+            g_dfw_cb(dfw_need(i) + k);
+    }
+    if (crc != 0)
         return DFW_ERR_CRC;
     u32 w = out[DIMM_SLOT_SIZE - 4] | (u32)out[DIMM_SLOT_SIZE - 3] << 8 |
             (u32)out[DIMM_SLOT_SIZE - 2] << 16 | (u32)out[DIMM_SLOT_SIZE - 1] << 24;

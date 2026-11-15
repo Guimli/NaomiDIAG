@@ -188,6 +188,11 @@ u32 fb_progress_enabled(void) { return g_fb_live; }
  * that shows nothing here is a cabling or DIP question, not a board fault. */
 void pvr_video_on(void)
 {
+    /* The VRAM controller is set up BEFORE the video starts, not after:
+     * on the real board the screen went black for the ~6 s of the quick
+     * framebuffer check when this first reconfiguration came with the
+     * video already running. Rewriting the same values later is harmless. */
+    pvr_vram_enable();
     PVR_FB_R_CTRL     = 0x00800000;      /* VGA clock, framebuffer reads off */
     PVR_VO_CONTROL    = 0x00160008;      /* blank while we program timings */
     PVR_SOFTRESET     = 0;

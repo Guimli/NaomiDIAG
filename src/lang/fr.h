@@ -266,6 +266,7 @@
 #define S_FW_NOSESSION      "  le firmware DIMM n'est pas dans sa boucle de requêtes, ou n'a pas donné sa taille mémoire : pas de mise à jour\n"
 #define S_FW_DRY            "Transfert seul (essai)"
 #define S_P_FW_XFER         "Image vers le DIMM"
+#define S_P_FW_UNPACK       "Décompression firmware"
 #define S_P_FW_CMP          "Relecture de l'image"
 #define S_FW_XFER_AT        "  image copiée dans la SDRAM du DIMM (sa zone de travail) à "
 #define S_FW_XFER_BAD       "  relu DIFFÉRENT dans la SDRAM du DIMM, rien n'est demandé, à l'offset "

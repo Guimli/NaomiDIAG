@@ -263,6 +263,7 @@
 #define S_FW_NOSESSION      "  die DIMM-Firmware ist nicht in ihrer Anfrageschleife oder hat keine Speichergröße gemeldet: kein Update\n"
 #define S_FW_DRY            "Nur übertragen (Test)"
 #define S_P_FW_XFER         "Abbild zum DIMM"
+#define S_P_FW_UNPACK       "Firmware entpacken"
 #define S_P_FW_CMP          "Abbild zurückgelesen"
 #define S_FW_XFER_AT        "  Abbild in den DIMM-SDRAM kopiert (sein Arbeitsbereich) bei "
 #define S_FW_XFER_BAD       "  im DIMM-SDRAM ANDERS zurückgelesen, nichts angefordert, bei Offset "

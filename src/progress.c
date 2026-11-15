@@ -40,7 +40,14 @@ void progress_heartbeat(void)
     resume_tick();
     g_hb_dim ^= 1u;
     u32 c = phase_col[g_phase];
-    pvr_border(g_hb_dim ? ((c >> 2) & 0x003F3F3Fu) : c);
+    if (g_phase <= PH_BUS_READY)
+        /* until the report is on screen: blue and cyan, both at full
+         * brightness. The quarter-brightness half of the usual pulse is
+         * all but black on a monitor, and a black screen for seconds
+         * reads as a dead board. */
+        pvr_border(g_hb_dim ? phase_col[PH_ROM_ALIVE] : phase_col[PH_BUS_READY]);
+    else
+        pvr_border(g_hb_dim ? ((c >> 2) & 0x003F3F3Fu) : c);
     eta_redraw();
 }
 

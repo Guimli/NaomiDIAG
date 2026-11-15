@@ -262,6 +262,7 @@
 #define S_FW_NOSESSION      "  el firmware del DIMM no está en su bucle de peticiones o no dio su tamaño de memoria: sin actualización\n"
 #define S_FW_DRY            "Solo transferir (prueba)"
 #define S_P_FW_XFER         "Imagen al DIMM"
+#define S_P_FW_UNPACK       "Descomprimiendo firmware"
 #define S_P_FW_CMP          "Relectura de la imagen"
 #define S_FW_XFER_AT        "  imagen copiada en la SDRAM del DIMM (su zona de trabajo) en "
 #define S_FW_XFER_BAD       "  releído DIFERENTE en la SDRAM del DIMM, no se pide nada, en el offset "

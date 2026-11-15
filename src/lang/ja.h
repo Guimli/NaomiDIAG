@@ -265,6 +265,7 @@
 #define S_FW_NOSESSION      "  DIMMファームウェアが要求ループにいない、またはメモリ容量を通知していない: 更新しません\n"
 #define S_FW_DRY            "転送のみ (テスト)"
 #define S_P_FW_XFER         "DIMMへ転送"
+#define S_P_FW_UNPACK       "ファームウェア展開"
 #define S_P_FW_CMP          "イメージ読み返し"
 #define S_FW_XFER_AT        "  イメージをDIMM SDRAM (作業領域) にコピー: "
 #define S_FW_XFER_BAD       "  DIMM SDRAMの読み返しが不一致、要求は送らない、オフセット "

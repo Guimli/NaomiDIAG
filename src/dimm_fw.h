@@ -44,5 +44,9 @@ u32 dfw_need(u32 i);
  * bytes), copy entry i's 1 MB slot image to out, apply its patch, check its
  * CRC and check word. */
 int dfw_unpack(u32 i, u8 *out, u8 *dec, void *work);
+/* Units dfw_unpack reports to its progress callback (0 = none): the decoded
+ * bytes, then the slot's CRC, 1 MB more. */
+u32 dfw_unpack_total(u32 i);
+void dfw_set_progress(void (*cb)(u32 done));
 
 #endif

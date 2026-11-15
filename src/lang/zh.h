@@ -265,6 +265,7 @@
 #define S_FW_NOSESSION      "  DIMM固件不在请求循环中, 或未报告内存容量: 不进行更新\n"
 #define S_FW_DRY            "仅传输 (测试)"
 #define S_P_FW_XFER         "映像传至DIMM"
+#define S_P_FW_UNPACK       "解压固件"
 #define S_P_FW_CMP          "回读映像"
 #define S_FW_XFER_AT        "  映像已复制到DIMM SDRAM (其工作区), 地址 "
 #define S_FW_XFER_BAD       "  DIMM SDRAM回读不一致, 未发送请求, 偏移 "

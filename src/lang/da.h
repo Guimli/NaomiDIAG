@@ -263,6 +263,7 @@
 #define S_FW_NOSESSION      "  DIMM-firmwaren er ikke i sin anmodningsløkke eller har ikke meldt sin hukommelsesstørrelse: ingen opdatering\n"
 #define S_FW_DRY            "Kun overfør (test)"
 #define S_P_FW_XFER         "Image til DIMM"
+#define S_P_FW_UNPACK       "Udpakker firmware"
 #define S_P_FW_CMP          "Image læst tilbage"
 #define S_FW_XFER_AT        "  image kopieret til DIMM-SDRAM (dens arbejdsområde) ved "
 #define S_FW_XFER_BAD       "  læst tilbage ANDERLEDES i DIMM-SDRAM, intet anmodet, ved offset "

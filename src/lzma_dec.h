@@ -18,5 +18,9 @@ typedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32;
 u32 lzma_work_size(void);
 int lzma_decode(const u8 *in, u32 in_len, u32 lc, u32 lp, u32 pb,
                 u8 *out, u32 out_len, void *work);
+/* Called with the bytes written so far every 16 KB of output (0 = none):
+ * a decode of several MB takes minutes from the EPROM, and the screen must
+ * show it is moving. */
+void lzma_set_progress(void (*cb)(u32 done));
 
 #endif

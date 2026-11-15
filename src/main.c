@@ -3413,7 +3413,11 @@ static void test_dimm_flash(u32 resumed)
 
     /* The image, unpacked and checked (slot CRC-32 = 0, check word) */
     scif_puts(S_FW_UNPACK);
+    progress_begin(S_P_FW_UNPACK, dfw_unpack_total(pick));
+    dfw_set_progress(progress_tick);    /* also keeps the DIMM answered */
     int ue = dfw_unpack(pick, FWBUF, FWDEC, FWWORK);
+    dfw_set_progress(0);
+    progress_end();
     if (ue != DFW_OK) {
         scif_puts(S_FW_UNPACK_BAD);
         scif_putdec((u32)ue);
@@ -4326,7 +4330,7 @@ static t_status quick_fb_zone(u32 bank)
 
 static void quick_video_bringup(void)
 {
-    pvr_vram_enable();
+    /* the VRAM controller is already set up: pvr_video_on does it first */
 
     /* TEX0 first, where the image has always lived. If its image area
      * fails, the same area of TEX1 -- 8 MB further in the same window, on

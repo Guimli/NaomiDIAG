@@ -261,6 +261,7 @@
 #define S_FW_NOSESSION      "  the DIMM firmware is not in its request loop, or posted no memory size: no update\n"
 #define S_FW_DRY            "Transfer only (test)"
 #define S_P_FW_XFER         "Image to the DIMM"
+#define S_P_FW_UNPACK       "Unpacking firmware"
 #define S_P_FW_CMP          "Image read back"
 #define S_FW_XFER_AT        "  image copied into the DIMM SDRAM (its work area) at "
 #define S_FW_XFER_BAD       "  read back DIFFERENT in the DIMM SDRAM, nothing requested, at offset "

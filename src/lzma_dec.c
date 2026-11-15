@@ -120,6 +120,9 @@ static u32 dec_len(rc_t *rc, len_probs *l, u32 ps)
     return 16 + tree(rc, l->high, 8);
 }
 
+static void (*g_progress)(u32 done);
+void lzma_set_progress(void (*cb)(u32 done)) { g_progress = cb; }
+
 int lzma_decode(const u8 *in, u32 in_len, u32 lc, u32 lp, u32 pb,
                 u8 *out, u32 out_len, void *work)
 {
@@ -143,9 +146,15 @@ int lzma_decode(const u8 *in, u32 in_len, u32 lc, u32 lp, u32 pb,
     u32 state = 0, rep0 = 0, rep1 = 0, rep2 = 0, rep3 = 0;
     u32 pos = 0;
 
+    u32 next_cb = 0x4000;
     while (pos < out_len) {
         if (rc.err)
             return rc.err;
+        if (pos >= next_cb) {
+            next_cb = pos + 0x4000;
+            if (g_progress)
+                g_progress(pos);
+        }
         u32 ps = pos & pb_mask;
         if (!rc_bit(&rc, &w->is_match[state][ps])) {
             /* literal */
