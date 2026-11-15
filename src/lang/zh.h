@@ -216,6 +216,7 @@
 #define S_DH_REQS           "  请求 已处理/已拒绝: "
 #define S_DH_WAIT           "  等待DIMM加载程序 (TEST = 放弃)...\n"
 #define S_SCR_DH_WAIT       "等待DIMM加载程序..."
+#define S_P_DH_WAIT         "等待DIMM加载程序"
 #define S_DH_IDLE           "  DIMM空闲 (请求循环)\n"
 #define S_DH_NOTIDLE        "  DIMM不空闲: 不进行破坏性测试\n"
 #define S_L_DH_BUSY         "DIMM: 加载程序忙"

@@ -214,6 +214,7 @@
 #define S_DH_REQS           "  richieste servite/rifiutate: "
 #define S_DH_WAIT           "  attesa del loader DIMM (TEST = rinuncia)...\n"
 #define S_SCR_DH_WAIT       "Attesa del loader DIMM..."
+#define S_P_DH_WAIT         "Attesa del loader DIMM"
 #define S_DH_IDLE           "  DIMM a riposo (ciclo richieste)\n"
 #define S_DH_NOTIDLE        "  DIMM non a riposo: nessun test distruttivo\n"
 #define S_L_DH_BUSY         "DIMM: loader occupato"

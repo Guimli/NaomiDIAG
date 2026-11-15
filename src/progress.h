@@ -62,6 +62,9 @@ boot_phase_t progress_current_phase(void);
  * compares against the precomputed count at which the next percent lands. */
 void progress_begin(const char *label, u32 total);
 void progress_tick(u32 done);
+/* progress_tick without looking at the operator's input: for a wait that
+ * reads the buttons and keys itself (the DIMM loader wait) */
+void progress_set(u32 done);
 void progress_end(void);
 
 /* No more percentages from here on: wipe the bar and give the report its

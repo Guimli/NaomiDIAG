@@ -214,6 +214,7 @@
 #define S_DH_REQS           "  Anfragen bedient/abgelehnt: "
 #define S_DH_WAIT           "  warte auf den DIMM-Lader (TEST = aufgeben)...\n"
 #define S_SCR_DH_WAIT       "Warte auf den DIMM-Lader..."
+#define S_P_DH_WAIT         "Warten auf den DIMM-Lader"
 #define S_DH_IDLE           "  DIMM untätig (Anfrageschleife)\n"
 #define S_DH_NOTIDLE        "  DIMM nicht untätig: kein zerstörender Test\n"
 #define S_L_DH_BUSY         "DIMM: Lader beschäftigt"

@@ -212,6 +212,7 @@
 #define S_DH_REQS           "  requests served/refused: "
 #define S_DH_WAIT           "  waiting for the DIMM loader (TEST = give up)...\n"
 #define S_SCR_DH_WAIT       "Waiting for the DIMM loader..."
+#define S_P_DH_WAIT         "Waiting for the DIMM loader"
 #define S_DH_IDLE           "  DIMM idle (request loop)\n"
 #define S_DH_NOTIDLE        "  DIMM not idle: no destructive test\n"
 #define S_L_DH_BUSY         "DIMM: loader busy"

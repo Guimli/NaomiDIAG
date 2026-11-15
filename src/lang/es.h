@@ -213,6 +213,7 @@
 #define S_DH_REQS           "  peticiones atendidas/rechazadas: "
 #define S_DH_WAIT           "  esperando al cargador del DIMM (TEST = abandonar)...\n"
 #define S_SCR_DH_WAIT       "Esperando al cargador del DIMM..."
+#define S_P_DH_WAIT         "Esperando al cargador DIMM"
 #define S_DH_IDLE           "  DIMM en reposo (bucle de peticiones)\n"
 #define S_DH_NOTIDLE        "  DIMM no en reposo: sin prueba destructiva\n"
 #define S_L_DH_BUSY         "DIMM: cargador ocupado"

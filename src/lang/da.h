@@ -214,6 +214,7 @@
 #define S_DH_REQS           "  anmodninger betjent/afvist: "
 #define S_DH_WAIT           "  venter på DIMM-loaderen (TEST = opgiv)...\n"
 #define S_SCR_DH_WAIT       "Venter på DIMM-loaderen..."
+#define S_P_DH_WAIT         "Venter på DIMM-loaderen"
 #define S_DH_IDLE           "  DIMM i hvile (anmodningsløkke)\n"
 #define S_DH_NOTIDLE        "  DIMM ikke i hvile: ingen destruktiv test\n"
 #define S_L_DH_BUSY         "DIMM: loader optaget"

@@ -216,6 +216,7 @@
 #define S_DH_REQS           "  要求 処理/拒否: "
 #define S_DH_WAIT           "  DIMMローダーを待機中 (TEST = 中止)...\n"
 #define S_SCR_DH_WAIT       "DIMMローダーを待機中..."
+#define S_P_DH_WAIT         "DIMMローダー待機"
 #define S_DH_IDLE           "  DIMMアイドル (要求ループ)\n"
 #define S_DH_NOTIDLE        "  DIMMがアイドルでない: 破壊的テストなし\n"
 #define S_L_DH_BUSY         "DIMM: ローダー動作中"

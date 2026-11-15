@@ -2669,23 +2669,40 @@ static void dimm_find(dimm_info *di, u32 quiet)
 }
 
 /* Serves the DIMM until it has done everything in `want`, or ms run out,
- * or the operator presses a key or TEST. 1 = done. */
-static u32 dimm_host_wait(u32 want, u32 ms)
+ * or the operator presses a key or TEST. 1 = done. With a label, a progress
+ * bar counts the time against ms (the wait itself reads the buttons). */
+static u32 dimm_host_wait_bar(u32 want, u32 ms, const char *label);
+#define dimm_host_wait(want, ms) dimm_host_wait_bar((want), (ms), 0)
+static u32 dimm_host_wait_bar(u32 want, u32 ms, const char *label)
 {
-    u32 t0 = timer_ms();
+    u32 t0 = timer_ms(), r;
+    if (label)
+        progress_begin(label, ms);
     for (;;) {
         dimm_host_service();
-        if ((dimm_host_got() & want) == want)
-            return 1;
-        if (timer_ms() - t0 > ms)
-            return 0;
+        if ((dimm_host_got() & want) == want) {
+            r = 1;
+            break;
+        }
+        u32 el = timer_ms() - t0;
+        if (el > ms) {
+            r = 0;
+            break;
+        }
+        if (label)
+            progress_set(el);
         input_event ev;
         if (input_poll(&ev) &&
-            (ev.kind == INPUT_SELECT || ev.kind == INPUT_KEY))
-            return 0;
+            (ev.kind == INPUT_SELECT || ev.kind == INPUT_KEY)) {
+            r = 0;
+            break;
+        }
         progress_heartbeat();
         delay_ms(2);
     }
+    if (label)
+        progress_end();
+    return r;
 }
 
 /* "DIMM: firmware 4.03, 512 MB" from what the DIMM posted. */
@@ -2836,7 +2853,7 @@ static u32 dimm_session_open(u32 resumed, u32 step, u32 *psize, u32 *pidle)
             scif_puts(S_DH_WAIT);
             if (g_screen_ready)
                 fb_text(16, g_screen_y + 12, S_SCR_DH_WAIT, COL_AMBER, FB_W);
-            idle = dimm_host_wait(DH_GOT_IDLE, 180000);
+            idle = dimm_host_wait_bar(DH_GOT_IDLE, 180000, S_P_DH_WAIT);
             if (g_screen_ready)
                 fb_fill_rows(g_screen_y + 12, g_screen_y + 30, 0);
         }

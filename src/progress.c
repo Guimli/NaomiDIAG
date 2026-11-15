@@ -128,8 +128,13 @@ void progress_begin(const char *label, u32 total)
 
 void progress_tick(u32 done)
 {
-    progress_heartbeat();
     diag_input_check(g_in_loop);
+    progress_set(done);
+}
+
+void progress_set(u32 done)
+{
+    progress_heartbeat();
     if (!g_active || done < g_next)
         return;
     /* a tick can jump several percent if the caller samples coarsely */

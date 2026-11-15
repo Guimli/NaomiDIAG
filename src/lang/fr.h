@@ -217,6 +217,7 @@
 #define S_DH_REQS           "  requetes servies/refusees : "
 #define S_DH_WAIT           "  attente du chargeur du DIMM (TEST = abandon)...\n"
 #define S_SCR_DH_WAIT       "Attente du chargeur DIMM..."
+#define S_P_DH_WAIT         "Attente du chargeur DIMM"
 #define S_DH_IDLE           "  DIMM au repos (boucle de requetes)\n"
 #define S_DH_NOTIDLE        "  DIMM pas au repos : pas de test destructif\n"
 #define S_L_DH_BUSY         "DIMM : chargeur actif"
