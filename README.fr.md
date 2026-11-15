@@ -968,7 +968,18 @@ Ce qui marche passe à côté, par le bus G1 :
   présence (sur un bus vide, le message se perd). La présence se décide en écrivant deux motifs dans les
   registres OFFSETL/PARAMETERL de la mailbox et en les relisant : après
   un reset, la mailbox d'un DIMM lit 0xFFFF partout, exactement comme un
-  bus vide. *Pas encore validé sur vrai matériel* ; sous MAME (un jeu
+  bus vide. **Validé sur une vraie Naomi 2 avec un NetDIMM** (firmware
+  4.02, 512 Mo, aucun jeu chargé, 2026-11-15) : session, les deux reprises
+  après les resets du DIMM, 1 Mo relu deux fois stable ; la sonde, sur une
+  mémoire lisant 0x00000000 partout (une référence constante est acceptée
+  sauf si elle vaut tout à 1, ce que lit un bus vide), a établi
+  **SB_GDDIR = 1 lit, 0 écrit** — la convention du BIOS pour les
+  cartouches ; le premier reversing du DIMM l'avait à l'envers — les deux
+  unités du compteur fonctionnent, lecture à 8 Mo/s ; puis les trois motifs
+  sur 0-0x1F000000, 15872 blocs de 32 Ko chacun, CRC égaux, aucune erreur,
+  en 10 min 30. Les 16 Mo du haut ont été laissés de côté : la suite avait
+  été écourtée, aucune RAM CPU n'était donc prouvée pour leur copie. Sous
+  MAME (un jeu
   GD-ROM avec NaomiDIAG à la place de l'epr-21576h de `naomigd`, placé devant les
   dumps SEGA dans le rompath,
   `-bios bios2`) la carte est détectée et la sonde lit, mais MAME ignore

@@ -898,7 +898,16 @@ What does work goes around it, on the G1 bus:
   empty bus the message is simply lost). Presence is decided by writing two patterns into the mailbox's
   OFFSETL/PARAMETERL latches and reading them back: a DIMM's mailbox reads
   0xFFFF in every register after reset, exactly like an empty bus.
-  *Not validated on real hardware yet*; under MAME (a GD-ROM game with
+  **Validated on a real Naomi 2 with a NetDIMM** (firmware 4.02, 512 MB, no
+  game loaded, 2026-11-15): session, both resumes after the DIMM's resets,
+  1 MB read twice stable; the probe, on memory reading 0x00000000
+  everywhere (a constant reference is accepted unless it is all ones, what
+  an empty bus reads), settled **SB_GDDIR = 1 reads, 0 writes** -- the
+  BIOS's cartridge convention; the first DIMM reversing had it backwards --
+  both count units working, reads at 8 MB/s; then the three patterns over
+  0-0x1F000000, 15872 blocks of 32 KB each, CRC equal, no error, in
+  10.5 minutes. The top 16 MB were left out: the suite had been cut short,
+  so no CPU RAM was proven to hold their copy. Under MAME (a GD-ROM game with
   NaomiDIAG staged as `naomigd`'s epr-21576h ahead of the SEGA dumps in the
   rompath, `-bios bios2`) the board
   is found and the probe reads, but MAME ignores the direction bit and
