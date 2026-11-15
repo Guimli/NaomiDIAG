@@ -1016,9 +1016,12 @@ Ce qui marche passe à côté, par le bus G1 :
   une gravure réussie, l'action indique donc la version que le DIMM devra
   annoncer, et chaque `f` suivant compare la version démarrée aux images
   embarquées — une version de chargeur (slot 0) voulant dire que le slot 1 a
-  été rejeté. *Pas encore
-  validé sur vrai matériel* (le premier essai, avec l'ancien chemin « mode
-  flash », relisait la SDRAM du DIMM au lieu de sa flash, et n'a rien écrit).
+  été rejeté. **Validé sur un vrai NetDIMM** (2026-11-15) : 4.02 remplacé
+  par 4.03 CD-R — transfert et relecture en 9 s environ, gravure par le DIMM
+  en 12 s, et après remise sous tension le DIMM a annoncé « firmware 4.03 »,
+  que l'action a reconnu comme l'image embarquée 4.03 CD-R du slot 1. (Un
+  premier essai, avec l'ancien chemin « mode flash », relisait la SDRAM du
+  DIMM au lieu de sa flash, et n'a rien écrit.)
 
 L'analyse des images de firmware SEGA reste hors de ce dépôt, délibérément.
 

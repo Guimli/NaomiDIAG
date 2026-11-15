@@ -942,9 +942,12 @@ What does work goes around it, on the G1 bus:
   after a successful write the action says which version the DIMM must
   then announce, and every later `f` names the version it booted against
   the embedded images -- a boot-loader (slot 0) version meaning slot 1 was
-  rejected. *Not validated on real
-  hardware yet* (the first attempt, with the former flash-mode path, read
-  the DIMM's SDRAM back instead of its flash, and wrote nothing).
+  rejected. **Validated on a real NetDIMM** (2026-11-15): 4.02 replaced by
+  4.03 CD-R -- transfer and read-back in about 9 s, the DIMM's own write in
+  12 s, and after the power cycle the DIMM announced "firmware 4.03", which
+  the action named as the embedded slot-1 image 4.03 CD-R. (A first
+  attempt, with the former flash-mode path, read the DIMM's SDRAM back
+  instead of its flash, and wrote nothing.)
 
 The supporting analysis of SEGA's firmware images stays out of this
 repository on purpose.
