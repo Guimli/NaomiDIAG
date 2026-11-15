@@ -171,6 +171,7 @@ u32 x76f100_rtr(void)
 #define RTC_HI      REG32(0xA0710000u)
 #define RTC_LO      REG32(0xA0710004u)
 
+u32 rtc_now(void);
 static u32 rtc_read(void)
 {
     aica_g2_wait();
@@ -293,4 +294,10 @@ u32 rtc_year(u32 secs)
         days -= dy;
         y++;
     }
+}
+
+/* the counter, seconds since 1950: for timing across a reset (main.c) */
+u32 rtc_now(void)
+{
+    return rtc_read();
 }

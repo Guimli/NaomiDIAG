@@ -235,6 +235,7 @@
 #define S_L_RESUME_LOST     "(line lost)"
 #define S_RESUME            "\nResume: the DIMM board restarted the Naomi, the DIMM test goes on\n"
 #define S_RESUME_GIVEUP     "\nResume block ignored: too many restarts in a row\n"
+#define S_RESUME_COLD       "\nResume block ignored: a power cycle, not a DIMM reset (RTC gap "
 #define S_RESUME_MIE_KEPT   "  MIE: program still resident\n"
 #define S_RESUME_MIE_UP     "  MIE: program uploaded again\n"
 #define S_RESUME_MIE_NONE   "  MIE: no answer, buttons off\n"

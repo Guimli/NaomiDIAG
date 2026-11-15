@@ -49,6 +49,9 @@ void progress_phase(boot_phase_t ph);
  * one thing it is there to say. Cheap enough to call inside a test loop --
  * it reads a timer and returns unless the interval has elapsed. */
 void progress_heartbeat(void);
+/* Provided by main.c: dates the resume block while a DIMM step is under way
+ * (called from the heartbeat, at most every 0.7 s). */
+void resume_tick(void);
 
 /* delay_ms, but pulsing: for the seconds spent waiting on audio. */
 void progress_wait_ms(u32 ms);

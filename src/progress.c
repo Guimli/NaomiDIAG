@@ -37,6 +37,7 @@ void progress_heartbeat(void)
     if ((u32)(now - g_hb_last) < HB_TICKS)
         return;
     g_hb_last = now;
+    resume_tick();
     g_hb_dim ^= 1u;
     u32 c = phase_col[g_phase];
     pvr_border(g_hb_dim ? ((c >> 2) & 0x003F3F3Fu) : c);

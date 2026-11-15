@@ -236,6 +236,7 @@
 #define S_L_RESUME_LOST     "(linha perdida)"
 #define S_RESUME            "\nRetoma: a placa DIMM reiniciou a Naomi, o teste DIMM continua\n"
 #define S_RESUME_GIVEUP     "\nBloco de retoma ignorado: demasiados reinícios seguidos\n"
+#define S_RESUME_COLD       "\nBloco de retoma ignorado: um corte de energia, não um reset do DIMM (diferença RTC "
 #define S_RESUME_MIE_KEPT   "  MIE: programa ainda residente\n"
 #define S_RESUME_MIE_UP     "  MIE: programa recarregado\n"
 #define S_RESUME_MIE_NONE   "  MIE: sem resposta, botões desligados\n"

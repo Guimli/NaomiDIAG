@@ -237,6 +237,7 @@
 #define S_L_RESUME_LOST     "(linje tabt)"
 #define S_RESUME            "\nGenoptagelse: DIMM-kortet genstartede Naomi, DIMM-testen fortsætter\n"
 #define S_RESUME_GIVEUP     "\nGenoptagelsesblok ignoreret: for mange genstarter i træk\n"
+#define S_RESUME_COLD       "\nGenoptagelsesblok ignoreret: en strømafbrydelse, ikke en DIMM-reset (RTC-afstand "
 #define S_RESUME_MIE_KEPT   "  MIE: program stadig indlæst\n"
 #define S_RESUME_MIE_UP     "  MIE: program indlæst igen\n"
 #define S_RESUME_MIE_NONE   "  MIE: intet svar, knapper slået fra\n"

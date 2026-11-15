@@ -938,7 +938,12 @@ Ce qui marche passe à côté, par le bus G1 :
   suit un tel reset saute la suite de base, rétablit l'écran,
   l'identification de la carte et le programme du MIE (donc les boutons),
   remet le rapport avec une ligne « Reprise apres reset du DIMM » et
-  continue. Trois reprises de suite au plus, puis un boot normal. Le GD-DMA
+  continue. Trois reprises de suite au plus, puis un boot normal. Le bloc survit à
+  une coupure de courant dans la SDRAM (vu après 10 s hors tension) : tant
+  qu'une étape est en cours, le battement le date avec la RTC de l'AICA, qui
+  tourne sur sa pile, et un démarrage ne reprend que dans les 2 s qui
+  suivent ; une action terminée efface le bloc. Le journal série donne la
+  cause de chaque démarrage (`EXPEVT`). Le GD-DMA
   de Holly a un bit de sens, et
   les sources se contredisent : le reverse du DIMM donnait 0 = lecture,
   alors que le BIOS d'origine charge les cartouches avec `SB_GDDIR = 1`. Le

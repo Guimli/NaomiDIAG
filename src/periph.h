@@ -25,6 +25,7 @@ typedef struct {
     u32 verdict;            /* RTC_*                        */
 } rtc_result;
 void rtc_check(rtc_result *r);
+u32  rtc_now(void);   /* the AICA counter, seconds; runs on its battery */
 u32  rtc_year(u32 secs);    /* calendar year of a counter value */
 
 /* Format an AICA RTC reading (seconds since 1950) as

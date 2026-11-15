@@ -828,9 +828,46 @@ static void resume_seal(void)
     RB->crc = resume_crc();
 }
 
+/* The block is only for a reset the DIMM orders while a step is under way.
+ * Its CRC does not tell that from a power cycle: the SDRAM kept it intact
+ * through 10 s off on the real board (2026-11-15). So while a step is
+ * armed, the heartbeat dates it with the AICA RTC, which runs on its
+ * battery, in a word just below the block (outside its CRC). At boot a
+ * resume needs that date within RESUME_GAP_S of now: a DIMM reset lands
+ * while the ROM runs, a power cycle leaves a hole of seconds -- or sends
+ * the RTC back to 0 with a flat battery, which counts as cold too. */
+#define RESUME_HB       ((volatile u32 *)(RESUME_P2 - 16))
+#define RESUME_HB_MAGIC 0x48425431u     /* "HBT1" */
+#define RESUME_GAP_S    2u
+static u32 g_resume_armed;
+
+void resume_tick(void)
+{
+    if (!g_resume_armed)
+        return;
+    u32 t = rtc_now();
+    RESUME_HB[1] = t;
+    RESUME_HB[2] = ~t;
+    RESUME_HB[0] = RESUME_HB_MAGIC;
+}
+
+/* 0 = the reset came during an armed step; else seconds of hole, or
+ * 0xFFFFFFFF with no valid date (or a clock that went backwards) */
+static u32 resume_gap(void)
+{
+    if (RESUME_HB[0] != RESUME_HB_MAGIC || RESUME_HB[2] != ~RESUME_HB[1])
+        return 0xFFFFFFFFu;
+    u32 then = RESUME_HB[1], now = rtc_now();
+    if (now < then)
+        return 0xFFFFFFFFu;
+    return now - then <= RESUME_GAP_S ? 0 : now - then;
+}
+
 static void resume_clear(void)
 {
     RB->magic = 0;
+    g_resume_armed = 0;
+    RESUME_HB[0] = 0;
 }
 
 /* Valid block: magic, version, size and CRC all agree. */
@@ -866,6 +903,8 @@ static void resume_begin(void)
 static void resume_save(u32 step)
 {
     resume_blk *b = RB;
+    g_resume_armed = 1;                 /* a step under way: date it */
+    resume_tick();
     b->step = step;
     b->mie_port1 = g_mie_port1;
     b->ram_usable = g_ram_usable;
@@ -2868,14 +2907,14 @@ static void test_dimm(u32 resumed)
     if (pr.dir_read == DP_UNKNOWN || pr.dir_write == DP_UNKNOWN) {
         scif_puts(S_DIMM_NO_DIRS);
         log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, T_SKIP, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
     /* A loader that never settled may still decide the game is bad and
      * reset the Naomi in the middle of the test. */
     if (!idle) {
         log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, T_SKIP, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
 
@@ -2911,7 +2950,7 @@ static void test_dimm(u32 resumed)
     if (!dimm_confirm_destructive(detail)) {
         scif_puts(S_DIMM_SKIPPED);
         log_result(S_L_DIMM_MEM_PAT, CLIP_NONE, T_SKIP, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
 
@@ -2923,7 +2962,7 @@ static void test_dimm(u32 resumed)
         scif_puts("\n");
         if (!size) {
             log_result(S_L_DIMM_NOSIZE, CLIP_NONE, T_FAIL, 0, 0);
-            resume_save(RS_DONE);
+            resume_clear();
             return;
         }
         RB->dimm_size = size;
@@ -3053,7 +3092,7 @@ static void test_dimm(u32 resumed)
     /* Whatever stopped the passes, the DIMM's working area goes back. */
     if (top_saved)
         dimm_top_restore();
-    resume_save(RS_DONE);
+    resume_clear();
 }
 
 /* The DIMM reset the Naomi in the middle of the destructive test (it should
@@ -3071,7 +3110,7 @@ static void dimm_resume_interrupted(void)
         dimm_set_count32(RB->count32);
         dimm_top_restore();
     }
-    resume_save(RS_DONE);
+    resume_clear();
 }
 
 /* ------------------------------------------------------------------ */
@@ -3292,13 +3331,13 @@ static void test_dimm_flash(u32 resumed)
     if (!nimg) {
         scif_puts(S_FW_NOIMG);
         log_result(S_L_FW_NOIMG, CLIP_NONE, T_SKIP, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
     if (!idle || size < 0x02000000u) {
         scif_puts(S_FW_NOSESSION);
         log_result(S_L_FW_WRITE, CLIP_NONE, T_SKIP, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
     u32 need_ram = FWDEC_PHYS - 0x0C000000u;
@@ -3308,7 +3347,7 @@ static void test_dimm_flash(u32 resumed)
     if (g_ram_usable < need_ram) {
         scif_puts(S_FW_NORAM);
         log_result(S_L_FW_RAM, CLIP_NONE, T_SKIP, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
 
@@ -3349,7 +3388,7 @@ static void test_dimm_flash(u32 resumed)
     if (ch < 0) {
         scif_puts(S_FW_ABORT);
         log_screen_line(LK_INFO, S_SCR_FW_CANCEL, 0, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
     u32 pick = idx[ch];
@@ -3367,7 +3406,7 @@ static void test_dimm_flash(u32 resumed)
     if (go < 0) {
         scif_puts(S_FW_ABORT);
         log_screen_line(LK_INFO, S_SCR_FW_CANCEL, 0, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
     u32 dry = go == 1;
@@ -3380,7 +3419,7 @@ static void test_dimm_flash(u32 resumed)
         scif_putdec((u32)ue);
         scif_puts("\n");
         log_result(S_L_FW_IMAGE, CLIP_NONE, T_FAIL, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
     scif_puts(S_FW_UNPACK_OK);
@@ -3403,13 +3442,13 @@ static void test_dimm_flash(u32 resumed)
         scif_puthex(bad - 1);
         scif_puts("\n");
         log_result(S_L_FW_WRITE, CLIP_NONE, T_FAIL, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
     if (dry) {
         scif_puts(S_FW_DRY_DONE);
         log_result(S_L_FW_DRY, CLIP_NONE, T_OK, 0, 0);
-        resume_save(RS_DONE);
+        resume_clear();
         return;
     }
 
@@ -3468,7 +3507,7 @@ static void test_dimm_flash(u32 resumed)
                   state == 4 ? S_FW_NOTAKE : S_FW_FAIL1);
         log_result(S_L_FW_WRITE, CLIP_NONE, T_FAIL, 0, 0);
     }
-    resume_save(RS_DONE);
+    resume_clear();
 }
 
 /* ------------------------------------------------------------------ */
@@ -5704,9 +5743,8 @@ static void resume_run(void)
         bar_hide(was);
         break;
     }
-    default:                            /* RS_DONE: the report only */
-        dimm_host_start();              /* keep the DIMM answered */
-        resume_save(RS_DONE);
+    default:                            /* never reached: see the boot check */
+        resume_clear();
         break;
     }
     console_idle();                     /* never returns */
@@ -5732,6 +5770,12 @@ void cmain(void)
      * declared the register until now, never wrote it. */
     DMAOR = 0x00008201;
     scif_puts(S_SCIF_UP);
+    /* Why this boot: 000 power-on, 020 manual reset. Logged to learn what a
+     * reset ordered by the DIMM looks like -- a code of its own would tell
+     * a DIMM reset from a power cycle without any timing. */
+    scif_puts("  reset cause EXPEVT=");
+    scif_puthex(REG32(0xFF000024u));
+    scif_puts("\n");
 
     /* crt0 already proved OC-RAM works, put it in the log.
      * A failure here means the SH4 itself (IC designator TBD) is dead —
@@ -5751,13 +5795,24 @@ void cmain(void)
      * the session were sealed in CPU RAM, and nothing has written RAM yet.
      * Bounded, so a DIMM that keeps resetting cannot hold the ROM in a loop. */
     if (resume_valid()) {
-        if (++RB->resets > RESUME_MAX_RESETS) {
+        u32 gap = resume_gap();
+        if (gap) {                      /* a power cycle, not a DIMM reset */
+            resume_clear();
+            scif_puts(S_RESUME_COLD);
+            if (gap != 0xFFFFFFFFu)
+                scif_putdec(gap);
+            else
+                scif_putc('?');
+            scif_puts(" s)\n");
+        } else if (++RB->resets > RESUME_MAX_RESETS) {
             resume_clear();
             scif_puts(S_RESUME_GIVEUP);
         } else {
             resume_seal();
             resume_run();               /* never returns */
         }
+    } else {
+        RESUME_HB[0] = 0;               /* nothing to date any more */
     }
 
     /* light up the audio and video channels within seconds, by proving

@@ -239,6 +239,7 @@
 #define S_L_RESUME_LOST     "(行消失)"
 #define S_RESUME            "\n再開: DIMMボードがNAOMIを再起動しました、DIMMテストを続行します\n"
 #define S_RESUME_GIVEUP     "\n再開ブロックを無視: 連続再起動が多すぎます\n"
+#define S_RESUME_COLD       "\n再開ブロックを無視: DIMMのリセットではなく電源の入れ直し (RTC差 "
 #define S_RESUME_MIE_KEPT   "  MIE: プログラムは常駐したまま\n"
 #define S_RESUME_MIE_UP     "  MIE: プログラムを再ロード\n"
 #define S_RESUME_MIE_NONE   "  MIE: 応答なし、ボタン無効\n"

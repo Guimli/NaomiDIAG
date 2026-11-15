@@ -871,7 +871,11 @@ What does work goes around it, on the G1 bus:
   and the boot that follows such a reset skips the base suite, brings back
   the screen, the board identification and the MIE program (so the buttons
   work), puts the report back with a "Resumed after a DIMM reset" line and
-  carries on. At most three resumes in a row, then a normal boot. Holly's
+  carries on. At most three resumes in a row, then a normal boot. The block outlives a
+  power cycle in the SDRAM (seen through 10 s off), so while a step is under
+  way the heartbeat dates it with the AICA RTC, which runs on its battery:
+  a boot resumes only within 2 s of that date, and a finished action clears
+  the block. The serial log names each boot's cause (`EXPEVT`). Holly's
   GD-DMA has a direction bit, and the
   sources disagree on it: the DIMM reversing had 0 = read, while the
   original BIOS loads cartridges with `SB_GDDIR = 1`. The count register

@@ -237,6 +237,7 @@
 #define S_L_RESUME_LOST     "(Zeile verloren)"
 #define S_RESUME            "\nFortsetzung: die DIMM-Platine hat die Naomi neu gestartet, der DIMM-Test läuft weiter\n"
 #define S_RESUME_GIVEUP     "\nFortsetzungsblock ignoriert: zu viele Neustarts hintereinander\n"
+#define S_RESUME_COLD       "\nWiederaufnahmeblock ignoriert: ein Aus- und Einschalten, kein DIMM-Reset (RTC-Abstand "
 #define S_RESUME_MIE_KEPT   "  MIE: Programm noch geladen\n"
 #define S_RESUME_MIE_UP     "  MIE: Programm erneut geladen\n"
 #define S_RESUME_MIE_NONE   "  MIE: keine Antwort, Tasten aus\n"

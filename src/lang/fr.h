@@ -240,6 +240,7 @@
 #define S_L_RESUME_LOST     "(ligne perdue)"
 #define S_RESUME            "\nReprise : la carte DIMM a redemarre la Naomi, le test DIMM continue\n"
 #define S_RESUME_GIVEUP     "\nBloc de reprise ignore : trop de redemarrages de suite\n"
+#define S_RESUME_COLD       "\nBloc de reprise ignoré : une coupure de courant, pas un reset du DIMM (écart RTC "
 #define S_RESUME_MIE_KEPT   "  MIE : programme toujours resident\n"
 #define S_RESUME_MIE_UP     "  MIE : programme recharge\n"
 #define S_RESUME_MIE_NONE   "  MIE : pas de reponse, boutons inactifs\n"

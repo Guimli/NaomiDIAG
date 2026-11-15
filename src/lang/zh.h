@@ -239,6 +239,7 @@
 #define S_L_RESUME_LOST     "(行丢失)"
 #define S_RESUME            "\n继续: DIMM板重启了NAOMI, DIMM测试继续进行\n"
 #define S_RESUME_GIVEUP     "\n忽略继续块: 连续重启次数过多\n"
+#define S_RESUME_COLD       "\n忽略继续块: 是断电重启, 不是DIMM复位 (RTC间隔 "
 #define S_RESUME_MIE_KEPT   "  MIE: 程序仍在驻留\n"
 #define S_RESUME_MIE_UP     "  MIE: 已重新上传程序\n"
 #define S_RESUME_MIE_NONE   "  MIE: 无响应, 按钮无效\n"
