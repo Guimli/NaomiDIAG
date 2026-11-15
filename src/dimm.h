@@ -127,6 +127,12 @@ u32  dimm_size_probe(u32 dir_write, u32 dir_read);
 u32  dimm_count32(void);
 void dimm_set_count32(u32 on);
 
+/* The DIMM SDRAM through the PIO port, as SEGA's firmware updater does it:
+ * dimm_pio_put writes len bytes at addr, dimm_pio_check reads them back
+ * against ref (0 = identical, else 1 + offset of the first difference). */
+void dimm_pio_put(u32 addr, const void *src, u32 len);
+u32  dimm_pio_check(u32 addr, const void *ref, u32 len);
+
 /* Quick CPU-side sanity check of the system-RAM scratch the DMA test needs.
  * Returns 1 if the scratch holds data, 0 if main RAM there is unusable. */
 u32 dimm_scratch_ok(void);

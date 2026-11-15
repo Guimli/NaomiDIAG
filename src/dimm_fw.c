@@ -1,7 +1,6 @@
 /* NetDIMM firmware images of a local build: table, unpack, checks.
  * See dimm_fw.h and tools/dimmfw_pack.py for the blob format ("DFW2"). */
 #include "dimm_fw.h"
-#include "dimm_flash.h"
 #include "lzma_dec.h"
 
 extern const u8 dimmfw_blob[];
@@ -81,4 +80,17 @@ int dfw_unpack(u32 i, u8 *out, u8 *dec, void *work)
     if (w != e->check)
         return DFW_ERR_CHECK;
     return DFW_OK;
+}
+
+/* CRC-32 (0xEDB88320, no final XOR): the DIMM boot loader accepts a slot
+ * whose CRC over the whole slot, this way, is 0 -- and so does its firmware
+ * update, which refuses anything else. */
+u32 dimm_crc32_update(u32 crc, const u8 *p, u32 n)
+{
+    while (n--) {
+        crc ^= *p++;
+        for (int k = 0; k < 8; k++)
+            crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+    }
+    return crc;
 }

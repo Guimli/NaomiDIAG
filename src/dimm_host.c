@@ -87,6 +87,18 @@ u32 dimm_host_word(u32 addr)
     return p[0] | (p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
 }
 
+void dimm_host_set_word(u32 addr, u32 v)
+{
+    u32 off = addr - SH_BASE;
+    if (off > SH_SIZE - 4 || (off & 3))
+        return;
+    volatile u8 *p = SH(off);
+    p[0] = (u8)v;
+    p[1] = (u8)(v >> 8);
+    p[2] = (u8)(v >> 16);
+    p[3] = (u8)(v >> 24);
+}
+
 u32 dimm_host_size(void)
 {
     if (!(g_got & DH_GOT_MEM))

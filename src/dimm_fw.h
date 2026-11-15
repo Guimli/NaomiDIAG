@@ -21,6 +21,9 @@ typedef struct {
     u32  check;         /* slot check word (last 4 bytes), names a version  */
 } dfw_entry;
 
+#define DIMM_SLOT_SIZE  0x100000u   /* 1 MB per slot, 2 slots in the flash */
+u32 dimm_crc32_update(u32 crc, const u8 *p, u32 n);
+
 u32 dfw_count(void);
 const dfw_entry *dfw_get(u32 i);
 

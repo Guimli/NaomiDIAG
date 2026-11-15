@@ -21,7 +21,6 @@
 #include "pvr.h"
 #include "periph.h"
 #include "dimm.h"
-#include "dimm_flash.h"
 #include "dimm_fw.h"
 #include "ram_pins.h"
 #include "dimm_host.h"
@@ -796,7 +795,7 @@ static u32 g_ram_usable;
 #define BACKUP_PHYS     0x0C800000u
 #define BACKUP_LEN      0x01000000u
 
-enum { RS_HELLO = 1, RS_SESSION, RS_TEST, RS_DONE };
+enum { RS_HELLO = 1, RS_SESSION, RS_TEST, RS_DONE, RS_FW };
 
 typedef struct {
     u32 magic, crc, version, size;      /* header: crc covers what follows */
@@ -2734,7 +2733,13 @@ static void dimm_top_restore(void)
     b->bk_valid = 0;
 }
 
-static void test_dimm(u32 resumed)
+/* Find the DIMM and stand in for the BIOS until its firmware sits in its
+ * request loop: the first part of the DIMM test, shared by the firmware
+ * update. `step` is the resume step sealed while the first message is out,
+ * since that message can make the DIMM reset the Naomi (the boot then comes
+ * back through resume_run). 0 = no DIMM (logged); otherwise *size is what it
+ * posted (0 if nothing) and *idle whether its loader settled. */
+static u32 dimm_session_open(u32 resumed, u32 step, u32 *psize, u32 *pidle)
 {
     dimm_info di;
     u32 hello_sent = 0;
@@ -2748,7 +2753,7 @@ static void test_dimm(u32 resumed)
          * this message can make the DIMM reset the Naomi. */
         if (!resumed)
             resume_begin();
-        resume_save(RS_HELLO);
+        resume_save(step);
         scif_puts(S_DH_PROBE);
         dimm_host_start();
         if (dimm_host_wait(DH_GOT_ANY, 3000)) {
@@ -2761,7 +2766,7 @@ static void test_dimm(u32 resumed)
             if (!resumed)
                 log_result(S_L_DIMM_ABSENT, CLIP_NONE, T_OK, 0, 0);
             resume_clear();
-            return;
+            return 0;
         }
     }
     if (!resumed) {
@@ -2776,7 +2781,7 @@ static void test_dimm(u32 resumed)
      * the Naomi; the boot then comes back here (resume_run). Sent once:
      * the presence probe above may already have done it. */
     u32 idle = 1, size = 0;
-    resume_save(RS_HELLO);
+    resume_save(step);
     if (!hello_sent) {
         scif_puts(S_DH_HELLO);
         dimm_host_start();
@@ -2811,6 +2816,16 @@ static void test_dimm(u32 resumed)
     scif_putc('/');
     scif_putdec(dimm_host_refused());
     scif_puts("\n");
+    *psize = size;
+    *pidle = idle;
+    return 1;
+}
+
+static void test_dimm(u32 resumed)
+{
+    u32 idle, size;
+    if (!dimm_session_open(resumed, RS_HELLO, &size, &idle))
+        return;
     RB->dimm_size = size;
     resume_save(RS_SESSION);
 
@@ -3060,13 +3075,18 @@ static void dimm_resume_interrupted(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* DIMM firmware update (dimm_flash.c, dimm_fw.c).
- * Always: identify the flash and name the versions in place from the slot
- * check words. Only a LOCAL build carries firmware images (make ... DIMMFW=1,
- * a local test build): then one slot at a time can be erased (sector erase, the other
- * slot untouched), programmed and verified. Slot 1 is the main firmware; a
- * bad slot 1 falls back to slot 0 at boot. Slot 0 holds the boot loader: it
- * asks for a second confirmation, and a failure there needs a programmer. */
+/* DIMM firmware update, the way SEGA's own updater does it (analysis:
+ * analysis/dimm_dis/DIMM_FW_UPDATE_REAL.md). The Naomi never touches the
+ * DIMM's flash: the DIMM firmware writes it itself. The Naomi stands in for
+ * the BIOS (the DIMM session), puts the slot-1 image in the DIMM SDRAM at
+ * B + 0x200000 (B = the DIMM's top 16 MB, its work area) and a descriptor
+ * {source, 0xA0100000, 0x100000, 0} at B + 0x1FFFF0, then raises bit 24 of
+ * the test request word 0x0C01FC08, which the DIMM PEEKs. The DIMM checks
+ * the image's CRC-32 (refused unless 0), erases and writes slot 1 sector by
+ * sector, and posts its progress in 0x0C01FC0C: (v >> 8) & 3 = 1 under way
+ * (low byte = percent), 2 done (0x264), 3 failed (0x300). Slot 0, the boot
+ * loader, is never the target. Images exist in a LOCAL build only
+ * (make ... DIMMFW=1); a published one stops after the session. */
 #define FWBUF_PHYS  0x0C500000u             /* 1 MB slot image to write        */
 #define FWBUF       ((u8 *)(0x80000000u | FWBUF_PHYS))
 #define FWWORK      ((void *)(0x80000000u | (FWBUF_PHYS + 0x00100000u)))  /* LZMA probs */
@@ -3075,7 +3095,6 @@ static void dimm_resume_interrupted(void)
 #define FWDEC_PHYS  0x0C800000u
 #define FWDEC       ((u8 *)(0x80000000u | FWDEC_PHYS))
 #define FW_MAXCH    10
-static char g_fwbuf[40], g_fws0[40], g_fws1[40], g_fwres[32];
 /* menu labels: main RAM (validated before the menu is reached), clear of the
  * slot buffer and of the LZMA probabilities that follow it */
 typedef struct { char lab[FW_MAXCH][28]; const char *ch[FW_MAXCH + 1]; } fw_menu;
@@ -3083,34 +3102,6 @@ typedef struct { char lab[FW_MAXCH][28]; const char *ch[FW_MAXCH + 1]; } fw_menu
 #define g_fwlab     (FWMENU->lab)
 #define g_fwch      (FWMENU->ch)
 static void hex_into(char *d, u32 v, u32 ndigits);
-
-/* JEDEC manufacturer, from the low byte of the read-ID answer (the DIMM's
- * flash is 16 bits wide and answers the byte code on both halves) */
-static const char *flash_maker(u32 mfr)
-{
-    switch (mfr & 0xFF) {
-    case 0x01: return "AMD/Spansion";
-    case 0x04: return "Fujitsu";
-    case 0x20: return "ST";
-    case 0x89: return "Intel";
-    case 0xC2: return "Macronix";
-    case 0xDA: return "Winbond";
-    default:   return 0;
-    }
-}
-
-static u32 str_cat(char *d, u32 n, const char *t)
-{
-    while (*t) {
-        u32 k = utf8_seq((u8)*t);
-        if (n + k > 39)
-            break;
-        while (k-- && *t)
-            d[n++] = *t++;
-    }
-    d[n] = 0;
-    return n;
-}
 
 /* A chooser under the report lines: TEST moves, SERVICE/START picks, keys
  * 1..n pick on the console, any other key cancels. Returns the index, or
@@ -3184,105 +3175,63 @@ static int fw_choose(const char *const *t, u32 n, int key_yes)
     return pick;
 }
 
-static u32 g_fw_phase;                  /* phase + 1 shown, 0 = none (.bss) */
-static void fw_progress(u32 phase, u32 done, u32 total)
+#define FW_REQ_WORD     0x0C01FC08u     /* test requests, PEEKed by the DIMM */
+#define FW_STAT_WORD    0x0C01FC0Cu     /* its version (high) and status (low) */
+#define FW_REQ_UPDATE   0x01000000u     /* bit 24: flash the described image */
+#define FW_SLOT1_FLASH  0xA0100000u     /* slot 1 in the DIMM's own map */
+#define FW_SLOT_LEN     0x00100000u
+#define FW_CHUNK        0x00010000u     /* 64 KB per PIO step, as SEGA */
+
+/* Put len bytes from CPU RAM at dimm in 64 KB steps under a progress bar,
+ * then read them all back: 0 = in place, else 1 + offset of a difference. */
+static u32 fw_put_checked(u32 dimm, const u8 *src, u32 len)
 {
-    static const char *const lab[] = { S_P_FW_CHECK, S_P_FW_ERASE, S_P_FW_BLANK,
-                                        S_P_FW_PROG, S_P_FW_VERIFY, S_P_FW_READ,
-                                        S_P_FW_VERIFY };
-    if (phase + 1 != g_fw_phase) {
-        if (g_fw_phase)
+    progress_begin(S_P_FW_XFER, len);
+    for (u32 o = 0; o < len; o += FW_CHUNK) {
+        dimm_pio_put(dimm + o, src + o, FW_CHUNK < len - o ? FW_CHUNK : len - o);
+        progress_tick(o);
+    }
+    progress_end();
+    progress_begin(S_P_FW_CMP, len);
+    for (u32 o = 0; o < len; o += FW_CHUNK) {
+        u32 bad = dimm_pio_check(dimm + o, src + o,
+                                 FW_CHUNK < len - o ? FW_CHUNK : len - o);
+        progress_tick(o);
+        if (bad) {
             progress_end();
-        g_fw_phase = 0;
-        if (phase < DF_PH_DONE) {
-            g_fw_phase = phase + 1;
-            progress_begin(lab[phase], total);
+            return o + bad;
         }
     }
-    if (phase < DF_PH_DONE)
-        progress_tick(done);
+    progress_end();
+    return 0;
 }
 
-/* "Slot 0 : 2.03" or "Slot 0 : ? (check word 1234ABCD)" */
-static void fw_slot_line(char *d, const char *pfx, u32 slot, u32 word)
+static void test_dimm_flash(u32 resumed)
 {
-    u32 n = str_cat(d, 0, pfx);
-    const char *nm = dfw_name(slot, word);
-    if (nm) {
-        str_cat(d, n, nm);
-    } else {
-        n = str_cat(d, n, S_SCR_FW_UNK);
-        hex_into(d + n, word, 8);
-        d[n + 8] = 0;
-        str_cat(d, n + 8, ")");
-    }
-}
-
-static void test_dimm_flash(void)
-{
-    dimm_info di;
     g1_bus_init();
-    dimm_probe(&di);
-    scif_puts(S_FW_HDR);
-    if (!di.present) {
-        log_result(S_L_DIMM_ABSENT, CLIP_NONE, T_OK, 0, 0);
-        return;
-    }
-    scif_puts(S_FW_IDING);
-    dimm_flash_id fi;
-    dimm_flash_identify(&fi);
-    if (!fi.id_ok) {
-        scif_puts(S_FW_NO_DIMM);
-        log_result(S_L_FW_NOID, CLIP_NONE, T_FAIL, 0, 0);
-        return;
-    }
-    scif_puts(S_FW_ID);
-    scif_puthex(fi.mfr);
-    scif_putc('/');
-    scif_puthex(fi.dev);
-    scif_puts("\n");
-    {   /* "DIMM flash: Fujitsu 0004/22C4" */
-        u32 n = str_cat(g_fwbuf, 0, S_SCR_FW_ID);
-        const char *mk = flash_maker(fi.mfr);
-        if (mk) {
-            n = str_cat(g_fwbuf, n, mk);
-            n = str_cat(g_fwbuf, n, " ");
-        }
-        hex_into(g_fwbuf + n, fi.mfr, 4);
-        g_fwbuf[n + 4] = '/';
-        hex_into(g_fwbuf + n + 5, fi.dev, 4);
-        g_fwbuf[n + 9] = 0;
-        log_screen_line(LK_INFO, g_fwbuf, 0, 0, 0);
-    }
+    if (!resumed)
+        scif_puts(S_FW_HDR);
 
-    /* the versions in place, from the slot check words */
-    u32 w0, w1;
-    dimm_flash_check_words(&w0, &w1);
-    scif_puts(S_FW_WORDS);
-    scif_puthex(w0);
-    scif_puts(" / ");
-    scif_puthex(w1);
-    scif_puts("\n");
-    fw_slot_line(g_fws0, S_SCR_FW_S0, 0, w0);
-    fw_slot_line(g_fws1, S_SCR_FW_S1, 1, w1);
-    scif_puts("  ");
-    scif_puts(g_fws0);
-    scif_puts("\n  ");
-    scif_puts(g_fws1);
-    scif_puts("\n");
-    log_screen_line(LK_INFO, g_fws0, 0, 0, 0);
-    log_screen_line(LK_INFO, g_fws1, 0, 0, 0);
+    /* The DIMM's attention first: it only acts on a request while it sits
+     * in its request loop, served by a BIOS -- this session. Its version and
+     * memory size come with it ("DIMM: firmware 4.02, 512 MB"). */
+    u32 size, idle;
+    if (!dimm_session_open(resumed, RS_FW, &size, &idle))
+        return;
+    RB->dimm_size = size;
+    resume_save(RS_FW);
 
-    /* writing needs: images in this build, a known flash, validated RAM */
     u32 nimg = dfw_count();
     if (!nimg) {
         scif_puts(S_FW_NOIMG);
         log_result(S_L_FW_NOIMG, CLIP_NONE, T_SKIP, 0, 0);
+        resume_save(RS_DONE);
         return;
     }
-    if (!fi.layout_ok) {
-        scif_puts(S_FW_BADCHIP);
-        log_result(S_L_FW_CHIP, CLIP_NONE, T_FAIL, 0, 0);
+    if (!idle || size < 0x02000000u) {
+        scif_puts(S_FW_NOSESSION);
+        log_result(S_L_FW_WRITE, CLIP_NONE, T_SKIP, 0, 0);
+        resume_save(RS_DONE);
         return;
     }
     u32 need_ram = FWDEC_PHYS - 0x0C000000u;
@@ -3292,26 +3241,16 @@ static void test_dimm_flash(void)
     if (g_ram_usable < need_ram) {
         scif_puts(S_FW_NORAM);
         log_result(S_L_FW_RAM, CLIP_NONE, T_SKIP, 0, 0);
+        resume_save(RS_DONE);
         return;
     }
 
-    /* the choice, in two steps: the slot, then its versions, newest first */
-    static const char *const slot_ch[3] = { S_FW_PICK_S1, S_FW_PICK_S0, S_FW_CANCEL };
-    scif_puts(S_FW_MENU_SLOT);
-    int sp = fw_choose(slot_ch, 3, 0);
-    if (sp < 0) {
-        scif_puts(S_FW_ABORT);
-        log_screen_line(LK_INFO, S_SCR_FW_CANCEL, 0, 0, 0);
-        return;
-    }
-    u32 want_slot = sp == 0 ? 1 : 0;
-    /* newest first, and the newest kept when the slot has more versions
-     * than the menu has lines: the oldest falls off the end. The first line,
-     * the newest, is the one selected when the menu opens. */
+    /* The slot-1 versions, newest first and the newest selected; the oldest
+     * fall off when the menu is full. */
     u32 idx[FW_MAXCH], n_ch = 0;
     for (u32 i = 0; i < nimg; i++) {
         const dfw_entry *c = dfw_get(i);
-        if (c->slot != want_slot)
+        if (c->slot != 1)
             continue;
         u32 k = n_ch < FW_MAXCH - 1 ? n_ch++ : FW_MAXCH - 1;
         while (k > 0 && fw_label_cmp(dfw_get(idx[k - 1])->label, c->label) < 0) {
@@ -3326,9 +3265,8 @@ static void test_dimm_flash(void)
     for (u32 j = 0; j < n_ch; j++) {
         const dfw_entry *c = dfw_get(idx[j]);
         u32 n = 0;
-        const char *pfx = c->slot ? S_SCR_FW_S1 : S_SCR_FW_S0;
-        while (*pfx && n < 20)
-            g_fwlab[j][n++] = *pfx++;
+        for (const char *t = S_SCR_FW_S1; *t && n < 20; t++)
+            g_fwlab[j][n++] = *t;
         for (u32 k = 0; k < 20 && c->label[k] && n < 27; k++)
             g_fwlab[j][n++] = c->label[k];
         g_fwlab[j][n] = 0;
@@ -3344,76 +3282,113 @@ static void test_dimm_flash(void)
     if (ch < 0) {
         scif_puts(S_FW_ABORT);
         log_screen_line(LK_INFO, S_SCR_FW_CANCEL, 0, 0, 0);
+        resume_save(RS_DONE);
         return;
     }
-    int pick = (int)idx[ch];
-    const dfw_entry *e = dfw_get((u32)pick);
-    u32 slot = e->slot;
+    u32 pick = idx[ch];
     scif_puts(S_FW_SEL);
     scif_puts(g_fwlab[ch]);
     scif_puts("\n");
     log_screen_line(LK_INFO, g_fwlab[ch], 0, 0, 0);
-    if (e->check == (slot ? w1 : w0))
-        scif_puts(S_FW_SAME);
 
-    /* confirmation: once for slot 1, twice for slot 0 */
-    static const char *const yes_no[2] = { S_FW_YES, S_FW_CANCEL };
-    scif_puts(slot ? S_FW_WARN1 : S_FW_WARN0);
-    log_screen_line(LK_INFO, slot ? S_SCR_FW_WARN1 : S_SCR_FW_WARN0, 0, 0, 0);
-    if (fw_choose(yes_no, 2, 1) != 0 ||
-        (slot == 0 && (scif_puts(S_FW_WARN0B),
-                       log_screen_line(LK_INFO, S_SCR_FW_WARN0B, 0, 0, 0),
-                       fw_choose(yes_no, 2, 1) != 0))) {
+    /* Write it, or only put it in place (a test: the request is not sent,
+     * the flash is not touched), or nothing. */
+    static const char *const how[3] = { S_FW_YES, S_FW_DRY, S_FW_CANCEL };
+    scif_puts(S_FW_WARN1);
+    log_screen_line(LK_INFO, S_SCR_FW_WARN1, 0, 0, 0);
+    int go = fw_choose(how, 3, 0);
+    if (go < 0) {
         scif_puts(S_FW_ABORT);
         log_screen_line(LK_INFO, S_SCR_FW_CANCEL, 0, 0, 0);
+        resume_save(RS_DONE);
         return;
     }
+    u32 dry = go == 1;
 
-    /* unpack and check the image before touching the flash */
+    /* The image, unpacked and checked (slot CRC-32 = 0, check word) */
     scif_puts(S_FW_UNPACK);
-    int ue = dfw_unpack((u32)pick, FWBUF, FWDEC, FWWORK);
+    int ue = dfw_unpack(pick, FWBUF, FWDEC, FWWORK);
     if (ue != DFW_OK) {
         scif_puts(S_FW_UNPACK_BAD);
         scif_putdec((u32)ue);
         scif_puts("\n");
         log_result(S_L_FW_IMAGE, CLIP_NONE, T_FAIL, 0, 0);
+        resume_save(RS_DONE);
         return;
     }
     scif_puts(S_FW_UNPACK_OK);
 
-    df_report r;
-    g_fw_phase = 0;
-    int fe = dimm_flash_write_slot(slot, FWBUF, slot == 0 ? DF_ALLOW_SLOT0 : 0,
-                                   fw_progress, &r);
-    if (g_fw_phase)
-        progress_end();
-    progress_clear_abort();            /* nothing could stop it anyway */
-    if (fe == DF_OK) {
+    /* Into the DIMM's work area, read back; then the descriptor */
+    u32 base = size - 0x01000000u;
+    u32 img = base + 0x00200000u, desc_at = base + 0x001FFFF0u;
+    scif_puts(S_FW_XFER_AT);
+    scif_puthex(img);
+    scif_puts("\n");
+    u32 bad = fw_put_checked(img, FWBUF, FW_SLOT_LEN);
+    u32 desc[4] = { img, FW_SLOT1_FLASH, FW_SLOT_LEN, 0 };
+    if (!bad) {
+        dimm_pio_put(desc_at, desc, sizeof desc);
+        if (dimm_pio_check(desc_at, desc, sizeof desc))
+            bad = 1;
+    }
+    if (bad) {
+        scif_puts(S_FW_XFER_BAD);
+        scif_puthex(bad - 1);
+        scif_puts("\n");
+        log_result(S_L_FW_WRITE, CLIP_NONE, T_FAIL, 0, 0);
+        resume_save(RS_DONE);
+        return;
+    }
+    if (dry) {
+        scif_puts(S_FW_DRY_DONE);
+        log_result(S_L_FW_DRY, CLIP_NONE, T_OK, 0, 0);
+        resume_save(RS_DONE);
+        return;
+    }
+
+    /* The request. Its status is cleared to the version alone, as the
+     * updater does; then the DIMM, polling the request word, takes it. */
+    dimm_host_set_word(FW_STAT_WORD, dimm_host_word(FW_STAT_WORD) & 0xFFFF0000u);
+    dimm_host_set_word(FW_REQ_WORD, FW_REQ_UPDATE);
+    scif_puts(S_FW_REQ);
+    progress_begin(S_P_FW_PROG, 100);
+    u32 t0 = timer_ms(), t_seen = t0, last = 0xFFFFFFFFu, state = 0;
+    for (;;) {
+        dimm_host_service();
+        progress_heartbeat();
+        u32 v = dimm_host_word(FW_STAT_WORD), now = timer_ms();
+        state = (v >> 8) & 3;
+        if (state >= 2)
+            break;
+        if (v != last) {
+            last = v;
+            t_seen = now;
+            if (state == 1)
+                progress_tick((v & 0xFF) < 100 ? (v & 0xFF) : 99);
+        }
+        if ((dimm_host_word(FW_REQ_WORD) & FW_REQ_UPDATE) &&
+            now - t0 > 30000) {
+            dimm_host_set_word(FW_REQ_WORD, 0);     /* never taken: withdrawn */
+            state = 4;
+            break;
+        }
+        if (now - t_seen > 120000) {
+            state = 5;                              /* stalled while writing */
+            break;
+        }
+        delay_ms(2);
+    }
+    progress_end();
+    if (state == 2) {
         scif_puts(S_FW_DONE);
         log_result(S_L_FW_WRITE, CLIP_NONE, T_OK, 0, 0);
         log_screen_line(LK_INFO, S_SCR_FW_POWER, 0, 0, 0);
-        return;
+    } else {
+        scif_puts(state == 3 ? S_FW_DIMM_CRC :
+                  state == 4 ? S_FW_NOTAKE : S_FW_FAIL1);
+        log_result(S_L_FW_WRITE, CLIP_NONE, T_FAIL, 0, 0);
     }
-    scif_puts(S_FW_ERR);
-    scif_putdec((u32)fe);
-    scif_puts(S_FW_ERR_STAGE);
-    scif_putdec(r.stage);
-    scif_puts(S_FW_ERR_ADDR);
-    scif_puthex(r.addr);
-    scif_puts(S_FW_ERR_GOT);
-    scif_puthex(r.got);
-    scif_puts(S_FW_ERR_WANT);
-    scif_puthex(r.want);
-    scif_puts("\n");
-    scif_puts(r.stage <= DF_PH_CHECK ? S_FW_UNTOUCHED :
-              slot ? S_FW_FAIL1 : S_FW_FAIL0);
-    {
-        u32 n = str_cat(g_fwres, 0, S_SCR_FW_ERRAT);
-        hex_into(g_fwres + n, r.addr, 6);
-        g_fwres[n + 6] = 0;
-        log_screen_line(LK_INFO, g_fwres, 0, 0, 0);
-    }
-    log_result(S_L_FW_WRITE, CLIP_NONE, T_FAIL, 0, 0);
+    resume_save(RS_DONE);
 }
 
 /* ------------------------------------------------------------------ */
@@ -5239,7 +5214,7 @@ static void run_action(u32 act)
     case ACT_FLASH: {
         u32 was = bar_show();
         report_restart();
-        test_dimm_flash();
+        test_dimm_flash(0);
         bar_hide(was);
         break;
     }
@@ -5643,6 +5618,12 @@ static void resume_run(void)
     case RS_TEST:
         dimm_resume_interrupted();
         break;
+    case RS_FW: {                       /* the DIMM reset us before the request */
+        u32 was = bar_show();
+        test_dimm_flash(1);
+        bar_hide(was);
+        break;
+    }
     default:                            /* RS_DONE: the report only */
         dimm_host_start();              /* keep the DIMM answered */
         resume_save(RS_DONE);

@@ -114,6 +114,35 @@ static void dimm_pio_read(u32 addr, volatile u32 *dst, u32 nw, u16 flags)
     }
 }
 
+/* Bytes to and from the DIMM SDRAM through the PIO port, auto-advance on,
+ * the way SEGA's DIMM firmware updater moves the image (updater 0x0C02FA80 /
+ * 0x0C02F980: high word | 0x8000, low word, then 16-bit data). Seen working
+ * on a real NetDIMM, both ways (2026-11-15). len is a multiple of 2. */
+void dimm_pio_put(u32 addr, const void *src, u32 len)
+{
+    const u16 *s = (const u16 *)src;
+    REG16(0xA05F7000) = (u16)(((addr >> 16) & 0x1FFF) | 0x8000);
+    REG16(0xA05F7004) = (u16)addr;
+    for (u32 i = 0; i < len / 2; i++)
+        REG16(0xA05F7008) = s[i];
+}
+
+/* Read len bytes back and compare: 0 = identical, else 1 + the byte offset
+ * of the first 16-bit word that differs. */
+u32 dimm_pio_check(u32 addr, const void *ref, u32 len)
+{
+    const u16 *r = (const u16 *)ref;
+    REG16(0xA05F7000) = (u16)(((addr >> 16) & 0x1FFF) | 0x8000);
+    REG16(0xA05F7004) = (u16)addr;
+    u32 bad = 0;
+    for (u32 i = 0; i < len / 2; i++) {
+        u16 v = REG16(0xA05F7008);     /* every word read: the port advances */
+        if (v != r[i] && !bad)
+            bad = 1 + 2 * i;
+    }
+    return bad;
+}
+
 static u32 same(volatile u32 *a, volatile u32 *b)
 {
     for (u32 i = 0; i < PROBE_NW; i++)

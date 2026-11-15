@@ -47,6 +47,9 @@ u32  dimm_host_refused(void);   /* outside the shadow, or unknown */
 
 /* a 32-bit word of the shadow, by its Naomi address (0x0C01Fxxx) */
 u32  dimm_host_word(u32 addr);
+/* ... and set one: what the BIOS writes there for the DIMM to PEEK, such as
+ * a test request in 0x0C01FC08 (one bit per test, 24 = firmware update) */
+void dimm_host_set_word(u32 addr, u32 v);
 
 /* The memory word, decoded. Bits 0-11: memory past the DIMM's own 16 MB,
  * in MB; bits 16-19 / 20-23: size code of socket 0 / 1 (64 MB << code,

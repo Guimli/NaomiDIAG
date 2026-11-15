@@ -290,28 +290,29 @@ Les 16 Mo du haut (zone de travail du firmware) sont copiés à `0x0C800000`
 par DMA, testés, restaurés et relus ; un en-tête « sans CRC » est cassé
 après restauration.
 
-### 2. Flash du firmware DIMM — identification faite, gravure désarmée
+### 2. Flash du firmware DIMM — par le firmware DIMM lui-même
 
-La flash de 2 Mo du DIMM se pilote **par le PIO ROM-board G1**
-(`0x5F7000`/`0x5F7004`/`0x5F7008` — les registres que `cart.c` utilise
-déjà), avec un jeu de commandes AMD. `src/dimm_flash.c` fait le **read-ID**
-(`0x90`/`0xF0`), strictement non destructeur, et l'action `f` du menu
-identifie la puce puis propose un choix de version 3.17 / 4.01 / 4.03.
+> **Corrigé le 2026-11-15** (détail dans `analysis/dimm_dis/DIMM_FW_UPDATE_REAL.md`,
+> hors dépôt). Ce qui était écrit ici — la flash du DIMM pilotée par la Naomi à
+> travers le PIO G1 en mode « flash », un chip-erase de l'updater — était faux :
+> cet automate de l'updater écrit le module FLASH/RTC des cartes ROM. Sur un vrai
+> NetDIMM, le read-ID par ce chemin relit la SDRAM.
 
-La **gravure reste délibérément non armée**. L'updater officiel Sega a été
-décompilé : sa machine à états fait un **chip-erase unique** (`0x10`) suivi
-de la reprogrammation de l'image entière depuis un tampon RAM — pas de
-boucle par secteur. Le filet de sécurité de la carte (deux slots de 1 Mo,
-chacun validé par un CRC-32 nul, l'amorceur retombant sur le slot 0 si le
-slot 1 est faux) **survit à un flash réussi mais pas pendant** : une coupure
-en cours de gravure brique la carte. Tant que la portée exacte de
-l'effacement n'est pas vérifiée sur du matériel réel par le read-ID, écrire
-le code de gravure serait irresponsable.
+**Le firmware DIMM se grave lui-même.** L'updater SEGA écrit l'image du slot 1
+dans la SDRAM du DIMM (par le PIO G1, auto-incrément) à `B + 0x200000`, `B` étant
+le début des 16 Mo du haut (taille annoncée dans `0x0C01FC04`, moins 16 Mo), puis
+un descripteur `{source, 0xA0100000, 0x100000, 0}` à `B + 0x1FFFF0`, et lève le
+bit 24 du mot de requête de test `0x0C01FC08` de la zone de travail du BIOS, que
+le DIMM lit par PEEK. Le firmware DIMM (4.03, boucle des requêtes de test) copie
+l'image, refuse si son CRC-32 n'est pas nul, efface et écrit le slot 1 par
+secteur, et rend compte dans `0x0C01FC0C` : `(v >> 8) & 3` = 1 en cours (octet
+bas = pourcentage), 2 terminé (`0x264`), 3 erreur (`0x300`). L'action `f` de
+NaomiDIAG fait exactement cela, dans la session hôte qui répond aux PEEK/POKE du
+DIMM ; elle ne vise jamais le slot 0.
 
-Il existe par ailleurs un chemin `FirmUpdate` interne au firmware
-(`CmdInput` → `HostIf` → `TestTask`, TestCode `0x301` puis `0x303`) qui
-grave depuis la SDRAM du DIMM et n'existe qu'en 3.x/4.x. Le cadrage exact
-des octets de la boîte aux lettres qui le déclenche n'est pas terminé.
+Le chemin `FirmUpdate` du firmware (`CmdInput` → `HostIf` → `TestTask`,
+TestCode `0x301` puis `0x303`, 3.x/4.x) est une autre entrée vers la même
+gravure ; l'updater ne s'en sert pas, NaomiDIAG non plus.
 
 ### La place : réglée par le codec, pas par le silence
 

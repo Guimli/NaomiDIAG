@@ -660,7 +660,7 @@ Touches sur la console série :
 | `c` / `v` / `s` | boucler le test RAM CPU / vidéo / son |
 | `d` | test complet de la SDRAM du DIMM |
 | `g` | intégrité SHA-1 des flash du jeu |
-| `f` | flash du firmware DIMM — identification, et choix d'une version |
+| `f` | mise à jour du firmware DIMM — la version en place ; dans un build `DIMMFW=1`, graver le slot 1 ou transfert seul |
 | `j` | test des entrées JVS — chaque contact, monnayeur et voie analogique, en direct |
 | `m` | mire vidéo |
 | `!` | moniteur série — lecture/écriture mémoire, statut G1 (console seulement, absent du menu à l'écran) |
@@ -702,8 +702,8 @@ seul le **SERVICE** de la carte, ou une touche série, en fait sortir.
 Deux d'entre elles sont à l'initiative de l'opérateur précisément parce
 qu'elles ne sont pas sûres sans surveillance : le test SDRAM du DIMM écrase
 le jeu qui y est chargé (pas le firmware, qui tourne depuis sa propre RAM),
-et l'action flash touche à la flash du firmware du DIMM — identification
-seulement, sauf dans un build local `DIMMFW=1`, voir plus bas.
+et l'action flash fait réécrire au DIMM son propre firmware — seulement
+dans un build local `DIMMFW=1`, voir plus bas.
 
 ## Compilation
 
@@ -988,30 +988,29 @@ Ce qui marche passe à côté, par le bus G1 :
   dialogue avec aucun BIOS : la session PEEK/POKE n'y est pas testable non
   plus ; la reprise après reset l'est, avec `mame/dimm_resume.lua`, qui
   remplace le reset du DIMM par un reset logiciel.
-- **`f` — flash du firmware DIMM.** La flash s'atteint par le PIO
-  ROM-board du G1 avec des commandes AMD. Tout build l'identifie (read-ID,
-  non destructeur) et nomme la version que contient chaque slot d'après son
-  mot de contrôle : l'écran affiche le fabricant et l'identifiant (ou
-  « Carte DIMM : absente » / « Flash DIMM (ne repond pas) ») et les deux
-  slots. L'écriture demande les images de firmware, qui sont à SEGA : elles
-  ne sont que dans un **build local `DIMMFW=1`** (voir
-  [Compilation](#compilation)), jamais dans une ROM publiée, qui s'arrête là
-  sur « Images firmware (absentes ici) ». Un build `DIMMFW=1` exige
-  aussi une Am29LV160 top-boot (ID 0x22C4) et une RAM CPU validée par la
-  suite, puis demande quel slot écrire — le slot 1, firmware principal, ou
-  le slot 0, chargeur de démarrage (risqué) — et quelle version, de la plus
-  récente à la plus ancienne, la plus récente présélectionnée (TEST déplace,
-  SERVICE ou START choisit, touches 1 à 9 sur la console). Le slot 1 se
-  confirme une fois, le slot 0 deux fois. L'image est décompressée et
-  contrôlée (CRC-32 du slot = 0, mot de contrôle) avant de toucher la
-  flash ; seuls les secteurs de ce slot sont ensuite effacés — effacement
-  par secteur, comme le fait la routine flash du firmware DIMM lui-même,
-  alors que l'updater de SEGA efface toute la puce, donc les deux slots —,
-  vérifiés vierges, programmés, puis vérifiés mot à mot et par le CRC du
-  slot relu depuis la flash. Si l'écriture du slot 1 échoue, le DIMM
-  démarre encore sur son slot 0 de secours. *Pas encore validé sur vrai
-  matériel* ; le pilote tourne sur PC contre une flash simulée
-  (`tools/test_dimm_flash.c`).
+- **`f` — mise à jour du firmware DIMM.** La Naomi ne touche jamais la
+  flash du DIMM : c'est le firmware DIMM qui l'écrit lui-même, comme avec
+  l'updater de SEGA (dont l'automate de flash, pris un temps pour celui-ci,
+  écrit en fait le module FLASH/RTC des cartes ROM). L'action ouvre la
+  session DIMM (comme `d`, reprises après les resets du DIMM comprises), qui
+  nomme le firmware en place (« DIMM: firmware 4.02, 512 MB »). L'écriture
+  demande les images de firmware, qui sont à SEGA : elles ne sont que dans
+  un **build local `DIMMFW=1`** (voir [Compilation](#compilation)) ; une ROM
+  publiée s'arrête là sur « Images firmware (absentes ici) ». Dans un build
+  `DIMMFW=1`, avec une RAM CPU validée par la suite et le DIMM dans sa boucle
+  de requêtes, elle propose les versions du slot 1, la plus récente en tête
+  et présélectionnée, puis **1 = graver**, **2 = transfert seul (essai)**,
+  autre chose annule. L'image est décompressée et contrôlée (CRC-32 du slot
+  = 0), écrite par le port PIO dans la zone de travail du DIMM (ses 16 Mo du
+  haut, à +2 Mo) et relue, avec un descripteur {source, 0xA0100000, 1 Mo}
+  juste avant ; « transfert seul » s'arrête là. La gravure lève ensuite le
+  bit 24 du mot de requête de test 0x0C01FC08, que le DIMM lit par PEEK : le
+  firmware DIMM vérifie le CRC de l'image (il refuse tout autre), efface et
+  écrit le slot 1 par secteur, et publie sa progression dans 0x0C01FC0C,
+  affichée sur la barre. Le slot 0, chargeur de démarrage, n'est jamais
+  visé : un slot 1 raté laisse le DIMM démarrer sur le slot 0. *Pas encore
+  validé sur vrai matériel* (le premier essai, avec l'ancien chemin « mode
+  flash », relisait la SDRAM du DIMM au lieu de sa flash, et n'a rien écrit).
 
 L'analyse des images de firmware SEGA reste hors de ce dépôt, délibérément.
 
