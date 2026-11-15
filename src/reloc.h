@@ -66,6 +66,13 @@ u32  reloc_install(u32 p2_dest);
 
 u32  reloc_active(void);
 
+/* Copy .ramtext (the LZMA decoder and the slot CRC, linked for CPU RAM at
+ * RAMTEXT_PHYS, stored in the EPROM) to its place and check the copy; then
+ * invalidate the instruction cache. Done before each use: the RAM tests and
+ * other actions may have overwritten the area since. 1 = ready. */
+#define RAMTEXT_PHYS    0x0C700000u
+u32  ramtext_install(void);
+
 /* Re-read the relocated block and compare it byte for byte against the master
  * copy in ROM. A cell that passes an 8 KB test and then decays under load
  * would otherwise corrupt the very code producing the results, and the

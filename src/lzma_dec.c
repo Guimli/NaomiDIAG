@@ -43,7 +43,7 @@ typedef struct {
     int err;
 } rc_t;
 
-static u8 rc_byte(rc_t *rc)
+static RAMTEXT u8 rc_byte(rc_t *rc)
 {
     if (rc->in_pos >= rc->in_len) {
         rc->err = LZMA_ERR_INPUT;
@@ -52,7 +52,7 @@ static u8 rc_byte(rc_t *rc)
     return rc->in[rc->in_pos++];
 }
 
-static void rc_norm(rc_t *rc)
+static RAMTEXT void rc_norm(rc_t *rc)
 {
     if (rc->range < (1u << 24)) {
         rc->range <<= 8;
@@ -60,7 +60,7 @@ static void rc_norm(rc_t *rc)
     }
 }
 
-static u32 rc_bit(rc_t *rc, prob *p)
+static RAMTEXT u32 rc_bit(rc_t *rc, prob *p)
 {
     u32 bound = (rc->range >> 11) * *p;
     u32 b;
@@ -78,7 +78,7 @@ static u32 rc_bit(rc_t *rc, prob *p)
     return b;
 }
 
-static u32 rc_direct(rc_t *rc, u32 n)
+static RAMTEXT u32 rc_direct(rc_t *rc, u32 n)
 {
     u32 r = 0;
     while (n--) {
@@ -92,7 +92,7 @@ static u32 rc_direct(rc_t *rc, u32 n)
     return r;
 }
 
-static u32 tree(rc_t *rc, prob *p, u32 nbits)
+static RAMTEXT u32 tree(rc_t *rc, prob *p, u32 nbits)
 {
     u32 m = 1;
     for (u32 i = 0; i < nbits; i++)
@@ -100,7 +100,7 @@ static u32 tree(rc_t *rc, prob *p, u32 nbits)
     return m - (1u << nbits);
 }
 
-static u32 tree_rev(rc_t *rc, prob *p, u32 nbits)
+static RAMTEXT u32 tree_rev(rc_t *rc, prob *p, u32 nbits)
 {
     u32 m = 1, sym = 0;
     for (u32 i = 0; i < nbits; i++) {
@@ -111,7 +111,7 @@ static u32 tree_rev(rc_t *rc, prob *p, u32 nbits)
     return sym;
 }
 
-static u32 dec_len(rc_t *rc, len_probs *l, u32 ps)
+static RAMTEXT u32 dec_len(rc_t *rc, len_probs *l, u32 ps)
 {
     if (!rc_bit(rc, &l->choice))
         return tree(rc, l->low[ps], 3);
@@ -123,7 +123,7 @@ static u32 dec_len(rc_t *rc, len_probs *l, u32 ps)
 static void (*g_progress)(u32 done);
 void lzma_set_progress(void (*cb)(u32 done)) { g_progress = cb; }
 
-int lzma_decode(const u8 *in, u32 in_len, u32 lc, u32 lp, u32 pb,
+RAMTEXT int lzma_decode(const u8 *in, u32 in_len, u32 lc, u32 lp, u32 pb,
                 u8 *out, u32 out_len, void *work)
 {
     lzma_work *w = (lzma_work *)work;

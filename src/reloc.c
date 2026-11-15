@@ -148,3 +148,28 @@ u32 reloc_install(u32 p2_dest)
     g_active = 1;
     return 1;
 }
+
+/* .ramtext: linked at 0x8C700000 (P1, cached; linker.ld), stored in the EPROM
+ * at __ramtext_load. Written through the P1 alias: write-through, so memory
+ * and any operand-cache line of the area agree -- the code's literal pools
+ * are read through the operand cache. Then ICI, from P2 like reloc_install. */
+extern char _ramtext_start[], _ramtext_end[], _ramtext_load[];   /* __ramtext_* in linker.ld */
+
+u32 ramtext_install(void)
+{
+    const volatile u32 *src = (const volatile u32 *)_ramtext_load;
+    volatile u32 *dst = (volatile u32 *)_ramtext_start;
+    u32 n = (u32)(_ramtext_end - _ramtext_start) / 4;
+
+    if (((u32)dst & 0x1FFFFFFFu) != RAMTEXT_PHYS)
+        return 0;                   /* linker.ld and reloc.h disagree */
+    for (u32 i = 0; i < n; i++)
+        dst[i] = src[i];
+    for (u32 i = 0; i < n; i++)
+        if (dst[i] != src[i])
+            return 0;
+    CCR = 0x000009A1;               /* ICI, OC kept (stack and .bss are there) */
+    for (volatile int i = 0; i < 8; i++)
+        ;
+    return 1;
+}

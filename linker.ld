@@ -16,6 +16,7 @@ MEMORY
 {
     ROM    (rx) : ORIGIN = @ROM_BASE@, LENGTH = 2M
     OCRAM1 (rw) : ORIGIN = 0x7E000000, LENGTH = 4K
+    RAMX   (rx) : ORIGIN = 0x8C700000, LENGTH = 64K
 }
 
 SECTIONS
@@ -29,6 +30,17 @@ SECTIONS
     .rodata : {
         *(.rodata*)
     } > ROM
+
+    /* Code that runs from CPU RAM (P1, cached): stored here in the EPROM,
+     * copied to 0x0C700000 by ramtext_install() before each use. Its name
+     * does not start with .text, so .text above does not take it. */
+    .ramtext : {
+        __ramtext_start = .;
+        *(.ramtext)
+        . = ALIGN(4);
+        __ramtext_end = .;
+    } > RAMX AT> ROM
+    __ramtext_load = LOADADDR(.ramtext);
 
     .data : {
         *(.data*)

@@ -3447,9 +3447,14 @@ static void test_dimm_flash(u32 resumed)
     scif_puts(S_FW_UNPACK);
     progress_begin(S_P_FW_UNPACK, dfw_unpack_total(pick));
     dfw_set_progress(progress_tick);    /* also keeps the DIMM answered */
+    u32 t_unpack = timer_ms();
     int ue = dfw_unpack(pick, FWBUF, FWDEC, FWWORK);
+    t_unpack = timer_ms() - t_unpack;
     dfw_set_progress(0);
     progress_end();
+    scif_puts("  ");                    /* how long, for the record */
+    scif_putdec(t_unpack);
+    scif_puts(" ms\n");
     if (ue != DFW_OK) {
         scif_puts(S_FW_UNPACK_BAD);
         scif_putdec((u32)ue);

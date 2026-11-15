@@ -37,6 +37,7 @@ u32 dfw_need(u32 i);
 #define DFW_OK          0
 #define DFW_ERR_INDEX   1
 #define DFW_ERR_DECODE  2
+#define DFW_ERR_RAM     3   /* the decoder copy into CPU RAM failed */
 #define DFW_ERR_CRC     4   /* unpacked slot CRC-32 != 0         */
 #define DFW_ERR_CHECK   5   /* check word differs from the table */
 
