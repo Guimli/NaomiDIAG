@@ -934,7 +934,15 @@ What does work goes around it, on the G1 bus:
   firmware checks the image's CRC (it refuses anything else), erases and
   writes slot 1 sector by sector, and posts its progress in 0x0C01FC0C,
   shown on the progress bar. Slot 0, the boot loader, is never the target:
-  a failed slot 1 leaves the DIMM starting on slot 0. *Not validated on real
+  a failed slot 1 leaves the DIMM starting on slot 0. The Naomi cannot
+  read the DIMM's flash back (the PIO port reaches its SDRAM only, and the
+  firmware offers no request for it); what checks the write is the DIMM:
+  each word is read back as it is programmed, and at the next power-on its
+  boot loader re-reads the whole of slot 1 (CRC) before starting it. So
+  after a successful write the action says which version the DIMM must
+  then announce, and every later `f` names the version it booted against
+  the embedded images -- a boot-loader (slot 0) version meaning slot 1 was
+  rejected. *Not validated on real
   hardware yet* (the first attempt, with the former flash-mode path, read
   the DIMM's SDRAM back instead of its flash, and wrote nothing).
 

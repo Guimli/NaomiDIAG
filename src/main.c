@@ -3182,6 +3182,72 @@ static int fw_choose(const char *const *t, u32 n, int key_yes)
 #define FW_SLOT_LEN     0x00100000u
 #define FW_CHUNK        0x00010000u     /* 64 KB per PIO step, as SEGA */
 
+/* The version a label names, as the DIMM posts it in 0x0C01FC0C's high
+ * half: "4.03 CD-R" -> 0x0403 (digits as hex nibbles, as SEGA prints it,
+ * "%X.%02X"). 0 if the label does not start with one. */
+static u32 fw_label_ver(const char *l)
+{
+    u32 maj = 0, min = 0, nd = 0;
+    while (*l >= '0' && *l <= '9')
+        maj = maj * 16 + (u32)(*l++ - '0'), nd++;
+    if (!nd || *l++ != '.')
+        return 0;
+    for (nd = 0; *l >= '0' && *l <= '9'; nd++)
+        min = min * 16 + (u32)(*l++ - '0');
+    return nd ? (maj << 8) | (min & 0xFF) : 0;
+}
+
+/* "4.03" into d (at least 6 bytes) */
+static void fw_ver_text(char *d, u32 v)
+{
+    u32 n = 0;
+    if (v >> 12)
+        d[n++] = "0123456789ABCDEF"[(v >> 12) & 15];
+    d[n++] = "0123456789ABCDEF"[(v >> 8) & 15];
+    d[n++] = '.';
+    d[n++] = "0123456789ABCDEF"[(v >> 4) & 15];
+    d[n++] = "0123456789ABCDEF"[v & 15];
+    d[n] = 0;
+}
+
+/* The only re-read of the flash there is: at power-on the DIMM's boot
+ * loader checks slot 1's CRC over the whole slot and starts it only if 0,
+ * else falls back to slot 0. The version the running firmware posts says
+ * which happened. Named against the embedded images: a slot-1 version means
+ * slot 1 passed; a version embedded only as a boot loader means it did not. */
+static void fw_inplace_report(u32 nimg)
+{
+    if (!(dimm_host_got() & DH_GOT_VER))
+        return;
+    u32 v = dimm_host_word(FW_STAT_WORD) >> 16;
+    char t[8];
+    fw_ver_text(t, v);
+    scif_puts(S_FW_INPLACE);
+    scif_puts(t);
+    const char *s1 = 0, *s0 = 0;
+    for (u32 i = 0; i < nimg; i++) {
+        const dfw_entry *c = dfw_get(i);
+        if (fw_label_ver(c->label) != v)
+            continue;
+        if (c->slot == 1 && !s1)
+            s1 = c->label;
+        if (c->slot == 0 && !s0)
+            s0 = c->label;
+    }
+    if (s1) {
+        scif_puts(S_FW_IS_S1);
+        scif_puts(s1);
+        scif_puts("\n");
+    } else if (s0) {
+        scif_puts(S_FW_IS_S0);
+        log_screen_line(LK_INFO, S_SCR_FW_ON_S0, 0, 0, 0);
+    } else {
+        scif_puts(S_FW_IS_OTHER);
+    }
+}
+
+static char g_fw_expect[40];            /* "After power-on: firmware 4.03" */
+
 /* Put len bytes from CPU RAM at dimm in 64 KB steps under a progress bar,
  * then read them all back: 0 = in place, else 1 + offset of a difference. */
 static u32 fw_put_checked(u32 dimm, const u8 *src, u32 len)
@@ -3222,6 +3288,7 @@ static void test_dimm_flash(u32 resumed)
     resume_save(RS_FW);
 
     u32 nimg = dfw_count();
+    fw_inplace_report(nimg);
     if (!nimg) {
         scif_puts(S_FW_NOIMG);
         log_result(S_L_FW_NOIMG, CLIP_NONE, T_SKIP, 0, 0);
@@ -3383,6 +3450,19 @@ static void test_dimm_flash(u32 resumed)
         scif_puts(S_FW_DONE);
         log_result(S_L_FW_WRITE, CLIP_NONE, T_OK, 0, 0);
         log_screen_line(LK_INFO, S_SCR_FW_POWER, 0, 0, 0);
+        /* what the boot loader's check must give after the power cycle */
+        char t[8];
+        fw_ver_text(t, fw_label_ver(dfw_get(pick)->label));
+        scif_puts(S_FW_AFTER_A);
+        scif_puts(t);
+        scif_puts(S_FW_AFTER_B);
+        u32 n = 0;
+        for (const char *q = S_SCR_FW_EXPECT; *q && n < 30; q++)
+            g_fw_expect[n++] = *q;
+        for (const char *q = t; *q && n < 38; q++)
+            g_fw_expect[n++] = *q;
+        g_fw_expect[n] = 0;
+        log_screen_line(LK_INFO, g_fw_expect, 0, 0, 0);
     } else {
         scif_puts(state == 3 ? S_FW_DIMM_CRC :
                   state == 4 ? S_FW_NOTAKE : S_FW_FAIL1);

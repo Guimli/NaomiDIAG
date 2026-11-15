@@ -83,6 +83,7 @@ def main():
         (("S_LP_ERRS",), 30, "loop screen buf[48]"),
         (("S_LP_FIRST",), 33, "loop screen buf[48] with two numbers"),
         (("S_EXC_SCREEN",), 20, "exception line, cut at 20 bytes"),
+        (("S_SCR_FW_EXPECT",), 30, "g_fw_expect[40], cut at 30 bytes, then the version"),
     ]
     pl = cur.get("S_JT_PLAYER", "P")
     if len(pl) != 1 or ord(pl) > 0x7F:

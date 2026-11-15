@@ -1008,7 +1008,15 @@ Ce qui marche passe à côté, par le bus G1 :
   firmware DIMM vérifie le CRC de l'image (il refuse tout autre), efface et
   écrit le slot 1 par secteur, et publie sa progression dans 0x0C01FC0C,
   affichée sur la barre. Le slot 0, chargeur de démarrage, n'est jamais
-  visé : un slot 1 raté laisse le DIMM démarrer sur le slot 0. *Pas encore
+  visé : un slot 1 raté laisse le DIMM démarrer sur le slot 0. La Naomi ne
+  peut pas relire la flash du DIMM (le port PIO n'atteint que sa SDRAM, et
+  le firmware n'offre aucune requête pour cela) ; ce qui vérifie l'écriture,
+  c'est le DIMM : chaque mot est relu dès sa programmation, et au démarrage
+  suivant son chargeur relit tout le slot 1 (CRC) avant de le lancer. Après
+  une gravure réussie, l'action indique donc la version que le DIMM devra
+  annoncer, et chaque `f` suivant compare la version démarrée aux images
+  embarquées — une version de chargeur (slot 0) voulant dire que le slot 1 a
+  été rejeté. *Pas encore
   validé sur vrai matériel* (le premier essai, avec l'ancien chemin « mode
   flash », relisait la SDRAM du DIMM au lieu de sa flash, et n'a rien écrit).
 
