@@ -192,6 +192,11 @@ u32 text_size(void)
     return (u32)(text_hi - text_lo);
 }
 
+static u32 g_text_p1, g_text_delta;     /* the copy in use, 0 = none */
+/* the EPROM original, recorded while running from it: in the copy, the
+ * address of text_lo is one of the shifted ones and names the copy itself */
+static u32 g_text_rom, g_text_words;
+
 u32 text_install(u32 p2_dest)
 {
     const volatile textreloc_t *tr = &textreloc_tab;
@@ -223,5 +228,35 @@ u32 text_install(u32 p2_dest)
     CCR = 0x000009A1;                   /* ICI, from P2; OC kept (stack, .bss) */
     for (volatile int i = 0; i < 8; i++)
         ;
+    g_text_p1 = p1;
+    g_text_delta = delta;
+    g_text_rom = ts;
+    g_text_words = n;
     return delta;
+}
+
+u32 text_verify(u32 *addr, u32 *expect, u32 *got)
+{
+    if (!g_text_p1)
+        return 1;
+    /* through P2: the cache would answer with the clean copy it holds */
+    const volatile u32 *src = (const volatile u32 *)g_text_rom;
+    const volatile u32 *cp = (const volatile u32 *)(g_text_p1 | 0x20000000u);
+    const volatile textreloc_t *tr = &textreloc_tab;
+    u32 n = g_text_words;               /* not text_size(): see g_text_rom */
+    for (u32 i = 0; i < n; i++) {
+        u32 want = src[i], have = cp[i];
+        if (have == want)
+            continue;
+        u32 shifted = 0;
+        for (u32 k = 0; k < tr->count && !shifted; k++)
+            shifted = tr->off[k] == i;
+        if (shifted && have == want + g_text_delta)
+            continue;                   /* a code address, shifted on purpose */
+        *addr = (g_text_p1 | 0x20000000u) + i * 4;
+        *expect = shifted ? want + g_text_delta : want;
+        *got = have;
+        return 0;
+    }
+    return 1;
 }

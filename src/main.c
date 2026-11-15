@@ -737,6 +737,26 @@ static void log_result(const char *name, u32 clip, t_status st, u32 detail,
     log_result_q(name, clip, st, detail, comps, 0, CLIP_NONE);
 }
 
+/* Chips found after a result was logged (a diagnosis that runs once the
+ * verdict is out) join that result on the screen. i: the index the result
+ * was stored at (g_log_n before it); nothing if it was not stored. */
+static void report_comps(const char *ramname, u32 compmask,
+                         const comp_map *comps);
+static void screen_render(void);
+static void log_add_chips(u32 i, const char *name, u32 mask,
+                          const comp_map *comps)
+{
+    if (!mask || !comps || i >= g_log_n || g_log[i].name != name ||
+        g_log[i].status != T_FAIL)
+        return;
+    if (g_log[i].comps && g_log[i].comps != comps)
+        return;                         /* one table per result line */
+    g_log[i].detail |= mask;
+    g_log[i].comps = comps;
+    report_comps(name, mask, comps);
+    screen_render();
+}
+
 /* Screen-only lines: serial already has the same facts in its own words,
  * and there is nothing to say out loud. */
 static void log_screen_line(u32 kind, const char *name, u32 detail, u32 line,
@@ -2142,8 +2162,10 @@ static u32 test_aram(void)
      * Cheap: 8 MB is 21 address lines, so the walk is a few hundred
      * accesses, not a sweep of the chip. */
     bad = aram_test_addrbus();
-    log_result_q(S_L_ARAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1,
-                 CLIP_SOUND_RAM);
+    /* one chip on this bus: a fault on it is IC35's address pins or the
+     * AICA's -- the chip is named either way */
+    log_result_q(S_L_ARAM_ABUS, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, bad ? 1u : 0u,
+                 IC(aram_comps), 1, CLIP_SOUND_RAM);
     if (bad) {
         scif_puts(S_BAD_ABITS);
         scif_puthex(bad);
@@ -2210,6 +2232,7 @@ static u32 test_aram(void)
 /* ------------------------------------------------------------------ */
 static u32 vram_diag_lines;
 static u32 vram_diag_cpu_bits, vram_diag_data_bits;
+static u32 vram_diag_chips;             /* chips of the wrong reads, BIOS order */
 static void report_vram_ic(u32 addr, u32 diff)
 {
     if (!g_ic_valid || !vram_is_mapped(addr) || !diff) return;
@@ -2231,6 +2254,11 @@ static void report_vram_address(const vram_address_event *e)
     else vram_diag_data_bits |= (e->expected ^ e->observed) |
                                (e->expected ^ e->reread) |
                                (e->peer_expected ^ e->peer_observed);
+    /* a wrong read in one cell names its chips (for the screen), whether
+     * or not its line is still printed */
+    if (!e->alias && e->first == e->second)
+        vram_diag_chips |= vram_chip_mask(e->first, (e->expected ^ e->observed) |
+                                                    (e->expected ^ e->reread));
     if (vram_diag_lines++ >= 32) return;
     scif_puts(e->alias ? "  VRAM coupling candidate" : "  VRAM readback failure");
     scif_puts(" addr="); scif_puthex(e->first);
@@ -2257,7 +2285,7 @@ static void report_vram_address(const vram_address_event *e)
 static void diagnose_vram(u32 base, u32 size)
 {
     vram_diag_lines = 0;
-    vram_diag_cpu_bits = vram_diag_data_bits = 0;
+    vram_diag_cpu_bits = vram_diag_data_bits = vram_diag_chips = 0;
     scif_puts(S_VRAM_DIAG);
     u32 failed = vram_address_diagnose(base, size, report_vram_address);
     scif_puts("  VRAM diagnostic failed pairs="); scif_putdec(failed);
@@ -2283,6 +2311,7 @@ static void test_vram_region_body(const char *name, const char *dbus, const char
     u32 bad = vram_test_databus(base);
     u32 c = (bad & 0xFFFF ? 1u : 0) | (bad >> 16 ? 2u : 0);
     if (vram_is_mapped(base)) c = vram_chip_mask(base, bad);
+    u32 li = g_log_n;
     log_result_q(dbus, CLIP_DATA_BUS, bad ? T_FAIL : T_OK, c, comps, 1, name_clip);
     if (bad) {
         report_badbits(bad);
@@ -2291,6 +2320,7 @@ static void test_vram_region_body(const char *name, const char *dbus, const char
         report_cut_lines_vram(base, size, bad, bad, comps);
         *ok_flag = 0;
         diagnose_vram(base, size);
+        log_add_chips(li, dbus, vram_diag_chips & ~c, comps);
         return;
     }
 
@@ -2298,6 +2328,7 @@ static void test_vram_region_body(const char *name, const char *dbus, const char
      * so this window takes a plain pointer and the SDRAM walk applies to it
      * unchanged -- no VRAM-specific variant needed. */
     bad = ram_test_addrbus(base, size);
+    li = g_log_n;
     log_result_q(abus, CLIP_ADDR_BUS, bad ? T_FAIL : T_OK, 0, 0, 1, name_clip);
     if (bad) {
         scif_puts(S_BAD_ABITS);
@@ -2310,6 +2341,8 @@ static void test_vram_region_body(const char *name, const char *dbus, const char
                          name_clip);
         *ok_flag = 0;
         diagnose_vram(base, size);
+        /* wrong reads in single cells name chips the aliasing walk may not */
+        log_add_chips(li, abus, vram_diag_chips, comps);
         return;
     }
 
@@ -4435,7 +4468,9 @@ static void quick_audio_bringup(void)
         scif_puts(S_G2_STALL);
     }
     t_status st = (bad || res.errors) ? T_FAIL : T_OK;
-    log_result(S_L_AUDIO_QUICK, CLIP_NONE, st, 0, 0);
+    /* the only chip of the sound RAM, unless the G2 bus moved nothing */
+    u32 qchip = st == T_FAIL && aica_g2_stalled() == stalls;
+    log_result(S_L_AUDIO_QUICK, CLIP_NONE, st, qchip, qchip ? IC(aram_comps) : 0);
     if (st == T_OK) {
         progress_phase(PH_AUDIO_ON);    /* yellow */
 #if !NO_AUDIO
@@ -4447,11 +4482,12 @@ static void quick_audio_bringup(void)
 
 /* The image area of one bank: its data bus, then the three patterns over
  * the 600 KB the framebuffer occupies. */
-static t_status quick_fb_zone(u32 bank)
+static t_status quick_fb_zone(u32 bank, u32 *chips)
 {
     ram_result res;
     ram_result_clear(&res);
     u32 bad = vram_test_databus(bank);
+    *chips = vram_chip_mask(bank, bad);
     if (!bad) {
         u32 fb = bank + FB_VRAM_OFFSET;
         vram_test_pattern(fb, FB_ZONE_LEN, 0x55555555, &res);
@@ -4460,6 +4496,7 @@ static t_status quick_fb_zone(u32 bank)
     }
     if (res.errors)
         scif_puts("\n");               /* end the rescan's progress line */
+    *chips |= res.vram_chips;
     return (bad || res.errors) ? T_FAIL : T_OK;
 }
 
@@ -4471,11 +4508,14 @@ static void quick_video_bringup(void)
      * fails, the same area of TEX1 -- 8 MB further in the same window, on
      * the other four chips -- can carry the screen instead: a dead chip on
      * one bank does not take the display down with it. */
-    t_status st = quick_fb_zone(VRAM_TEX0_BASE);
-    log_result(S_L_VIDEO_QUICK, CLIP_NONE, st, 0, 0);
+    u32 qc;
+    t_status st = quick_fb_zone(VRAM_TEX0_BASE, &qc);
+    log_result(S_L_VIDEO_QUICK, CLIP_NONE, st, st == T_FAIL ? qc : 0,
+               st == T_FAIL && qc ? IC(tex0_comps) : 0);
     if (st != T_OK) {
-        st = quick_fb_zone(VRAM_TEX1_BASE);
-        log_result(S_L_VIDEO_QUICK_T1, CLIP_NONE, st, 0, 0);
+        st = quick_fb_zone(VRAM_TEX1_BASE, &qc);
+        log_result(S_L_VIDEO_QUICK_T1, CLIP_NONE, st, st == T_FAIL ? qc : 0,
+                   st == T_FAIL && qc ? IC(tex1_comps) : 0);
         if (st == T_OK) {
             pvr_fb_select_tex1(1);
             eta_video_retried();        /* two quick checks, not one */
@@ -6152,21 +6192,42 @@ static void __attribute__((noinline)) cmain_rest(void)
      * 8 KB qualification and then decayed would have corrupted the code
      * producing every result since, so the block is re-read and compared
      * against the master copy in ROM before anything is summarised. */
-    if (reloc_active()) {
-        u32 off, expect, got;
-        if (reloc_verify(&off, &expect, &got)) {
+    /* The same for the program's own copy (text_to_ram). A changed word
+     * names the chip it sits in, as a cell test would. */
+    if (reloc_active() || g_text_win) {
+        u32 off = 0, expect = 0, got = 0, where = 0, mask = 0, ok = 1;
+        u32 in_loops = 0;
+        if (reloc_active() && !reloc_verify(&off, &expect, &got)) {
+            ok = 0;
+            in_loops = 1;
+            where = g_reloc_win + off;
+            u32 sh = (where & 3u) * 8u;     /* a byte: its lane in the word */
+            mask = addr_chip_sdram(where, (expect ^ got) << sh);
+        } else if (g_text_win && !text_verify(&where, &expect, &got)) {
+            ok = 0;
+            mask = addr_chip_sdram(where, expect ^ got);
+        }
+        if (ok) {
             /* Serial only while intact: the screen is a line short on a
              * Naomi 2, and this one only matters when it fails. */
             log_result_q(S_L_RELOC_CHK, CLIP_NONE, T_OK, 0, 0, 1, CLIP_NONE);
         } else {
-            log_result(S_L_RELOC_CHK, CLIP_NONE, T_FAIL, 0, 0);
-            scif_puts("  relocated code changed at offset ");
-            scif_puthex(off);
+            log_result(S_L_RELOC_CHK, mask ? CLIP_CPU_RAM : CLIP_NONE, T_FAIL,
+                       mask, mask ? IC(work_comps) : 0);
+            if (in_loops) {
+                scif_puts("  relocated code changed at offset ");
+                scif_puthex(off);
+            } else {
+                scif_puts("  program copy changed at ");
+                scif_puthex(where);
+            }
             scif_puts(": wrote ");
             scif_puthex(expect);
             scif_puts(", read ");
             scif_puthex(got);
             scif_puts("\n");
+            if (mask)
+                report_comps(S_CG_CPU, mask, IC(work_comps));
             scif_puts(S_RELOC_SUSPECT);
         }
     }

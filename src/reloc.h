@@ -83,6 +83,9 @@ u32  ramtext_install(void);
 #define TEXTRELOC_MAX   3072u
 u32  text_size(void);
 u32  text_install(u32 p2_dest);
+/* Re-read the copy (uncached) against the EPROM and the table: 1 = intact;
+ * 0 = the first word that changed (its P2 address, expected, read). */
+u32  text_verify(u32 *addr, u32 *expect, u32 *got);
 
 /* Re-read the relocated block and compare it byte for byte against the master
  * copy in ROM. A cell that passes an 8 KB test and then decays under load
