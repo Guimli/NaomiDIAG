@@ -245,11 +245,13 @@ maintenant dans la ROM.
 ### 1. Test de la SDRAM du DIMM par DMA G1 — implémenté
 
 La carte DIMM est vue par la Naomi comme une carte ROM sur le bus G1. Les
-registres GD-DMA de Holly (`0xA05F74xx`) ont un bit de **sens** :
-`SB_GDDIR = 0` lit le DIMM vers la RAM système (c'est ainsi que le jeu est
-chargé), `SB_GDDIR = 1` **écrit la RAM système vers le DIMM**. Le bit est
-utilisé dans les deux sens par le BIOS compatible DIMM (`epr-23605c.ic27`),
-à trois sites.
+registres GD-DMA de Holly (`0xA05F74xx`) ont un bit de **sens**, utilisé
+dans les deux sens par le BIOS compatible DIMM (`epr-23605c.ic27`), à trois
+sites. **Mesuré sur une vraie Naomi 2 avec NetDIMM** (2026-11-15) :
+`SB_GDDIR = 1` lit le DIMM vers la RAM système, `SB_GDDIR = 0` **écrit la
+RAM système vers le DIMM** — la convention du BIOS pour les cartouches. La
+première lecture de ce reverse donnait l'inverse ; l'action `d` ne présume
+de rien et sonde les deux valeurs avant d'écrire quoi que ce soit.
 
 `src/dimm.c` s'en sert pour un vrai test mémoire : motifs `0x55555555` puis
 `0xAAAAAAAA` (écriture DMA puis relecture DMA, bloc par bloc), puis **adresse-dans-donnée** : chaque mot reçoit son propre offset,
@@ -318,18 +320,21 @@ gravure ; l'updater ne s'en sert pas, NaomiDIAG non plus.
 
 Embarquer des images de firmware DIMM demandait de la place, et la première
 réponse a été l'option `AUDIO=0` du Makefile, qui remplace la table des clips
-vocaux par un stub muet et fait tomber la ROM à 6 % de l'EPROM.
+vocaux par un stub muet et fait tomber la ROM à 9 % de l'EPROM.
 
 Elle n'est plus nécessaire. Les clips sont passés en **ADPCM 4 bits décodé
 par l'AICA** (`PCMS=2`), soit un facteur 4 sans décompresseur : le build
-français complet occupe 29 % de l'EPROM au lieu de 98 %. Et les trois images
-de firmware, compressées **ensemble** en un flux LZMA solide — elles
-partagent l'essentiel de leur code — tiennent en 526 116 octets au lieu des
-1,9 Mo qu'aurait coûté un deflate par image.
+français complet occupait alors 29 % de l'EPROM au lieu de 98 %. Et les
+images de firmware — les versions du set MAME `segadimm` et la « 4.03 CD-R »,
+pour les deux slots — compressées **ensemble** en un flux LZMA solide (elles
+partagent l'essentiel de leur code) tiennent en environ 546 Ko, là où un
+deflate image par image coûtait 1,4 Mo pour quatre d'entre elles.
 
-Le budget tient donc largement avec la voix : base 126 Ko + décodeur LZMA et
-primitives flash ~18 Ko + firmwares 514 Ko + voix française 470 Ko = **55 %
-de l'EPROM**, presque 1 Mo de libre. `AUDIO=0` reste disponible pour un banc
+Le budget tient donc avec la voix, dans les neuf langues : **81 à 85 % de
+l'EPROM**, 97 % en japonais (build local `DIMMFW=1`). Le décodeur LZMA
+tourne depuis la RAM CPU (section `.ramtext`, recopiée et vérifiée avant
+chaque décompression) : l'image de 1 Mo est prête en 1,5 s, contre 3 minutes
+quand il s'exécutait dans l'EPROM. `AUDIO=0` reste disponible pour un banc
 où la parole gêne.
 
 ### Sécurité de ce qu'on émet

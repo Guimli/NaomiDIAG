@@ -13,7 +13,8 @@ dépendre d'une mémoire dont le bon fonctionnement n'a pas encore été prouvé
 Elle a déjà servi à réparer une carte : la ROM a désigné **IC10**, et le
 remplacement d'IC10 seul a fait disparaître la panne.
 
-Disponible en **anglais** et en **français**, texte et voix localisés.
+Disponible en **anglais, français, allemand, espagnol, italien, portugais,
+danois, japonais et chinois**, texte et voix localisés.
 Les ROMs pré-compilées prêtes à graver sont sur la page
 [**Releases**](https://github.com/Guimli/NaomiDIAG/releases/latest) —
 téléchargement direct :
@@ -35,7 +36,7 @@ qui pulse tant que la ROM est vivante.
 
 L'exécution complète est sur la page des releases :
 [**NaomiDIAG_EN_IC9_fault.mp4**](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_EN_IC9_fault.mp4)
-— 162 secondes, tous les tests, **avec le son**, pour entendre la panne
+— 130 secondes, tous les tests, **avec le son**, pour entendre la panne
 annoncée autant que la lire. GitHub ne lit pas une vidéo hébergée dans un
 dépôt (il supprime la balise `<video>`) : d'où le GIF muet ci-dessus et le
 téléchargement pour la version sonore.
@@ -60,10 +61,10 @@ L'ordre d'activation des canaux suit ce dont chacun a besoin :
   s'active, il rejoue d'abord tous les résultats déjà acquis, puis rapporte
   en direct.
 
-Comme le son et la vidéo sont activés avant le long test de la RAM
-principale, la machine ne paraît jamais figée pendant ce test d'environ une
-minute — l'écran affiche déjà les résultats précédents et le SCIF imprime la
-progression passe par passe.
+Comme le son et la vidéo sont activés avant les tests mémoire, la machine
+ne paraît jamais figée pendant ceux-ci — l'écran affiche déjà les résultats
+précédents et une barre de progression, et le SCIF imprime la progression
+passe par passe.
 
 Les rapports vocaux sont bloquants, avec au moins une seconde de silence
 entre deux messages pour éviter tout chevauchement.
@@ -75,7 +76,7 @@ processeur — les octets sont copiés en RAM son exactement tels qu'ils sont
 en ROM. Le build français complet est passé de 98 % de l'EPROM à 29 % ;
 avec les clips ajoutés depuis (puces Naomi 2, carte JVS, lignes de données),
 un build complet
-occupe 54 à 58 % dans les langues en alphabet latin, 70 % en japonais.
+occupe 55 à 58 % dans les langues en alphabet latin, 71 % en japonais.
 
 ## Ce qui est testé
 
@@ -147,8 +148,8 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
    monnayeurs, voies analogiques). Si aucune carte ne répond, elle est
    rapportée *absente*, pas en panne.
 
-   Les étapes 6 à 8 ont lieu ici, avant les tests mémoire, sur le bloc
-   qualifié à l'étape 5 : les boutons peuvent ainsi interrompre la partie
+   Les étapes 7 à 9 ont lieu ici, avant les tests mémoire, sur le bloc
+   qualifié à l'étape 4 : les boutons peuvent ainsi interrompre la partie
    longue de la suite. Sur une carte où aucun bloc n'est qualifié, elles
    attendent le test de la RAM CPU et sont ignorées s'il échoue.
 10. **RAM CPU principale** (SDRAM, 16/32 Mo, IC9/IC10/IC11S/IC12S) — d'abord
@@ -204,9 +205,11 @@ utilise réellement, si bien que les résultats sont rapportés au fil de l'eau.
     (`Date RTC (2026 ou apres)`).
 16. **EEPROM numéro de série** (IC31, 93C46 sur GPIO du SH-4) — lecture +
     contrôle du contenu.
-17. **Intégrité du code relogé** — les boucles relogées ont tourné depuis la
-    RAM même qu'on testait : elles sont relues et comparées à la copie en
-    ROM. À l'écran seulement en cas d'échec ; toujours sur le port série.
+17. **Intégrité du code relogé** — les boucles relogées et la copie du
+    programme ont tourné depuis la RAM même qu'on testait : elles sont
+    relues (sans cache) et comparées à leurs originaux ; un mot modifié
+    nomme la puce de RAM CPU qui le porte. À l'écran seulement en cas
+    d'échec ; toujours sur le port série.
 
 Les **actions opérateur** sont au menu opérateur (voir
 [Menu opérateur](#menu-opérateur)) : soit elles écrivent quelque part,
@@ -234,7 +237,10 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
   gêne pas).
 - **Rapport d'exception** — une exception CPU arrête la ROM avec sa cause
   et son adresse à l'écran, à la voix, et sur le port série avec r0-r15,
-  SPC, SSR, PR et TEA (l'adresse fautive). Quand TEA est un mot du code
+  SPC, SSR, PR et TEA (l'adresse fautive). Depuis la copie du programme en
+  RAM, SPC et PR sont des adresses de la copie : la ligne série ajoute les
+  adresses EPROM que connaît le `.map`, et l'écran affiche le PC EPROM
+  suivi de `*`. Quand TEA est un mot du code
   juste autour de l'instruction fautive -- l'EPROM a renvoyé un mot voisin,
   ce que fait une cartouche défectueuse qui perturbe le bus G1 partagé avec
   l'EPROM -- le rapport affiche **Cartouche suspecte : la retirer**.
@@ -248,8 +254,9 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
   sans graver une EPROM par essai ; une adresse farfelue finit sur le
   rapport d'exception CPU.
 - **Carte DIMM** (`d`) — vidage des registres et contrôle de stabilité en
-  lecture, puis le test destructif de la SDRAM par DMA G1 ; `f` identifie
-  la flash du firmware DIMM (voir [Carte DIMM](#carte-dimm)).
+  lecture, puis le test destructif de la SDRAM par DMA G1 ; `f` nomme le
+  firmware du DIMM et, dans un build local `DIMMFW=1`, lui en fait graver
+  un nouveau (voir [Carte DIMM](#carte-dimm)).
 - **Test des entrées JVS** (`j`) — chaque entrée de la carte I/O, en direct.
 - **Mire vidéo** (`m`) — barres de couleur, quadrillage, échelle de gris,
   rampes par composante, plages de pureté et damier d'un pixel, pour le
@@ -329,7 +336,10 @@ données concernées, et désignateur IC sérigraphié (ex.
 désignées comme *voie suspecte (puce ou connexions)*. À l'écran, les puces
 fautives s'affichent en rouge sur la ligne même de l'échec, juste avant
 `ECHEC` (`SDRAM test cellules   IC9 IC12S ECHEC`) ; un libellé trop long pour
-leur laisser la place perd sa parenthèse.
+leur laisser la place perd sa parenthèse. Les tests de bus, les contrôles
+rapides du démarrage, le contrôle d'accès PVR-B et le contrôle d'intégrité
+du code nomment leurs puces de la même façon dès que les bits fautifs le
+permettent (`Acces PVR-B   IC112S ECHEC`).
 
 Une panne de RAM est aussi examinée pour une **ligne de données coupée**,
 sur la RAM CPU, la VRAM et la RAM Elan de la Naomi 2. Chaque bit fautif est
@@ -443,8 +453,12 @@ ROM.
 L'exécution cachée depuis la SDRAM est tout autre chose : c'est là que tourne
 chaque jeu Naomi. Les boucles de test mémoire et la relecture de localisation — environ 500 octets, où
 passe la quasi-totalité du temps — sont donc recopiées au démarrage dans les 8 Ko
-de RAM CPU et exécutées depuis là, en cache, le reste du programme demeurant
-en ROM.
+de RAM CPU et exécutées depuis là, en cache. Le reste du programme suit
+(étape 4 ci-dessus) : ses 80 Ko de code sont recopiés dans une fenêtre de
+88 Ko juste sous ce bloc, testée de la même façon d'abord, et dès lors tout
+tourne en cache depuis la RAM CPU — la décompression du firmware DIMM est
+passée de 3 minutes à 1,5 s, la suite de 3:07 à 2:02. Seules les données
+(textes, glyphes, sons, images de firmware) sont encore lues dans l'EPROM.
 
 Les quatre puces de RAM CPU sont entrelacées par voie de données et non par
 plage d'adresses — IC9/IC10 portent les mots pairs, IC11S/IC12S les impairs —
@@ -469,8 +483,12 @@ avant qu'on y copie quoi que ce soit, et la mémoire sous test reste adressée
 par P2 : le chemin de données demeure non caché et la couverture est
 conservée. Si aucune RAM utilisable n'est trouvée, les pointeurs continuent
 de viser les copies en ROM et le diagnostic est lent plutôt qu'absent — ce
-qui est précisément le cas d'une carte à diagnostiquer. `RELOC=0` désactive
-complètement le mécanisme.
+qui est précisément le cas d'une carte à diagnostiquer. Il en va de même
+pour la copie du programme : pas de bloc testé pour les boucles, une
+fenêtre qui échoue à son test ou une copie qui ne se relit pas à
+l'identique, et le programme continue simplement depuis l'EPROM. Les tests
+de RAM CPU qui suivent s'arrêtent sous les deux fenêtres. `RELOC=0`
+désactive complètement le mécanisme.
 
 ## Diagnostic TEX et PVR-A/B
 
@@ -773,10 +791,10 @@ du diagnostic : elle ne se termine jamais, donc le rapport reste affiché mais
 la machine ne se stabilise pas. À activer quand vous avez une sonde en main.
 
 **`AUDIO=0`** produit une ROM muette : la table des clips vocaux est
-remplacée par un stub et l'image tombe à 6 % de l'EPROM. Cette option est née
+remplacée par un stub et l'image tombe à 9 % de l'EPROM. Cette option est née
 quand les clips étaient du PCM 16 bits et ne laissaient de place à rien
-d'autre ; depuis leur passage en ADPCM, un build complet occupe de 54 à
-70 %, ce n'est donc plus un moyen de faire de la place — c'est pour un
+d'autre ; depuis leur passage en ADPCM, un build complet occupe de 55 à
+71 %, ce n'est donc plus un moyen de faire de la place — c'est pour un
 établi où la parole gêne, et ça démarre un peu plus vite. `AUDIO=1` est la
 valeur par défaut.
 
@@ -953,7 +971,10 @@ Ce qui marche passe à côté, par le bus G1 :
   une coupure de courant dans la SDRAM (vu après 10 s hors tension) : tant
   qu'une étape est en cours, le battement le date avec la RTC de l'AICA, qui
   tourne sur sa pile, et un démarrage ne reprend que dans les 2 s qui
-  suivent ; une action terminée efface le bloc. Le journal série donne la
+  suivent, et seulement si l'horloge avance (une horloge arrêtée ne date
+  rien) ; une action terminée efface le bloc — la gravure du firmware
+  l'efface avant sa demande, si bien qu'un reset du DIMM pendant
+  l'écriture ne ramène jamais le menu des versions. Le journal série donne la
   cause de chaque démarrage (`EXPEVT`). Le GD-DMA
   de Holly a un bit de sens, et
   les sources se contredisent : le reverse du DIMM donnait 0 = lecture,
@@ -1035,7 +1056,9 @@ Ce qui marche passe à côté, par le bus G1 :
   été rejeté. **Validé sur un vrai NetDIMM** (2026-11-15) : 4.02 remplacé
   par 4.03 CD-R — transfert et relecture en 9 s environ, gravure par le DIMM
   en 12 s, et après remise sous tension le DIMM a annoncé « firmware 4.03 »,
-  que l'action a reconnu comme l'image embarquée 4.03 CD-R du slot 1. (Un
+  que l'action a reconnu comme l'image embarquée 4.03 CD-R du slot 1. Avec
+  le programme en RAM CPU depuis, la décompression prend 1,5 s (3 min
+  depuis l'EPROM) et le transfert avec sa relecture moins d'une seconde. (Un
   premier essai, avec l'ancien chemin « mode flash », relisait la SDRAM du
   DIMM au lieu de sa flash, et n'a rien écrit.)
 

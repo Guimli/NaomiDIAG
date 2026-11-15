@@ -31,7 +31,11 @@ RAM tests, which locate and name it. Only a write reaching another window
 does, because then testing B would write into A.
 
 An access failure produces a separate access failure and skips the PVR-B
-memory test, without announcing defective RAM chips. The Elan RAM is the
+memory test. The probe's wrong reads are reduced to chips the way a bus
+test's are and shown on that line (`PVR-B access   IC112S FAIL`, spoken and
+on serial too): a *suspect lane, chip or connections*, from a few samples,
+not the verdict of a full test. A wrong read in A, the reference, names A's
+chips (TEX0/TEX1), never B's. The Elan RAM is the
 Elan's own memory, not a window onto either GPU: testing it writes no VRAM,
 so it is still tested unless the Elan itself does not answer (codes 1-2).
 Serial codes:
@@ -48,8 +52,9 @@ Serial codes:
 Codes 5 and 6 leave too few trustworthy bits to see another window's marker
 through, so nothing is concluded. Code 6 means PVR-B's VRAM keeps nothing
 written to it — its chips, its controller, or an initialisation this ROM
-gets wrong on real hardware; no chip is named, and B is not written any
-further, because B writes were never shown to leave A alone.
+gets wrong on real hardware; the chips of its wrong reads are named as
+suspect lanes, and B is not written any further, because B writes were
+never shown to leave A alone.
 
 These samples do not prove the entire address map; the normal data-bus,
 address-bus, and pattern tests still run after success. A persistent

@@ -12,8 +12,9 @@ relying on memory it has not yet proven good.
 It has been used to repair a board: the ROM named **IC10**, replacing IC10
 alone cleared the fault.
 
-Available in **English** and **French**, text and voice both localized.
-Pre-built ROMs ready to burn are on the
+Available in **English, French, German, Spanish, Italian, Portuguese,
+Danish, Japanese and Chinese**, text and voice both localized. Pre-built
+ROMs ready to burn are on the
 [**Releases**](https://github.com/Guimli/NaomiDIAG/releases/latest) page —
 direct downloads:
 [NaomiDIAG_EN.bin](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_EN.bin)
@@ -34,7 +35,7 @@ alive.
 
 The full run is on the release page:
 [**NaomiDIAG_EN_IC9_fault.mp4**](https://github.com/Guimli/NaomiDIAG/releases/latest/download/NaomiDIAG_EN_IC9_fault.mp4)
-— 162 seconds, every test, **with the sound**, so you can hear the fault
+— 130 seconds, every test, **with the sound**, so you can hear the fault
 announced as well as read it. GitHub will not play a video that lives in a
 repository (it strips the `<video>` tag), hence the silent GIF above and the
 download for the real thing.
@@ -58,9 +59,9 @@ The order in which the channels come up follows what each one needs:
   passed. The full tests of those memories come later. When audio comes
   up it first replays every result acquired so far, then reports live.
 
-Because sound and video are brought up before the long main-RAM test, the
-machine never looks frozen during that ~1-minute test — the screen already
-shows the earlier results and the SCIF prints per-pass progress.
+Because sound and video are brought up before the memory tests, the
+machine never looks frozen during them — the screen already shows the
+earlier results and a progress bar, and the SCIF prints per-pass progress.
 
 Spoken reports are blocking, with at least one second of silence between two
 messages so clips never overlap.
@@ -71,7 +72,7 @@ on the EPROM with no decompressor, no scratch buffer and no CPU cost — the
 bytes are copied into sound RAM exactly as they sit in the ROM. The full
 French build went from 98 % of the EPROM to 29 %; with the clips added since
 (Naomi 2 chips, JVS board, data-line reports) a full build sits at
-54 to 58 % in the Latin-script languages, 70 % in Japanese.
+55 to 58 % in the Latin-script languages, 71 % in Japanese.
 
 ## What it tests
 
@@ -136,8 +137,8 @@ are reported as they land.
    revisions and inputs (players, switches, coin slots, analog channels).
    No board answering is reported as *not present*, not as a fault.
 
-   Steps 6-8 run here, before the memory tests, on the block qualified at
-   step 5, so the buttons can interrupt the long part of the suite. On a
+   Steps 7-9 run here, before the memory tests, on the block qualified at
+   step 4, so the buttons can interrupt the long part of the suite. On a
    board where no block qualifies they wait for the CPU RAM test and are
    skipped if it fails.
 10. **Main CPU RAM** (SDRAM, 16/32 MB, IC9/IC10/IC11S/IC12S) — first a data-bus
@@ -185,9 +186,10 @@ are reported as they land.
     clock never set — and it gets its own line (`RTC date (2026 or later)`).
 16. **Serial-number EEPROM** (IC31, 93C46 on SH-4 GPIO) — read + content
     check.
-17. **Relocated code integrity** — the relocated loops ran from the very RAM
-    under test, so they are read back and compared with the ROM copy. On
-    screen only when it fails; serial always.
+17. **Relocated code integrity** — the relocated loops and the program's
+    copy ran from the very RAM under test, so both are read back (uncached)
+    and compared with their originals; a changed word names the CPU RAM
+    chip it sits in. On screen only when it fails; serial always.
 
 The **operator actions** are on the operator menu (see
 [Operator menu](#operator-menu)): they either write to something or
@@ -212,7 +214,9 @@ take long enough that they have no business delaying the report.
   Keys are case-insensitive (caps lock does no harm).
 - **Exception report** — a CPU exception halts with its cause and address
   on screen, spoken, and on serial with r0-r15, SPC, SSR, PR and TEA (the
-  faulting address). When TEA is a word of the code right around the
+  faulting address). From the program's RAM copy, SPC and PR are copy
+  addresses: the serial line adds the EPROM addresses the `.map` knows, and
+  the screen shows the EPROM PC marked with `*`. When TEA is a word of the code right around the
   faulting instruction -- the EPROM handed back a neighbouring word, which
   is what a faulty cartridge disturbing the G1 bus it shares with the
   EPROM does -- the report says **Suspect cartridge: remove it**.
@@ -225,8 +229,9 @@ take long enough that they have no business delaying the report.
   question be put to a real board without burning an EPROM per guess; a
   wild address ends in the CPU exception report.
 - **DIMM board** (`d`) — register dump and read stability, then the
-  destructive SDRAM test over the G1 DMA; `f` identifies the DIMM's firmware
-  flash (see [DIMM board](#dimm-board)).
+  destructive SDRAM test over the G1 DMA; `f` names the DIMM's firmware and,
+  in a local `DIMMFW=1` build, has the DIMM write a new one (see
+  [DIMM board](#dimm-board)).
 - **JVS input test** (`j`) — every input of the I/O board, live.
 - **Video test pattern** (`m`) — colour bars, crosshatch, grey scale,
   per-component ramps, purity fields and a one-pixel checkerboard, for the
@@ -300,7 +305,9 @@ and the silkscreen IC designator (e.g. `CPU RAM 1 (IC9) DEFECTIVE`). VRAM and
 Elan RAM chips are named as a *suspect lane (chip or connections)*. On screen
 the failing chips sit in red on the failure's own line, just before `FAIL`
 (`SDRAM cell test   IC9 IC12S FAIL`); a label too long to leave them room
-drops its parenthesis.
+drops its parenthesis. The bus tests, the quick checks at boot, the PVR-B
+access check and the code integrity check name their chips the same way
+whenever the failing bits say which (`PVR-B access   IC112S FAIL`).
 
 A RAM fault is also checked for a **cut data line**, on the CPU RAM, the
 VRAM and the Naomi 2 Elan RAM. Each failing bit is probed on 64 addresses
@@ -409,7 +416,12 @@ which matches the original BIOS, that never executes cached from ROM either.
 Cached execution from SDRAM is a different matter: it is where every Naomi
 game runs. So the memory-test loops and the failure scan -- about 500 bytes, where
 essentially all the time goes -- are copied into an 8 KB block of CPU RAM at boot and run
-from there, cached, while everything else stays in ROM.
+from there, cached. Then the rest of the program follows (step 4 above): its
+80 KB of code are copied into an 88 KB window just below that block, tested
+the same way first, and from there on everything runs cached from CPU RAM --
+the DIMM firmware unpack went from 3 minutes to 1.5 s, the suite from 3:07
+to 2:02. Only the data (texts, glyphs, sounds, firmware images) is still
+read from the EPROM.
 
 The four CPU RAM chips are interleaved by data lane rather than by address
 range -- IC9/IC10 carry the even words, IC11S/IC12S the odd ones -- so every
@@ -432,7 +444,11 @@ anything is copied into it, and the memory under test is still addressed
 through P2, so the data path stays uncached and the test keeps its coverage.
 If no usable RAM is found the pointers keep addressing the ROM copies and the
 diagnostic runs slowly rather than not at all -- which is exactly the board
-that needs diagnosing. Build with `RELOC=0` to disable it entirely.
+that needs diagnosing. The same holds for the program's copy: no tested
+block for the loops, a window that fails its test, or a copy that does not
+read back exactly, and the program simply goes on from the EPROM. The CPU
+RAM tests that follow stop below both windows. Build with `RELOC=0` to
+disable it entirely.
 
 ## TEX and PVR-A/B diagnostics
 
@@ -715,9 +731,9 @@ so the report stays up but the machine never settles. Turn it on when you
 have a probe in hand.
 
 **`AUDIO=0`** builds a silent ROM: the spoken-clip table is replaced by a
-stub and the image drops to 6 % of the EPROM. It was introduced when the
+stub and the image drops to 9 % of the EPROM. It was introduced when the
 clips were 16-bit PCM and left no room for anything else; since they became
-ADPCM a full build sits at 54 to 70 %, so this is no longer a way of
+ADPCM a full build sits at 55 to 71 %, so this is no longer a way of
 making room — it is for a bench where the speech is in the way, and it boots
 a little faster. `AUDIO=1` is the default.
 
@@ -886,8 +902,10 @@ What does work goes around it, on the G1 bus:
   carries on. At most three resumes in a row, then a normal boot. The block outlives a
   power cycle in the SDRAM (seen through 10 s off), so while a step is under
   way the heartbeat dates it with the AICA RTC, which runs on its battery:
-  a boot resumes only within 2 s of that date, and a finished action clears
-  the block. The serial log names each boot's cause (`EXPEVT`). Holly's
+  a boot resumes only within 2 s of that date and only if the clock is seen
+  ticking (a stopped clock dates nothing), and a finished action clears
+  the block -- the firmware write clears it before its request, so a DIMM
+  reset during the write never brings the version menu back. The serial log names each boot's cause (`EXPEVT`). Holly's
   GD-DMA has a direction bit, and the
   sources disagree on it: the DIMM reversing had 0 = read, while the
   original BIOS loads cartridges with `SB_GDDIR = 1`. The count register
@@ -961,7 +979,9 @@ What does work goes around it, on the G1 bus:
   rejected. **Validated on a real NetDIMM** (2026-11-15): 4.02 replaced by
   4.03 CD-R -- transfer and read-back in about 9 s, the DIMM's own write in
   12 s, and after the power cycle the DIMM announced "firmware 4.03", which
-  the action named as the embedded slot-1 image 4.03 CD-R. (A first
+  the action named as the embedded slot-1 image 4.03 CD-R. With the program
+  in CPU RAM since, the unpack takes 1.5 s (3 min from the EPROM) and the
+  transfer with its read-back under a second. (A first
   attempt, with the former flash-mode path, read the DIMM's SDRAM back
   instead of its flash, and wrote nothing.)
 
