@@ -609,6 +609,7 @@ Keys on the serial console:
 | `j` | JVS input test — every switch, coin count and analog channel, live |
 | `m` | video test pattern |
 | `!` | serial monitor — memory read/write, G1 status (console only, not in the on-screen menu) |
+| `t` | set the date and time of the AICA RTC, `YYYY-MM-DD HH:MM:SS`, read back (console only) |
 
 On screen, the operator menu lists the same actions: **TEST** (or the
 cabinet's TEST) steps through them and wraps; **SERVICE** (or player 1

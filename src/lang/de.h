@@ -327,6 +327,7 @@
                             "  j  JVS-Eingabetest (Tasten, Münzschlitze, analog)\n"\
                             "  m  Video-Testbild (Balken, Gitter, Grau, Reinheit...)\n"\
                             "  !  serieller Monitor (Speicher lesen/schreiben, G1-Entsperrung)\n"\
+                            "  t  Datum und Uhrzeit stellen (nur diese Konsole)\n"\
                             "  (Groß- und Kleinschreibung sind gleich)\n"
 #define S_M_JVS             "JVS-Eingabetest"
 #define S_M_PATTERN         "Video-Testbild"
@@ -449,6 +450,12 @@
 #define S_RTC_READS         "  RTC-Lesungen: "
 #define S_L_RTC_DATE        "RTC-Datum (2026 oder später)"
 #define S_RTC_DATE_BAD      "  Datum vor 2026: Batterie leer oder Uhr nie gestellt.\n"
+#define S_RTCSET_NOW        "\nUhr (AICA-RTC): "
+#define S_RTCSET_ASK        "\n  neues Datum und Uhrzeit, JJJJ-MM-TT HH:MM:SS (Enter = behalten): "
+#define S_RTCSET_KEPT       "  unverändert\n"
+#define S_RTCSET_BAD        "  kein gültiges Datum mit Uhrzeit (1950 bis 2085): nichts geändert\n"
+#define S_RTCSET_OK         "  Uhr gestellt, sie zeigt jetzt "
+#define S_RTCSET_FAIL       "  die Uhr hat den neuen Wert nicht übernommen, sie zeigt "
 #define S_MAPLE_SKIP        "\nMaple/MIE-Test übersprungen (Hauptspeicher unbrauchbar).\n"
 #define S_EEPROM_SKIP       "\nTest des Einstellungs-EEPROM übersprungen (kein MIE).\n"
 #define S_EEPROM_MIE_NOTE   "  das MIE-Programm hat das EEPROM nicht geliefert\n"

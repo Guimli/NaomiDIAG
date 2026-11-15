@@ -325,6 +325,7 @@
                             "  j  JVS input test (buttons, coin slots, analog)\n"\
                             "  m  video test pattern (bars, crosshatch, grey, purity...)\n"\
                             "  !  serial monitor (memory read/write, G1 unlock)\n"\
+                            "  t  set the date and time (this console only)\n"\
                             "  (upper and lower case are the same)\n"
 #define S_M_JVS             "JVS input test"
 #define S_M_PATTERN         "Video test pattern"
@@ -447,6 +448,12 @@
 #define S_RTC_READS         "  RTC reads: "
 #define S_L_RTC_DATE        "RTC date (2026 or later)"
 #define S_RTC_DATE_BAD      "  Date before 2026: flat battery, or the clock was never set.\n"
+#define S_RTCSET_NOW        "\nClock (AICA RTC): "
+#define S_RTCSET_ASK        "\n  new date and time, YYYY-MM-DD HH:MM:SS (Enter = keep): "
+#define S_RTCSET_KEPT       "  unchanged\n"
+#define S_RTCSET_BAD        "  not a valid date and time (1950 to 2085): nothing changed\n"
+#define S_RTCSET_OK         "  clock set, it now reads "
+#define S_RTCSET_FAIL       "  the clock did not take the new value, it reads "
 #define S_MAPLE_SKIP        "\nMaple/MIE test skipped (main RAM unusable).\n"
 #define S_EEPROM_SKIP       "\nSettings EEPROM test skipped (no MIE).\n"
 #define S_EEPROM_MIE_NOTE   "  the MIE program did not return the EEPROM\n"

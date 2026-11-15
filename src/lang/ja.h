@@ -329,6 +329,7 @@
                             "  j  JVS入力テスト (ボタン、コインスロット、アナログ)\n"\
                             "  m  映像テストパターン (カラーバー、クロスハッチ、グレー、純度...)\n"\
                             "  !  シリアルモニタ (メモリ読み書き、G1解除)\n"\
+                            "  t  日付と時刻の設定 (このコンソールのみ)\n"\
                             "  (大文字と小文字は同じ)\n"
 #define S_M_JVS             "JVS入力テスト"
 #define S_M_PATTERN         "映像テストパターン"
@@ -451,6 +452,12 @@
 #define S_RTC_READS         "  RTC読み出し: "
 #define S_L_RTC_DATE        "RTCの日付 (2026年以降)"
 #define S_RTC_DATE_BAD      "  2026年より前の日付: 電池切れ、または時計が未設定です。\n"
+#define S_RTCSET_NOW        "\n時計 (AICA RTC): "
+#define S_RTCSET_ASK        "\n  新しい日時 YYYY-MM-DD HH:MM:SS (Enter = 変更なし): "
+#define S_RTCSET_KEPT       "  変更なし\n"
+#define S_RTCSET_BAD        "  無効な日時 (1950～2085年): 変更していません\n"
+#define S_RTCSET_OK         "  時計を設定、現在の表示: "
+#define S_RTCSET_FAIL       "  時計に新しい値が入らない、現在の表示: "
 #define S_MAPLE_SKIP        "\nMaple/MIEテスト省略 (メインRAM使用不可)。\n"
 #define S_EEPROM_SKIP       "\n設定EEPROMテスト省略 (MIEなし)。\n"
 #define S_EEPROM_MIE_NOTE   "  MIEプログラムがEEPROMの内容を返しませんでした\n"

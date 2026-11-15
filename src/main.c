@@ -2872,6 +2872,21 @@ static u32 dimm_session_open(u32 resumed, u32 step, u32 *psize, u32 *pidle)
     scif_putc('/');
     scif_putdec(dimm_host_refused());
     scif_puts("\n");
+    /* Everything the DIMM posted into the BIOS work area, for the record:
+     * besides its memory (FC04) and version (FC0C) words it fills FC14,
+     * FC20-FC2C, FC40-FC70 at boot, whose meaning is not all known yet
+     * (looking, among others, for the version of its flash's first half). */
+    for (u32 a = 0x0C01FC00u; a < 0x0C01FCA0u; a += 4) {
+        if (!(a & 0x1Fu)) {
+            scif_puts("  ");
+            scif_puthex(a);                 /* "  0C01FC00:" */
+            scif_putc(':');
+        }
+        scif_putc(' ');
+        scif_puthex(dimm_host_word(a));
+        if ((a & 0x1Fu) == 0x1Cu)
+            scif_puts("\n");
+    }
     *psize = size;
     *pidle = idle;
     return 1;
@@ -4795,6 +4810,7 @@ static void menu_draw(u32 sel)
 
 static void run_action(u32 act);
 static void monitor_run(void);
+static void rtc_set_console(void);
 
 /* TEST steps through the entries and wraps at the end; SERVICE runs the one
  * shown. A serial key jumps straight to its action without the menu. */
@@ -4817,6 +4833,8 @@ static void menu_run(void)
                     scif_puts(S_HELP);
                 } else if (ev.key == '!') {
                     monitor_run();
+                } else if (ev.key == 't' || ev.key == 'T') {
+                    rtc_set_console();      /* serial console only */
                 } else {
                     for (u32 i = 0; i < ACT_COUNT; i++) {
                         if (ev.key == menu_key[i]) {
@@ -5438,6 +5456,59 @@ static u32 mon_line(char *buf, u32 max)
     }
 }
 
+/* 't' on the console, from the menu or the idle screen, and nowhere else:
+ * set the AICA RTC. A board whose battery was replaced, or that left the
+ * factory with the clock at 1950, fails "RTC date (2026 or later)" until
+ * this is done. "YYYY-MM-DD HH:MM:SS" (seconds optional); Enter alone
+ * keeps the clock as it is. */
+static u32 rtc_parse_num(const char **p, u32 nd, u32 *v)
+{
+    u32 x = 0;
+    for (u32 i = 0; i < nd; i++, (*p)++) {
+        if (**p < '0' || **p > '9')
+            return 0;
+        x = x * 10u + (u32)(**p - '0');
+    }
+    *v = x;
+    return 1;
+}
+
+static void rtc_set_console(void)
+{
+    char cur[24], line[32];
+    rtc_fmt(rtc_now(), cur);
+    cur[19] = 0;
+    scif_puts(S_RTCSET_NOW);
+    scif_puts(cur);
+    scif_puts(S_RTCSET_ASK);
+    if (!mon_line(line, sizeof line)) {
+        scif_puts(S_RTCSET_KEPT);
+        return;
+    }
+    const char *p = line;
+    u32 y, mo, d, hh, mi, ss = 0, ok;
+    ok = rtc_parse_num(&p, 4, &y) && *p++ == '-' &&
+         rtc_parse_num(&p, 2, &mo) && *p++ == '-' &&
+         rtc_parse_num(&p, 2, &d) && (*p == ' ' || *p == 'T') && *p++ &&
+         rtc_parse_num(&p, 2, &hh) && *p++ == ':' &&
+         rtc_parse_num(&p, 2, &mi);
+    if (ok && *p == ':') {
+        p++;
+        ok = rtc_parse_num(&p, 2, &ss);
+    }
+    u32 secs = ok && !*p ? rtc_from_date(y, mo, d, hh, mi, ss) : 0xFFFFFFFFu;
+    if (secs == 0xFFFFFFFFu) {
+        scif_puts(S_RTCSET_BAD);
+        return;
+    }
+    u32 set = rtc_set(secs);
+    rtc_fmt(rtc_now(), cur);
+    cur[19] = 0;
+    scif_puts(set ? S_RTCSET_OK : S_RTCSET_FAIL);
+    scif_puts(cur);
+    scif_puts("\n");
+}
+
 static void monitor_run(void)
 {
     char line[64];
@@ -5530,6 +5601,8 @@ static void console_idle(void)
                     scif_puts(S_HELP);
                 } else if (ev.key == '!') {
                     monitor_run();
+                } else if (ev.key == 't' || ev.key == 'T') {
+                    rtc_set_console();      /* serial console only */
                 } else {
                     for (u32 i = 0; i < ACT_COUNT; i++) {
                         if (ev.key == menu_key[i]) {

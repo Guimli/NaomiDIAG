@@ -330,6 +330,7 @@
                             "  j  test des entrees JVS (boutons, monnayeurs, analogiques)\n"\
                             "  m  mire video (barres, quadrillage, gris, purete...)\n"\
                             "  !  moniteur serie (lecture/ecriture memoire, deverrouillage G1)\n"\
+                            "  t  regler la date et l'heure (cette console seulement)\n"\
                             "  (majuscules et minuscules sont equivalentes)\n"
 #define S_M_JVS             "Test des entrees JVS"
 #define S_M_PATTERN         "Mire video"
@@ -454,6 +455,12 @@
 #define S_RTC_READS         "  Lectures RTC : "
 #define S_L_RTC_DATE        "Date RTC (2026 ou apres)"
 #define S_RTC_DATE_BAD      "  Date anterieure a 2026 : pile HS ou horloge jamais reglee.\n"
+#define S_RTCSET_NOW        "\nHorloge (RTC de l'AICA) : "
+#define S_RTCSET_ASK        "\n  nouvelles date et heure, AAAA-MM-JJ HH:MM:SS (Entrée = garder) : "
+#define S_RTCSET_KEPT       "  inchangée\n"
+#define S_RTCSET_BAD        "  date et heure non valides (1950 à 2085) : rien n'est changé\n"
+#define S_RTCSET_OK         "  horloge réglée, elle indique maintenant "
+#define S_RTCSET_FAIL       "  l'horloge n'a pas pris la nouvelle valeur, elle indique "
 #define S_MAPLE_SKIP        "\nTest Maple/MIE ignore (RAM principale inutilisable).\n"
 #define S_EEPROM_SKIP       "\nTest EEPROM reglages ignore (pas de MIE).\n"
 #define S_EEPROM_MIE_NOTE   "  le programme MIE ne rend pas l'EEPROM\n"

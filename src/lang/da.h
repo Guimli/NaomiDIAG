@@ -327,6 +327,7 @@
                             "  j  JVS-indgangstest (knapper, møntindkast, analog)\n"\
                             "  m  videotestbillede (bjælker, gitter, grå, renhed...)\n"\
                             "  !  seriel monitor (læs/skriv hukommelse, G1-oplåsning)\n"\
+                            "  t  stil dato og tid (kun denne konsol)\n"\
                             "  (store og små bogstaver er ens)\n"
 #define S_M_JVS             "JVS-indgangstest"
 #define S_M_PATTERN         "Videotestbillede"
@@ -449,6 +450,12 @@
 #define S_RTC_READS         "  RTC-læsninger: "
 #define S_L_RTC_DATE        "RTC-dato (2026 eller senere)"
 #define S_RTC_DATE_BAD      "  Dato før 2026: afladet batteri, eller uret er aldrig blevet stillet.\n"
+#define S_RTCSET_NOW        "\nUr (AICA-RTC): "
+#define S_RTCSET_ASK        "\n  ny dato og tid, ÅÅÅÅ-MM-DD TT:MM:SS (Enter = behold): "
+#define S_RTCSET_KEPT       "  uændret\n"
+#define S_RTCSET_BAD        "  ikke en gyldig dato og tid (1950 til 2085): intet ændret\n"
+#define S_RTCSET_OK         "  uret er stillet, det viser nu "
+#define S_RTCSET_FAIL       "  uret tog ikke den nye værdi, det viser "
 #define S_MAPLE_SKIP        "\nMaple/MIE-test sprunget over (hoved-RAM ubrugelig).\n"
 #define S_EEPROM_SKIP       "\nTest af indstillings-EEPROM sprunget over (ingen MIE).\n"
 #define S_EEPROM_MIE_NOTE   "  MIE-programmet returnerede ikke EEPROM'en\n"

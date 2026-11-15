@@ -327,6 +327,7 @@
                             "  j  test ingressi JVS (pulsanti, gettoniere, analogici)\n"\
                             "  m  schermata di test video (barre, griglia, grigi, purezza...)\n"\
                             "  !  monitor seriale (lettura/scrittura memoria, sblocco G1)\n"\
+                            "  t  impostare data e ora (solo questa console)\n"\
                             "  (maiuscole e minuscole sono uguali)\n"
 #define S_M_JVS             "Test ingressi JVS"
 #define S_M_PATTERN         "Schermata di test video"
@@ -449,6 +450,12 @@
 #define S_RTC_READS         "  Letture RTC: "
 #define S_L_RTC_DATE        "Data RTC (2026 o successiva)"
 #define S_RTC_DATE_BAD      "  Data anteriore al 2026: batteria scarica, o l'orologio non è mai stato impostato.\n"
+#define S_RTCSET_NOW        "\nOrologio (RTC dell'AICA): "
+#define S_RTCSET_ASK        "\n  nuova data e ora, AAAA-MM-GG HH:MM:SS (Invio = mantieni): "
+#define S_RTCSET_KEPT       "  invariato\n"
+#define S_RTCSET_BAD        "  data e ora non valide (dal 1950 al 2085): nulla è cambiato\n"
+#define S_RTCSET_OK         "  orologio impostato, ora indica "
+#define S_RTCSET_FAIL       "  l'orologio non ha accettato il nuovo valore, indica "
 #define S_MAPLE_SKIP        "\nTest Maple/MIE saltato (RAM principale inutilizzabile).\n"
 #define S_EEPROM_SKIP       "\nTest EEPROM impostazioni saltato (nessun MIE).\n"
 #define S_EEPROM_MIE_NOTE   "  il programma del MIE non ha restituito l'EEPROM\n"

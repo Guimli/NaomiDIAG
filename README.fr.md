@@ -664,6 +664,7 @@ Touches sur la console série :
 | `j` | test des entrées JVS — chaque contact, monnayeur et voie analogique, en direct |
 | `m` | mire vidéo |
 | `!` | moniteur série — lecture/écriture mémoire, statut G1 (console seulement, absent du menu à l'écran) |
+| `t` | régler la date et l'heure de la RTC de l'AICA, `AAAA-MM-JJ HH:MM:SS`, relue (console seulement) |
 
 À l'écran, le menu opérateur liste les mêmes actions : **TEST** (ou le TEST
 de la borne) les parcourt en bouclant ; **SERVICE** (ou le **START** du

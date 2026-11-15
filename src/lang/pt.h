@@ -326,6 +326,7 @@
                             "  j  teste de entradas JVS (botões, moedeiros, analógicos)\n"\
                             "  m  padrão de teste de vídeo (barras, grelha, cinzentos, pureza...)\n"\
                             "  !  monitor série (leitura/escrita de memória, desbloqueio G1)\n"\
+                            "  t  acertar a data e a hora (só esta consola)\n"\
                             "  (maiúsculas e minúsculas são iguais)\n"
 #define S_M_JVS             "Teste de entradas JVS"
 #define S_M_PATTERN         "Padrão de teste de vídeo"
@@ -448,6 +449,12 @@
 #define S_RTC_READS         "  Leituras do RTC: "
 #define S_L_RTC_DATE        "Data do RTC (2026 ou posterior)"
 #define S_RTC_DATE_BAD      "  Data anterior a 2026: pilha gasta, ou o relógio nunca foi acertado.\n"
+#define S_RTCSET_NOW        "\nRelógio (RTC do AICA): "
+#define S_RTCSET_ASK        "\n  nova data e hora, AAAA-MM-DD HH:MM:SS (Enter = manter): "
+#define S_RTCSET_KEPT       "  sem alteração\n"
+#define S_RTCSET_BAD        "  data e hora inválidas (1950 a 2085): nada foi alterado\n"
+#define S_RTCSET_OK         "  relógio acertado, indica agora "
+#define S_RTCSET_FAIL       "  o relógio não aceitou o novo valor, indica "
 #define S_MAPLE_SKIP        "\nTeste Maple/MIE saltado (RAM principal inutilizável).\n"
 #define S_EEPROM_SKIP       "\nTeste da EEPROM de definições saltado (sem MIE).\n"
 #define S_EEPROM_MIE_NOTE   "  o programa do MIE não devolveu a EEPROM\n"

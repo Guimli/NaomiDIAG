@@ -329,6 +329,7 @@
                             "  j  JVS输入测试 (按钮、投币口、模拟量)\n"\
                             "  m  视频测试图 (彩条、交叉线、灰阶、纯度...)\n"\
                             "  !  串口监视器 (内存读写、G1解锁)\n"\
+                            "  t  设置日期和时间 (仅限本控制台)\n"\
                             "  (大小写相同)\n"
 #define S_M_JVS             "JVS输入测试"
 #define S_M_PATTERN         "视频测试图"
@@ -451,6 +452,12 @@
 #define S_RTC_READS         "  RTC读数: "
 #define S_L_RTC_DATE        "RTC日期 (2026年或以后)"
 #define S_RTC_DATE_BAD      "  日期早于2026年: 电池耗尽, 或时钟从未设置。\n"
+#define S_RTCSET_NOW        "\n时钟 (AICA RTC): "
+#define S_RTCSET_ASK        "\n  新的日期和时间 YYYY-MM-DD HH:MM:SS (回车 = 保持): "
+#define S_RTCSET_KEPT       "  未更改\n"
+#define S_RTCSET_BAD        "  日期时间无效 (1950至2085年): 未作更改\n"
+#define S_RTCSET_OK         "  时钟已设置, 现在显示 "
+#define S_RTCSET_FAIL       "  时钟未接受新值, 现在显示 "
 #define S_MAPLE_SKIP        "\n跳过Maple/MIE测试 (主RAM不可用)。\n"
 #define S_EEPROM_SKIP       "\n跳过设置EEPROM测试 (没有MIE)。\n"
 #define S_EEPROM_MIE_NOTE   "  MIE程序未返回EEPROM内容\n"

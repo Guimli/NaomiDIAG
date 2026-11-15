@@ -301,3 +301,50 @@ u32 rtc_now(void)
 {
     return rtc_read();
 }
+
+/* Seconds since 1950 for a calendar date, or 0xFFFFFFFF if it is not one
+ * (or past what the 32-bit counter holds, early 2086). */
+u32 rtc_from_date(u32 y, u32 mo, u32 d, u32 hh, u32 mi, u32 ss)
+{
+    static const unsigned char mlen[12] =
+        { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    if (y < 1950u || y > 2085u || mo < 1u || mo > 12u || d < 1u ||
+        hh > 23u || mi > 59u || ss > 59u)
+        return 0xFFFFFFFFu;
+    u32 leap = (y % 4u) == 0u && ((y % 100u) != 0u || (y % 400u) == 0u);
+    if (d > mlen[mo - 1u] + ((mo == 2u && leap) ? 1u : 0u))
+        return 0xFFFFFFFFu;
+    u32 days = 0;
+    for (u32 yy = 1950u; yy < y; yy++)
+        days += ((yy % 4u) == 0u && ((yy % 100u) != 0u || (yy % 400u) == 0u))
+                ? 366u : 365u;
+    for (u32 m = 1u; m < mo; m++)
+        days += mlen[m - 1u] + ((m == 2u && leap) ? 1u : 0u);
+    days += d - 1u;
+    return days * 86400u + hh * 3600u + mi * 60u + ss;
+}
+
+/* Set the counter: write enable (0x00710008 = 1), then the high and low
+ * halves. Which write drops the enable differs between accounts (the low
+ * one for KallistiOS's rtc_set, the high one under MAME, where the low half
+ * was then ignored), so it is raised again before each half. Read back:
+ * 1 if it holds the value (or one second more); a carry between the two
+ * halves is caught there and the write done again. */
+#define RTC_WE      REG32(0xA0710008u)
+u32 rtc_set(u32 secs)
+{
+    for (u32 tries = 0; tries < 3; tries++) {
+        aica_g2_wait();
+        RTC_WE = 1;
+        aica_g2_wait();
+        RTC_HI = secs >> 16;
+        aica_g2_wait();
+        RTC_WE = 1;
+        aica_g2_wait();
+        RTC_LO = secs & 0xFFFFu;
+        u32 now = rtc_read();
+        if (now == secs || now == secs + 1u)
+            return 1;
+    }
+    return 0;
+}
