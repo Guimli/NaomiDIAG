@@ -2417,8 +2417,37 @@ static void test_naomi2_ram(void)
     u32 ok = 1;
     pvr2_access access = pvr2_prepare();
     if (access != PVR2_READY) {
+        /* The probe's wrong reads name chips, the way a bus test does: on
+         * the screen as well, not only in the serial lines below. A wrong
+         * read in A (the reference) names A's chips, never B's. */
+        const comp_map *pc = 0;
+        u32 pmask = 0;
+        if (access == PVR2_MAPPING || access == PVR2_A_REFERENCE ||
+            access == PVR2_B_SILENT) {
+            u32 n;
+            const pvr2_probe_sample *sm = pvr2_probe_samples(&n);
+            for (u32 i = 0; i < n; i++) {
+                u32 a = sm[i].addr, x = sm[i].expected ^ sm[i].observed;
+                if (!x)
+                    continue;
+                const comp_map *c = a >= VRAM_PVRB_BASE ? pvrb_comps :
+                                    a >= VRAM_TEX1_BASE ? tex1_comps : tex0_comps;
+                if ((access == PVR2_A_REFERENCE) != (c != pvrb_comps))
+                    continue;           /* the other GPU's window */
+                if (pc && c != pc)
+                    continue;           /* one table per result line */
+                pc = c;
+                pmask |= vram_chip_mask(a, x);
+            }
+        }
+        if (!pmask)
+            pc = 0;
         log_result(access == PVR2_A_REFERENCE ? S_L_PVRA_REFERENCE : S_L_PVRB_ACCESS,
-                   CLIP_NONE, T_FAIL, 0, 0);
+                   pc == pvrb_comps ? CLIP_VRAM_B : pc ? CLIP_VRAM : CLIP_NONE,
+                   T_FAIL, pmask, IC(pc));
+        if (pmask)
+            report_comps(access == PVR2_A_REFERENCE ? S_L_PVRA_REFERENCE : S_L_PVRB_ACCESS,
+                         pmask, IC(pc));
         scif_puts(S_PVRB_SKIP);
         scif_putdec((u32)access);
         scif_puts("\n");
