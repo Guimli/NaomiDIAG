@@ -281,8 +281,9 @@ take long enough that they have no business delaying the report.
     the port; a transfer that never completes switches to the port, and a
     chip found bad (or a cart found unknown) through the DMA is read again
     through the port before any verdict. The log gives the time of 8 KB
-    both ways. *Not yet validated on real hardware* (MAME models neither
-    speed).
+    both ways. Measured on a real Naomi 2 (VIRTUA STRIKER 3): 8 KB in
+    1 ms by DMA against 16 ms by the port, the 172 MB of the 12 chips
+    hashed in 37.5 s (about 4.6 MB/s), 42 s from the header to the verdict.
   - **ROM set completeness** — once the game is identified, the
     **whole set of chips that game needs** is checked: every mask ROM in the
     database entry is probed and the result is stated affirmatively

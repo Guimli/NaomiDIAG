@@ -310,8 +310,9 @@ soit elles durent assez pour n'avoir rien à faire devant le rapport.
     lus par le port ; un transfert qui n'aboutit pas bascule sur le port, et
     une puce trouvée mauvaise (ou une cartouche inconnue) par le DMA est
     relue par le port avant tout verdict. Le log donne le temps de 8 Ko par
-    les deux voies. *Pas encore validé sur vrai matériel* (MAME ne simule
-    aucune des deux vitesses).
+    les deux voies. Mesuré sur une vraie Naomi 2 (VIRTUA STRIKER 3) : 8 Ko
+    en 1 ms par DMA contre 16 ms par le port, les 172 Mo des 12 puces hachés
+    en 37,5 s (environ 4,6 Mo/s), 42 s de l'en-tête au verdict.
   - **Complétude du jeu de ROM** — une fois le jeu identifié,
     **l'ensemble des puces nécessaires à ce jeu** est vérifié : chaque mask
     ROM de la fiche de la base est sondée et le résultat est affirmé
